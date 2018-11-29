@@ -48,7 +48,7 @@ classdef ETKF < handle
             obj.P = P_curr;
         end
         
-        function [x_curr,P_curr] = update(obj,meas)
+        function [x_curr,P_curr] = update(obj,meas,loc)
             for i=1:size(meas,2)
                 
                 % extract actual measurement
@@ -57,14 +57,14 @@ classdef ETKF < handle
                 % loop through elements of measurement
                 for j=1:size(meas_val,1)
                     % compute predicted measurement and innovation
-                    meas_pred = obj.H(j,:)*obj.x;
+                    meas_pred = obj.H(loc+j-1,:)*obj.x;
                     innov = meas_val(j) - meas_pred;
                     
                     % if surprising enough, perform explicit update
                     if abs(innov) > obj.delta
-                        [x_curr,P_curr] = obj.explicit_update(meas_val(j),j);
+                        [x_curr,P_curr] = obj.explicit_update(meas_val(j),j+loc-1);
                     elseif abs(innov) <= obj.delta
-                        [x_curr,P_curr] = obj.implicit_update(meas_val(j),j);
+                        [x_curr,P_curr] = obj.implicit_update(meas_val(j),j+loc-1);
                     end
                 end
    
@@ -84,7 +84,7 @@ classdef ETKF < handle
             x_curr = obj.x + K*innov;
             % update covariance
             P_curr = (eye(size(obj.F,1))-K*obj.H(i,:))*obj.P;
-
+            
             % update filter values
             obj.x = x_curr;
             obj.P = P_curr;

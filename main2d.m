@@ -81,10 +81,10 @@ P0 = eye(4);
 kf = KF(F,G,H,M,Q,R,x0,P0);
 
 % create ETFK observer objects
-delta = 0;
-R = [5 0; 0 40];
+delta = 4;
+R = [5 0; 0 400];
 obs1 = ETKF(F,G,H,M,Q,R,x0,P0,delta);
-R = [20 0; 0 5];
+R = [200 0; 0 5];
 obs2 = ETKF(F,G,H,M,Q,R,x0,P0,delta);
 
 % run filters
@@ -179,15 +179,20 @@ hold on; grid on;
 plot(x_true_vec(1,:),x_true_vec(3,:),'k')
 plot(x_est_et_obs1(1,:),x_est_et_obs1(3,:))
 plot(x_est_et_obs2(1,:),x_est_et_obs2(3,:))
-for i=1:10:length(x_est(1,:))
-    error_ellipse(squeeze(P_est_et_obs1([1,3],[1,3],i)),[x_est_et_obs1(1,i), x_est_et_obs1(3,i)]);
-    error_ellipse(squeeze(P_est_et_obs2([1,3],[1,3],i)),[x_est_et_obs2(1,i), x_est_et_obs2(3,i)]);
-    [xc,Pc] = covar_intersect([x_est_et_obs1(1,i); x_est_et_obs1(3,i)],...
-                                [x_est_et_obs2(1,i); x_est_et_obs2(3,i)],...
-                                squeeze(P_est_et_obs1([1,3],[1,3],i)),...
-                                squeeze(P_est_et_obs2([1,3],[1,3],i)));
-    error_ellipse(Pc,xc);
+for i=1:1:length(x_est(1,:))
+%     error_ellipse(squeeze(P_est_et_obs1([1,3],[1,3],i)),[x_est_et_obs1(1,i), x_est_et_obs1(3,i)]);
+%     error_ellipse(squeeze(P_est_et_obs2([1,3],[1,3],i)),[x_est_et_obs2(1,i), x_est_et_obs2(3,i)]);
+%     [xc,Pc] = covar_intersect([x_est_et_obs1(1,i); x_est_et_obs1(3,i)],...
+%                                 [x_est_et_obs2(1,i); x_est_et_obs2(3,i)],...
+%                                 squeeze(P_est_et_obs1([1,3],[1,3],i)),...
+%                                 squeeze(P_est_et_obs2([1,3],[1,3],i)));
+    [xc,Pc] = covar_intersect(x_est_et_obs1(:,i),x_est_et_obs2(:,i),...
+                            squeeze(P_est_et_obs1(:,:,i)),squeeze(P_est_et_obs2(:,:,i)));
+%     error_ellipse(Pc,xc);
+    x_est_et_fused(:,i) = xc;
+    P_est_et_fused(:,:,i) = Pc;
 end
+plot(x_est_et_fused(1,:),x_est_et_fused(3,:))
 axis equal
 
 
@@ -307,3 +312,71 @@ ylabel('Vel error [m]')
 title(['ETKF est Y velocity error and covariance with \delta=',num2str(delta)...
     ,', ',num2str(obs2.msg_sent),'/',num2str(length(input_tvec)*size(H,1)),' msgs'])
 legend('ETKF est','\pm 2\sigma','','truth','KF est')
+
+%% fused performance
+
+figure
+
+subplot(2,2,1)
+hold on; grid on;
+plot(input_tvec,x_est_et_fused(1,:) - x_true_vec(1,:))
+plot(input_tvec,x_est_et_obs1(1,:) - x_true_vec(1,:))
+plot(input_tvec,x_est_et_obs2(1,:) - x_true_vec(1,:))
+plot_xpos_cov_et_fused(:) = sqrt(P_est_et_fused(1,1,:));
+plot(input_tvec,x_est_et_fused(1,:) - x_true_vec(1,:) + 2*plot_xpos_cov_et_fused,'r--')
+plot(input_tvec,x_est_et_fused(1,:) - x_true_vec(1,:) - 2*plot_xpos_cov_et_fused,'r--')
+plot(input_tvec,zeros(length(input_tvec),1),'-.k')
+plot(input_tvec,x_est(1,:) - x_true_vec(1,:),'-.g')
+xlabel('Time [s]')
+ylabel('Pos error [m]')
+title(['Fused est X position error and covariance with \delta=',num2str(delta)...
+    ,', ',num2str(obs2.msg_sent),'/',num2str(length(input_tvec)*size(H,1)),' msgs'])
+legend('Fused est','Obs1 est','Obs2 est','\pm 2\sigma','truth','','KF est')
+
+subplot(2,2,2)
+hold on; grid on;
+plot(input_tvec,x_est_et_fused(2,:) - x_true_vec(2,:))
+plot(input_tvec,x_est_et_obs1(2,:) - x_true_vec(2,:))
+plot(input_tvec,x_est_et_obs2(2,:) - x_true_vec(2,:))
+plot_xvel_cov_et_fused(:) = sqrt(P_est_et_fused(2,2,:));
+plot(input_tvec,x_est_et_fused(2,:) - x_true_vec(2,:) + 2*plot_xvel_cov_et_fused,'r--')
+plot(input_tvec,x_est_et_fused(2,:) - x_true_vec(2,:) - 2*plot_xvel_cov_et_fused,'r--')
+plot(input_tvec,zeros(length(input_tvec),1),'-.k')
+plot(input_tvec,x_est(2,:) - x_true_vec(2,:),'-.g')
+xlabel('Time [s]')
+ylabel('Vel error [m]')
+title(['Fused est X velocity error and covariance with \delta=',num2str(delta)...
+    ,', ',num2str(obs2.msg_sent),'/',num2str(length(input_tvec)*size(H,1)),' msgs'])
+legend('Fused est','Obs1 est','Obs2 est','\pm 2\sigma','truth','','KF est')
+
+subplot(2,2,3)
+hold on; grid on;
+plot(input_tvec,x_est_et_fused(3,:) - x_true_vec(3,:))
+plot(input_tvec,x_est_et_obs1(3,:) - x_true_vec(3,:))
+plot(input_tvec,x_est_et_obs2(3,:) - x_true_vec(3,:))
+plot_ypos_cov_et_fused(:) = sqrt(P_est_et_fused(3,3,:));
+plot(input_tvec,x_est_et_fused(3,:) - x_true_vec(3,:) + 2*plot_ypos_cov_et_fused,'r--')
+plot(input_tvec,x_est_et_fused(3,:) - x_true_vec(3,:) - 2*plot_ypos_cov_et_fused,'r--')
+plot(input_tvec,zeros(length(input_tvec),1),'-.k')
+plot(input_tvec,x_est(3,:) - x_true_vec(3,:),'-.g')
+xlabel('Time [s]')
+ylabel('Pos error [m]')
+title(['Fused est Y position error and covariance with \delta=',num2str(delta)...
+    ,', ',num2str(obs2.msg_sent),'/',num2str(length(input_tvec)*size(H,1)),' msgs'])
+legend('Fused est','Obs1 est','Obs2 est','\pm 2\sigma','truth','','KF est')
+
+subplot(2,2,4)
+hold on; grid on;
+plot(input_tvec,x_est_et_fused(4,:) - x_true_vec(4,:))
+plot(input_tvec,x_est_et_obs1(4,:) - x_true_vec(4,:))
+plot(input_tvec,x_est_et_obs2(4,:) - x_true_vec(4,:))
+plot_yvel_cov_et_fused(:) = sqrt(P_est_et_fused(4,4,:));
+plot(input_tvec,x_est_et_fused(4,:) - x_true_vec(4,:) + 2*plot_yvel_cov_et_fused,'r--')
+plot(input_tvec,x_est_et_fused(4,:) - x_true_vec(4,:) - 2*plot_yvel_cov_et_fused,'r--')
+plot(input_tvec,zeros(length(input_tvec),1),'-.k')
+plot(input_tvec,x_est(4,:) - x_true_vec(4,:),'-.g')
+xlabel('Time [s]')
+ylabel('Vel error [m]')
+title(['Fused est Y velocity error and covariance with \delta=',num2str(delta)...
+    ,', ',num2str(obs2.msg_sent),'/',num2str(length(input_tvec)*size(H,1)),' msgs'])
+legend('Fused est','Obs1 est','Obs2 est','\pm 2\sigma','truth','','KF est')
