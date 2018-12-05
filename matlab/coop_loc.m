@@ -84,7 +84,7 @@ P01 = eye(8);
 agent1 = ETKF(F,G,H,M,Q,R,x01,P01,delta);
 
 % agent 1 common information
-delta = 0;
+delta = 6.25;
 x01 = [zeros(4,1);[30,0,30,0]'];
 P01 = eye(8);
 agent1_common = ETKF(F,G,H,M,Q,R,x01,P01,delta);
@@ -96,7 +96,7 @@ P02 = eye(8);
 agent2 = ETKF(F,G,H,M,Q,R,x02,P02,delta);
 
 % agent 2 common information
-delta = 0;
+delta = 6.25;
 tau = 100;
 x02 = [zeros(4,1);[30,0,30,0]'];
 P02 = eye(8);
@@ -107,6 +107,9 @@ x_est_1(:,1) = x01; P_est_1(:,:,1) = P01;
 x_est_2(:,1) = x02; P_est_2(:,:,1) = P02;
 x_est_1_common(:,1) = x01; P_est_1_common(:,:,1) = P01;
 x_est_2_common(:,1) = x02; P_est_2_common(:,:,1) = P02;
+
+ci_trigger_cnt = 0;
+total_cnt = 0;
 
 for i = 2:length(input_tvec)
     
@@ -146,15 +149,30 @@ for i = 2:length(input_tvec)
         x_est_1_common(:,i) = xc; P_est_1_common(:,:,i) = Pc;
         x_est_2_common(:,i) = xc; P_est_2_common(:,:,i) = Pc;
         
-        disp('CI triggered')
+        ci_trigger_cnt = ci_trigger_cnt + 1;
     end
+    total_cnt = total_cnt + 1;
         
 end
+
+fprintf('total ci triggers, %i\n',ci_trigger_cnt)
+fprintf('msgs sent to agent 1 by type: %i %i %i %i %i %i %i %i\n',...
+        agent1_common.msg_sent(1),agent1_common.msg_sent(2),agent1_common.msg_sent(3),...
+        agent1_common.msg_sent(4),agent1_common.msg_sent(5),agent1_common.msg_sent(6),...
+        agent1_common.msg_sent(7),agent1_common.msg_sent(8))
+fprintf('msgs sent to agent 2 by type: %i %i %i %i %i %i %i %i\n',...
+        agent2_common.msg_sent(1),agent2_common.msg_sent(2),agent2_common.msg_sent(3),...
+        agent2_common.msg_sent(4),agent2_common.msg_sent(5),agent2_common.msg_sent(6),...
+        agent2_common.msg_sent(7),agent2_common.msg_sent(8))
 
 figure
 hold on; grid on;
 plot(x_true1_vec(1,:),x_true1_vec(3,:))
 plot(x_true2_vec(1,:),x_true2_vec(3,:))
+legend('Agent 1','Agent 2')
+xlabel('x [m]')
+ylabel('y [m]')
+title('Plaftorm trajectories')
 
 figure
 
@@ -163,77 +181,83 @@ figure
 % agent 1 plots
 
 % x pos
-subplot(2,2,1)
+subplot(4,1,1)
 hold on; grid on;
 plot(input_tvec,x_est_1(1,:) - x_true1_vec(1,:))
 plot_xpos_cov_1(:) = sqrt(P_est_1(1,1,:));
-plot(input_tvec,x_est_1(1,:) - x_true1_vec(1,:) + 2*plot_xpos_cov_1,'r--')
-plot(input_tvec,x_est_1(1,:) - x_true1_vec(1,:) - 2*plot_xpos_cov_1,'r--')
+plot(input_tvec,2*plot_xpos_cov_1,'r--')
+plot(input_tvec,-2*plot_xpos_cov_1,'r--')
+fill([input_tvec flip(input_tvec)],[2*plot_xpos_cov_1 -2*plot_xpos_cov_1],'r','LineStyle','none')
+alpha(0.25)
 plot(input_tvec,zeros(length(input_tvec),1),'-.k')
-plot(input_tvec,x_base(1,:) - x_true1_vec(1,:),'-.g')
+plot(input_tvec,x_base(1,:) - x_true1_vec(1,:),'-.m')
 % plot(input_tvec,x_est_2(1,:) - x_true1_vec(1,:))
 plot(input_tvec,x_est_2_common(1,:) - x_true1_vec(1,:))
-plot(input_tvec,x_est_2_common(1,:) - x_true1_vec(1,:) + 2*sqrt(squeeze(P_est_2_common(1,1,:))'),'m--')
-plot(input_tvec,x_est_2_common(1,:) - x_true1_vec(1,:) - 2*sqrt(squeeze(P_est_2_common(1,1,:))'),'m--')
+plot(input_tvec,2*sqrt(squeeze(P_est_2_common(1,1,:))'),'g--')
+plot(input_tvec,-2*sqrt(squeeze(P_est_2_common(1,1,:))'),'g--')
+fill([input_tvec flip(input_tvec)],[2*sqrt(squeeze(P_est_2_common(1,1,:))')-2*plot_xpos_cov_1+2*plot_xpos_cov_1 zeros(size(-2*sqrt(squeeze(P_est_2_common(1,1,:))')))],'g','LineStyle','none')
+alpha(0.25)
+fill([input_tvec flip(input_tvec)],[-2*sqrt(squeeze(P_est_2_common(1,1,:))')+2*plot_xpos_cov_1 zeros(size(-2*sqrt(squeeze(P_est_2_common(1,1,:))')))],'g','LineStyle','none')
+alpha(0.25)
 xlabel('Time [s]')
 ylabel('Pos error [m]')
 title(['Agent1 est X position error and covariance with \delta=',num2str(delta)...
-    ,', ',num2str(agent1_common.msg_sent),'/',num2str(length(input_tvec)*size(H,1)),' msgs'])
+    ,', ',num2str(sum(agent1_common.msg_sent)),'/',num2str(length(input_tvec)*size(H,1)),' msgs'])
 legend('Agent1 est','\pm 2\sigma','','truth','KF est','Agent2 common est','common \pm 2\sigma')
 
 % x velocity
-subplot(2,2,2)
+subplot(4,1,2)
 hold on; grid on;
 plot(input_tvec,x_est_1(2,:) - x_true1_vec(2,:))
 plot_xvel_cov_1(:) = sqrt(P_est_1(2,2,:));
-plot(input_tvec,x_est_1(2,:) - x_true1_vec(2,:) + 2*plot_xvel_cov_1,'r--')
-plot(input_tvec,x_est_1(2,:) - x_true1_vec(2,:) - 2*plot_xvel_cov_1,'r--')
+plot(input_tvec,2*plot_xvel_cov_1,'r--')
+plot(input_tvec,-2*plot_xvel_cov_1,'r--')
 plot(input_tvec,zeros(length(input_tvec),1),'-.k')
-plot(input_tvec,x_base(2,:) - x_true1_vec(2,:),'-.g')
+plot(input_tvec,x_base(2,:) - x_true1_vec(2,:),'-.m')
 % plot(input_tvec,x_est_2(2,:) - x_true1_vec(2,:))
 plot(input_tvec,x_est_2_common(2,:) - x_true1_vec(2,:))
-plot(input_tvec,x_est_2_common(2,:) - x_true1_vec(2,:) + 2*sqrt(squeeze(P_est_2_common(2,2,:))'),'m--')
-plot(input_tvec,x_est_2_common(2,:) - x_true1_vec(2,:) - 2*sqrt(squeeze(P_est_2_common(2,2,:))'),'m--')
+plot(input_tvec,2*sqrt(squeeze(P_est_2_common(2,2,:))'),'g--')
+plot(input_tvec,-2*sqrt(squeeze(P_est_2_common(2,2,:))'),'g--')
 xlabel('Time [s]')
 ylabel('Vel error [m/s]')
 title(['Agent1 est X velocity error and covariance with \delta=',num2str(delta)...
-    ,', ',num2str(agent1_common.msg_sent),'/',num2str(length(input_tvec)*size(H,1)),' msgs'])
+    ,', ',num2str(sum(agent1_common.msg_sent)),'/',num2str(length(input_tvec)*size(H,1)),' msgs'])
 legend('Agent1 est','\pm 2\sigma','','truth','KF est','Agent2 common est','common \pm 2\sigma')
 
-subplot(2,2,3)
+subplot(4,1,3)
 hold on; grid on;
 plot(input_tvec,x_est_1(3,:) - x_true1_vec(3,:))
 plot_ypos_cov_1(:) = sqrt(P_est_1(3,3,:));
-plot(input_tvec,x_est_1(3,:) - x_true1_vec(3,:) + 2*plot_ypos_cov_1,'r--')
-plot(input_tvec,x_est_1(3,:) - x_true1_vec(3,:) - 2*plot_ypos_cov_1,'r--')
+plot(input_tvec,2*plot_ypos_cov_1,'r--')
+plot(input_tvec,-2*plot_ypos_cov_1,'r--')
 plot(input_tvec,zeros(length(input_tvec),1),'-.k')
-plot(input_tvec,x_base(3,:) - x_true1_vec(3,:),'-.g')
+plot(input_tvec,x_base(3,:) - x_true1_vec(3,:),'-.m')
 % plot(input_tvec,x_est_2(3,:) - x_true1_vec(3,:))
 plot(input_tvec,x_est_2_common(3,:) - x_true1_vec(3,:))
-plot(input_tvec,x_est_2_common(3,:) - x_true1_vec(3,:) + 2*sqrt(squeeze(P_est_2_common(3,3,:))'),'m--')
-plot(input_tvec,x_est_2_common(3,:) - x_true1_vec(3,:) - 2*sqrt(squeeze(P_est_2_common(3,3,:))'),'m--')
+plot(input_tvec,2*sqrt(squeeze(P_est_2_common(3,3,:))'),'g--')
+plot(input_tvec,-2*sqrt(squeeze(P_est_2_common(3,3,:))'),'g--')
 xlabel('Time [s]')
 ylabel('Pos error [m]')
 title(['Agent1 est Y position error and covariance with \delta=',num2str(delta)...
-    ,', ',num2str(agent1_common.msg_sent),'/',num2str(length(input_tvec)*size(H,1)),' msgs'])
+    ,', ',num2str(sum(agent1_common.msg_sent)),'/',num2str(length(input_tvec)*size(H,1)),' msgs'])
 legend('Agent1 est','\pm 2\sigma','','truth','KF est','Agent2 common est','common \pm 2\sigma')
 
-subplot(2,2,4)
+subplot(4,1,4)
 hold on; grid on;
 plot(input_tvec,x_est_1(4,:) - x_true1_vec(4,:))
 plot_yvel_cov_1(:) = sqrt(P_est_1(4,4,:));
-plot(input_tvec,x_est_1(4,:) - x_true1_vec(4,:) + 2*plot_yvel_cov_1,'r--')
-plot(input_tvec,x_est_1(4,:) - x_true1_vec(4,:) - 2*plot_yvel_cov_1,'r--')
+plot(input_tvec,2*plot_yvel_cov_1,'r--')
+plot(input_tvec,-2*plot_yvel_cov_1,'r--')
 plot(input_tvec,zeros(length(input_tvec),1),'-.k')
-plot(input_tvec,x_base(4,:) - x_true1_vec(4,:),'-.g')
+plot(input_tvec,x_base(4,:) - x_true1_vec(4,:),'-.m')
 % plot(input_tvec,x_est_2(4,:) - x_true1_vec(4,:))
 plot(input_tvec,x_est_2_common(4,:) - x_true1_vec(4,:))
-plot(input_tvec,x_est_2_common(4,:) - x_true1_vec(4,:) + 2*sqrt(squeeze(P_est_2_common(4,4,:))'),'m--')
-plot(input_tvec,x_est_2_common(4,:) - x_true1_vec(4,:) - 2*sqrt(squeeze(P_est_2_common(4,4,:))'),'m--')
+plot(input_tvec,2*sqrt(squeeze(P_est_2_common(4,4,:))'),'g--')
+plot(input_tvec,-2*sqrt(squeeze(P_est_2_common(4,4,:))'),'g--')
 xlabel('Time [s]')
 ylabel('Vel error [m]')
 title(['Agent1 est Y velocity error and covariance with \delta=',num2str(delta)...
-    ,', ',num2str(agent1_common.msg_sent),'/',num2str(length(input_tvec)*size(H,1)),' msgs'])
+    ,', ',num2str(sum(agent1_common.msg_sent)),'/',num2str(length(input_tvec)*size(H,1)),' msgs'])
 legend('Agent1 est','\pm 2\sigma','','truth','KF est','Agent2 common est','common \pm 2\sigma')
 
 % agent 2 plots
@@ -241,75 +265,75 @@ legend('Agent1 est','\pm 2\sigma','','truth','KF est','Agent2 common est','commo
 figure
 
 % x pos
-subplot(2,2,1)
+subplot(4,1,1)
 hold on; grid on;
 plot(input_tvec,x_est_2(5,:) - x_true2_vec(1,:))
 plot_xpos_cov_2(:) = sqrt(P_est_2(5,5,:));
-plot(input_tvec,x_est_2(5,:) - x_true2_vec(1,:) + 2*plot_xpos_cov_2,'r--')
-plot(input_tvec,x_est_2(5,:) - x_true2_vec(1,:) - 2*plot_xpos_cov_2,'r--')
+plot(input_tvec,2*plot_xpos_cov_2,'r--')
+plot(input_tvec,-2*plot_xpos_cov_2,'r--')
 plot(input_tvec,zeros(length(input_tvec),1),'-.k')
-plot(input_tvec,x_base(5,:) - x_true2_vec(1,:),'-.g')
+plot(input_tvec,x_base(5,:) - x_true2_vec(1,:),'-.m')
 % plot(input_tvec,x_est_1(5,:) - x_true2_vec(1,:))
 plot(input_tvec,x_est_1_common(5,:) - x_true2_vec(1,:))
-plot(input_tvec,x_est_1_common(5,:) - x_true2_vec(1,:) + 2*sqrt(squeeze(P_est_1_common(5,5,:))'),'m--')
-plot(input_tvec,x_est_1_common(5,:) - x_true2_vec(1,:) - 2*sqrt(squeeze(P_est_1_common(5,5,:))'),'m--')
+plot(input_tvec,2*sqrt(squeeze(P_est_1_common(5,5,:))'),'g--')
+plot(input_tvec,-2*sqrt(squeeze(P_est_1_common(5,5,:))'),'g--')
 xlabel('Time [s]')
 ylabel('Pos error [m]')
 title(['Agent2 est X position error and covariance with \delta=',num2str(delta)...
-    ,', ',num2str(agent2_common.msg_sent),'/',num2str(length(input_tvec)*size(H,1)),' msgs'])
+    ,', ',num2str(sum(agent2_common.msg_sent)),'/',num2str(length(input_tvec)*size(H,1)),' msgs'])
 legend('Agent2 est','\pm 2\sigma','','truth','KF est','Agent1 common est','common \pm 2\sigma')
 
 % x velocity
-subplot(2,2,2)
+subplot(4,1,2)
 hold on; grid on;
 plot(input_tvec,x_est_2(6,:) - x_true2_vec(2,:))
 plot_xvel_cov_2(:) = sqrt(P_est_2(6,6,:));
-plot(input_tvec,x_est_2(6,:) - x_true2_vec(2,:) + 2*plot_xvel_cov_2,'r--')
-plot(input_tvec,x_est_2(6,:) - x_true2_vec(2,:) - 2*plot_xvel_cov_2,'r--')
+plot(input_tvec,2*plot_xvel_cov_2,'r--')
+plot(input_tvec,-2*plot_xvel_cov_2,'r--')
 plot(input_tvec,zeros(length(input_tvec),1),'-.k')
-plot(input_tvec,x_base(6,:) - x_true2_vec(2,:),'-.g')
+plot(input_tvec,x_base(6,:) - x_true2_vec(2,:),'-.m')
 % plot(input_tvec,x_est_1(6,:) - x_true2_vec(2,:))
 plot(input_tvec,x_est_1_common(6,:) - x_true2_vec(2,:))
-plot(input_tvec,x_est_1_common(6,:) - x_true2_vec(2,:) + 2*sqrt(squeeze(P_est_1_common(6,6,:))'),'m--')
-plot(input_tvec,x_est_1_common(6,:) - x_true2_vec(2,:) - 2*sqrt(squeeze(P_est_1_common(6,6,:))'),'m--')
+plot(input_tvec,2*sqrt(squeeze(P_est_1_common(6,6,:))'),'g--')
+plot(input_tvec,-2*sqrt(squeeze(P_est_1_common(6,6,:))'),'g--')
 xlabel('Time [s]')
 ylabel('Vel error [m/s]')
 title(['Agent2 est X velocity error and covariance with \delta=',num2str(delta)...
-    ,', ',num2str(agent2_common.msg_sent),'/',num2str(length(input_tvec)*size(H,1)),' msgs'])
+    ,', ',num2str(sum(agent2_common.msg_sent)),'/',num2str(length(input_tvec)*size(H,1)),' msgs'])
 legend('Agent2 est','\pm 2\sigma','','truth','KF est','Agent1 common est','common \pm 2\sigma')
 
-subplot(2,2,3)
+subplot(4,1,3)
 hold on; grid on;
 plot(input_tvec,x_est_2(7,:) - x_true2_vec(3,:))
 plot_ypos_cov_2(:) = sqrt(P_est_2(7,7,:));
-plot(input_tvec,x_est_2(7,:) - x_true2_vec(3,:) + 2*plot_ypos_cov_2,'r--')
-plot(input_tvec,x_est_2(7,:) - x_true2_vec(3,:) - 2*plot_ypos_cov_2,'r--')
+plot(input_tvec,2*plot_ypos_cov_2,'r--')
+plot(input_tvec,-2*plot_ypos_cov_2,'r--')
 plot(input_tvec,zeros(length(input_tvec),1),'-.k')
-plot(input_tvec,x_base(7,:) - x_true2_vec(3,:),'-.g')
+plot(input_tvec,x_base(7,:) - x_true2_vec(3,:),'-.m')
 % plot(input_tvec,x_est_1(7,:) - x_true2_vec(3,:))
 plot(input_tvec,x_est_1_common(7,:) - x_true2_vec(3,:))
-plot(input_tvec,x_est_1_common(7,:) - x_true2_vec(3,:) + 2*sqrt(squeeze(P_est_1_common(7,7,:))'),'m--')
-plot(input_tvec,x_est_1_common(7,:) - x_true2_vec(3,:) - 2*sqrt(squeeze(P_est_1_common(7,7,:))'),'m--')
+plot(input_tvec,2*sqrt(squeeze(P_est_1_common(7,7,:))'),'g--')
+plot(input_tvec,-2*sqrt(squeeze(P_est_1_common(7,7,:))'),'g--')
 xlabel('Time [s]')
 ylabel('Pos error [m]')
 title(['Agent2 est Y position error and covariance with \delta=',num2str(delta)...
-    ,', ',num2str(agent2_common.msg_sent),'/',num2str(length(input_tvec)*size(H,1)),' msgs'])
+    ,', ',num2str(sum(agent2_common.msg_sent)),'/',num2str(length(input_tvec)*size(H,1)),' msgs'])
 legend('Agent2 est','\pm 2\sigma','','truth','KF est','Agent1 common est','common \pm 2\sigma')
 
-subplot(2,2,4)
+subplot(4,1,4)
 hold on; grid on;
 plot(input_tvec,x_est_2(8,:) - x_true2_vec(4,:))
 plot_yvel_cov_2(:) = sqrt(P_est_2(8,8,:));
-plot(input_tvec,x_est_2(8,:) - x_true2_vec(4,:) + 2*plot_yvel_cov_2,'r--')
-plot(input_tvec,x_est_2(8,:) - x_true2_vec(4,:) - 2*plot_yvel_cov_2,'r--')
+plot(input_tvec,2*plot_yvel_cov_2,'r--')
+plot(input_tvec,-2*plot_yvel_cov_2,'r--')
 plot(input_tvec,zeros(length(input_tvec),1),'-.k')
-plot(input_tvec,x_base(8,:) - x_true2_vec(4,:),'-.g')
+plot(input_tvec,x_base(8,:) - x_true2_vec(4,:),'-.m')
 % plot(input_tvec,x_est_1(8,:) - x_true2_vec(4,:))
 plot(input_tvec,x_est_1_common(8,:) - x_true2_vec(4,:))
-plot(input_tvec,x_est_1_common(8,:) - x_true2_vec(4,:) + 2*sqrt(squeeze(P_est_1_common(8,8,:))'),'m--')
-plot(input_tvec,x_est_1_common(8,:) - x_true2_vec(4,:) - 2*sqrt(squeeze(P_est_1_common(8,8,:))'),'m--')
+plot(input_tvec,2*sqrt(squeeze(P_est_1_common(8,8,:))'),'g--')
+plot(input_tvec,-2*sqrt(squeeze(P_est_1_common(8,8,:))'),'g--')
 xlabel('Time [s]')
 ylabel('Vel error [m/s]')
 title(['Agent2 est Y velocity error and covariance with \delta=',num2str(delta)...
-    ,', ',num2str(agent2.msg_sent),'/',num2str(length(input_tvec)*size(H,1)),' msgs'])
+    ,', ',num2str(sum(agent2.msg_sent)),'/',num2str(length(input_tvec)*size(H,1)),' msgs'])
 legend('Agent2 est','\pm 2\sigma','','truth','KF est','Agent1 common est','common \pm 2\sigma')

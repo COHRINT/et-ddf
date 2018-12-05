@@ -20,14 +20,14 @@ u = [3; 0.2];
 
 Q = diag([1 1 0.01]);
 noise = blkdiag(Q,zeros(size(u,1)));
-[t,y1] = ode45(@(t,y) dubin_uni(t,y,noise),[0:dt:tfin],[x0; u]);
-[t,y2] = ode45(@(t,y) dubin_uni(t,y,0),[0:dt:tfin],[x0; u]);
+[t1,y1] = ode45(@(t,y) dubin_uni(t,y,noise),[0:dt:tfin],[x0; u]);
+[t2,y2] = ode45(@(t,y) dubin_uni(t,y,0),[0:dt:tfin],[x0; u]);
 y1 = y1'; y2 = y2';
 
 R = [2*pi/180 0; 0 5];
 
 % h = @(x,y) [atan2(y/x);sqrt(x^2 + y^2)] + mvnrnd([0,0],[0.1 0; 0 20])';
-Gamma = @(t) [1 0 0; 0 1 0; 0 0 1]; % ********** THIS IS MOST DEFINITELY NOT CORRECT!!!! ********
+Gamma = @(t) [1 0 0; 0 1 0; 0 0 1]; % ********** THIS IS probably NOT CORRECT!!!! ********
 
 % create EKF filter object
 filter = EKF(@dubin_uni,@range_bearing,@Atilde,Gamma,@Htilde,Q,R,dt,x0,P0);

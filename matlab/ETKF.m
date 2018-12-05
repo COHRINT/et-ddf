@@ -22,8 +22,8 @@ classdef ETKF < handle
         x
         P
         xpred
-        delta = 1;
-        msg_sent = 0;
+        delta = 1
+        msg_sent
     end
     methods
         function obj = ETKF(F_,G_,H_,M_,Q_,R_,x0,P0,delta)
@@ -36,6 +36,7 @@ classdef ETKF < handle
             obj.x = x0;
             obj.P = P0;
             obj.delta = delta;
+            obj.msg_sent = zeros(1,size(obj.F,1));
         end
         
         function [x_curr,P_curr] = predict(obj,u)
@@ -88,7 +89,7 @@ classdef ETKF < handle
             % update filter values
             obj.x = x_curr;
             obj.P = P_curr;
-            obj.msg_sent = obj.msg_sent + 1;
+            obj.msg_sent(i) = obj.msg_sent(i) + 1;
         end
         
         function [x_curr,P_curr] = implicit_update(obj,meas_val,i)
