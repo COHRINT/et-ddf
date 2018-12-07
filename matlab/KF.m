@@ -17,6 +17,8 @@ classdef KF < handle
         R
         x
         P
+        state_history
+        cov_history
     end
     methods
         function obj = KF(F_,G_,H_,M_,Q_,R_,x0,P0)
@@ -28,6 +30,8 @@ classdef KF < handle
             obj.R = R_;
             obj.x = x0;
             obj.P = P0;
+            obj.state_history(:,1) = x0;
+            obj.cov_history(:,:,1) = P0;
         end
         
         function [x_curr,P_curr] = predict(obj,u)
@@ -37,6 +41,8 @@ classdef KF < handle
             
             obj.x = x_curr;
             obj.P = P_curr;
+            obj.state_history(:,end+1) = x_curr;
+            obj.cov_history(:,:,end+1) = P_curr;
         end
         
         function [x_curr,P_curr] = update(obj,meas)
@@ -59,6 +65,8 @@ classdef KF < handle
                 
                 obj.x = x_curr;
                 obj.P = P_curr;
+                obj.state_history(:,end) = x_curr;
+                obj.cov_history(:,:,end) = P_curr;
             end
         end
                    
