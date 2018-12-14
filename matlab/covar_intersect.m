@@ -18,10 +18,14 @@
 %   Pc - fused covariance
 %
 
-function [xc,Pc] = covar_intersect(xa,xb,Pa,Pb)
+function [xc,Pc] = covar_intersect(xa,xb,Pa,Pb,alpha)
+
+if nargin < 5
+    alpha = ones(size(xa,1),1);
+end
 
 % create fxn handle to find omega that minimizes tr(P)
-f = @(omega) trace(inv(omega*inv(Pa) + (1-omega)*inv(Pb)));
+f = @(omega) trace(inv(omega*inv(Pa) + (1-omega)*inv(Pb))*diag(alpha));
 omega = gss(f,0,1);
 
 Pc = inv(omega*inv(Pa) + (1-omega)*inv(Pb));

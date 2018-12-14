@@ -22,6 +22,7 @@ Gamma(2,1) = 1; Gamma(4,2) = 1; Gamma(6,3) = 1; Gamma(8,4) = 1;
 
 C = zeros(4,8);
 C(1,1) = 1; C(2,3) = 1; C(3,5) = 1; C(4,7) = 1;
+% C(5,1) = 1; C(5,5) = -1; C(6,3) = 1; C(6,7) = -1;
 
 D = 0;
 
@@ -60,11 +61,14 @@ for i=1:length(input_tvec)
     y_meas_obs1 = H(1:2,1:4)*x_true1 + v1;
     v2 = mvnrnd(zeros(1,2),R(3:4,3:4))';
     y_meas_obs2 = H(3:4,5:8)*x_true2 + v2;
+%     v3 = mvnrnd(zeros(1,2),R(5:6,5:6))';
+%     y_meas_rel = H(5:6,:)*[x_true1;x_true2] + v3;
     
     x_true1_vec(:,i) = x_true1;
     x_true2_vec(:,i) = x_true2;
     y_meas_vec_1(:,i) = y_meas_obs1;
     y_meas_vec_2(:,i) = y_meas_obs2;
+%     y_meas_rel_vec(:,i) = y_meas_rel;
     x_t1 = x_true1;
     x_t2 = x_true2;
     
@@ -185,20 +189,20 @@ subplot(4,1,1)
 hold on; grid on;
 plot(input_tvec,x_est_1(1,:) - x_true1_vec(1,:))
 plot_xpos_cov_1(:) = sqrt(P_est_1(1,1,:));
-plot(input_tvec,2*plot_xpos_cov_1,'r--')
-plot(input_tvec,-2*plot_xpos_cov_1,'r--')
+% plot(input_tvec,2*plot_xpos_cov_1,'r--')
+% plot(input_tvec,-2*plot_xpos_cov_1,'r--')
 fill([input_tvec flip(input_tvec)],[2*plot_xpos_cov_1 -2*plot_xpos_cov_1],'r','LineStyle','none')
 alpha(0.25)
 plot(input_tvec,zeros(length(input_tvec),1),'-.k')
 plot(input_tvec,x_base(1,:) - x_true1_vec(1,:),'-.m')
 % plot(input_tvec,x_est_2(1,:) - x_true1_vec(1,:))
 plot(input_tvec,x_est_2_common(1,:) - x_true1_vec(1,:))
-plot(input_tvec,2*sqrt(squeeze(P_est_2_common(1,1,:))'),'g--')
-plot(input_tvec,-2*sqrt(squeeze(P_est_2_common(1,1,:))'),'g--')
-fill([input_tvec flip(input_tvec)],[2*sqrt(squeeze(P_est_2_common(1,1,:))')-2*plot_xpos_cov_1+2*plot_xpos_cov_1 zeros(size(-2*sqrt(squeeze(P_est_2_common(1,1,:))')))],'g','LineStyle','none')
-alpha(0.25)
-fill([input_tvec flip(input_tvec)],[-2*sqrt(squeeze(P_est_2_common(1,1,:))')+2*plot_xpos_cov_1 zeros(size(-2*sqrt(squeeze(P_est_2_common(1,1,:))')))],'g','LineStyle','none')
-alpha(0.25)
+% plot(input_tvec,2*sqrt(squeeze(P_est_2_common(1,1,:))'),'g--')
+% plot(input_tvec,-2*sqrt(squeeze(P_est_2_common(1,1,:))'),'g--')
+fill([input_tvec flip(input_tvec)],[2*sqrt(squeeze(P_est_2_common(1,1,:))') 2*plot_xpos_cov_1],'g','LineStyle','none')
+alpha(0.15)
+fill([input_tvec flip(input_tvec)],[-2*sqrt(squeeze(P_est_2_common(1,1,:))') -2*plot_xpos_cov_1],'g','LineStyle','none')
+alpha(0.15)
 xlabel('Time [s]')
 ylabel('Pos error [m]')
 title(['Agent1 est X position error and covariance with \delta=',num2str(delta)...
@@ -212,12 +216,18 @@ plot(input_tvec,x_est_1(2,:) - x_true1_vec(2,:))
 plot_xvel_cov_1(:) = sqrt(P_est_1(2,2,:));
 plot(input_tvec,2*plot_xvel_cov_1,'r--')
 plot(input_tvec,-2*plot_xvel_cov_1,'r--')
+fill([input_tvec flip(input_tvec)],[2*plot_xvel_cov_1 -2*plot_xvel_cov_1],'r','LineStyle','none')
+alpha(0.25)
 plot(input_tvec,zeros(length(input_tvec),1),'-.k')
 plot(input_tvec,x_base(2,:) - x_true1_vec(2,:),'-.m')
 % plot(input_tvec,x_est_2(2,:) - x_true1_vec(2,:))
 plot(input_tvec,x_est_2_common(2,:) - x_true1_vec(2,:))
 plot(input_tvec,2*sqrt(squeeze(P_est_2_common(2,2,:))'),'g--')
 plot(input_tvec,-2*sqrt(squeeze(P_est_2_common(2,2,:))'),'g--')
+fill([input_tvec flip(input_tvec)],[2*sqrt(squeeze(P_est_2_common(2,2,:))') 2*plot_xvel_cov_1],'g','LineStyle','none')
+alpha(0.25)
+fill([input_tvec flip(input_tvec)],[-2*sqrt(squeeze(P_est_2_common(2,2,:))') -2*plot_xvel_cov_1],'g','LineStyle','none')
+alpha(0.25)
 xlabel('Time [s]')
 ylabel('Vel error [m/s]')
 title(['Agent1 est X velocity error and covariance with \delta=',num2str(delta)...
