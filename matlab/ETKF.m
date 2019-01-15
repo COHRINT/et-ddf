@@ -95,7 +95,7 @@ classdef ETKF < handle
     
 
         
-        function [transmit,types,data] = threshold(obj,meas)
+        function [transmit,types,data] = threshold(obj,meas,src_loc_list,dest_loc_list)
             % thresholds each measurement component against pred and
             % creates boolean vector of whether to trasmit each component
             % or not
@@ -115,7 +115,16 @@ classdef ETKF < handle
                     % extract actual measurement
                     meas_val = meas{i}.data;
                     meas_type = meas{i}.type;
-                    rel_agent_id = meas{i}.dest;
+%                     rel_agent_id = meas{i}.dest;
+                    if src_loc_list(i) < dest_loc_list(i)
+%                     src_agent_id = src_loc_list(i);
+                        src_agent_id = 1;
+                        rel_agent_id = 2;
+                    else
+                        src_agent_id = 2;
+                        rel_agent_id = 1;
+                    end
+%                     rel_agent_id = dest_loc_list(i);
                     
                     data{i} = zeros(size(meas_val,1),1);
 
@@ -125,10 +134,12 @@ classdef ETKF < handle
                         % compute predicted measurement and innovation
                         H = zeros(2,size(obj.F,1));
                         if meas_type == 'abs'
-                            H(1,4*(obj.agent_id-1)+1) = 1; H(2,4*(obj.agent_id-1)+3) = 1;
+%                             H(1,4*(obj.agent_id-1)+1) = 1; H(2,4*(obj.agent_id-1)+3) = 1;
+                            H(1,4*(src_agent_id-1)+1) = 1; H(2,4*(src_agent_id-1)+3) = 1;
                             R = obj.R_abs;
                         elseif meas_type == 'rel'
-                            H(1,4*(obj.agent_id-1)+1) = 1; H(2,4*(obj.agent_id-1)+3) = 1;
+%                             H(1,4*(obj.agent_id-1)+1) = 1; H(2,4*(obj.agent_id-1)+3) = 1;
+                            H(1,4*(src_agent_id-1)+1) = 1; H(2,4*(src_agent_id-1)+3) = 1;
                             H(1,4*(rel_agent_id-1)+1) = -1; H(2,4*(rel_agent_id-1)+3) = -1;
                             R = obj.R_rel;
                         end
@@ -189,7 +200,9 @@ classdef ETKF < handle
 %             obj.cov_history(:,:,end) = P_curr;
         end
         
-        function [x_curr,P_curr] = implicit_update(obj,meas_val,type,src_id,x_local,P_local)
+        function [x_curr,P_curr] = implicit_update(obj,meas_val,type,dest_id,x_local,P_local)
+            
+            src_id = 1;
             
 %             R_imp = 10;
             if isempty(type{1})
@@ -205,12 +218,12 @@ classdef ETKF < handle
                 H = zeros(1,size(obj.F,1));
                 H_local = zeros(1,size(x_local,1));
                 if strcmp(type{1},'abs')
-                    H(1,4*(src_id-1)+(i-1)*2+1) = 1; %H(2,4*(src_id-1)+2*i) = 1;
+                    H(1,4*(dest_id-1)+(i-1)*2+1) = 1; %H(2,4*(src_id-1)+2*i) = 1;
                     H_local(1,(i-1)*2+1) = 1;
                     R = obj.R_rel(i,i);
                 elseif strcmp(type{1},'rel')
-                    H(1,4*(src_id-1)+(i-1)*2+1) = 1; %H(2,4*(src_id-1)+3) = 1;
-                    H(1,4*(obj.agent_id-1)+(i-1)*2+1) = -1; %H(2,4*(obj.agent_id-1)+3) = -1;
+                    H(1,4*(dest_id-1)+(i-1)*2+1) = 1; %H(2,4*(src_id-1)+3) = 1;
+                    H(1,4*(src_id-1)+(i-1)*2+1) = -1; %H(2,4*(obj.agent_id-1)+3) = -1;
 %                     H_local(1,(i-1)*2+1) = 1;
 %                     H_local(1,(i-1)*2+3) = -1;
 %                     H_local(1,1) = 1;
