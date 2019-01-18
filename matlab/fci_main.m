@@ -19,7 +19,7 @@ num_connections = 3;
 
 % event-triggering params
 delta = 3;
-tau = 20000;
+tau = 50;
 msg_drop_prob = 0;
 
 % simulation params
@@ -42,7 +42,7 @@ R_abs = 9*eye(2);
 R_rel = 25*eye(2);
 
 [F_full,G_full] = ncv_dyn(dt,N);
-Q_full = eye(4*N);
+Q_full = 0.1*eye(4*N);
 x0_full = x_true_vec;
 P0_full = 100*eye(4*N);
 
@@ -54,6 +54,16 @@ baseline_filter = KF(F_full,G_full,0,0,Q_full,R_abs,R_rel,x_true_vec,P0_full,0);
 % specify connections
 connections = {[3],[3],[1,2,4],[3,5,6],[4],[4]};
 
+% connections = {[5],[5],[6],[6],[1,2,7],[3,4,7],[5,6,8],[7,9,10],[8,11,12],...
+%                 [8,13,14],[9],[9],[10],[10]};
+
+% connections = {[9],[9],[10],[10],[11],[11],[12],[12],...
+%                 [1,2,13],[3,4,13],[5,6,14],[7,8,14],[9,10,15],[11,12,15],[13,14,16],...
+%                 [15,17,18],[16,19,20],[16,21,22],[17,23,24],[17,25,26],[18,27,28],...
+%                 [18,29,30],[19],[19],[20],[20],[21],[21],[22],[22]};
+
+
+
 % for each platform, create dynamics models, and filters
 
 agents = cell(N,1);
@@ -64,7 +74,7 @@ for i=1:N
     % construct local estimates
     n = (length(connections{i})+1)*4;
     [F,G] = ncv_dyn(dt,length(connections{i})+1);
-    Q_local = 0.1*eye(n);
+    Q_local = eye(n);
     
     x0 = [x_true_vec((agent_id-1)*4+1:(agent_id-1)*4+4,1)];
     for j=1:length(connections{i})
@@ -80,7 +90,7 @@ for i=1:N
     
     % construct common estimates, will always only have two agents
     [F_comm,G_comm] = ncv_dyn(dt,2);
-    Q_comm = 0.1*eye(8);
+    Q_comm = eye(8);
     common_estimates = {};
     for j=1:length(connections{i})
         % make sure common estimate state vector is ordered by agent id
@@ -126,7 +136,7 @@ for i = 2:length(input_tvec)
         agents{j}.true_state(:,end+1) = F_local*agents{j}.true_state(:,end) + G_local*u(2*j-1:2*j,i) + w;
         
         % simulate measurements
-        if ((j == 1) ||  (j == 6))
+        if ((j == 3) ||  (j == 4))
             v = mvnrnd([0,0],R_abs)';
             y_abs = H_local*agents{j}.true_state(:,end) + v;
 %             fprintf('DRIVER LEVEL: Msg type, %s \t Msg src id, %i \t Msg dest id, %i \t Obj agent id, %i\n','abs',agents{j}.agent_id,agents{j}.agent_id,agents{j}.agent_id);
@@ -186,10 +196,14 @@ for i = 2:length(input_tvec)
             x_snap = agents{j}.local_filter.x;
             P_snap = agents{j}.local_filter.P;
             for k=1:length(agents{j}.connections)
-                ci_inbox{agents{j}.connections(k)}{end+1} = {x_snap,P_snap,j};
+                ci_inbox{agents{j}.connections(k)}{end+1} = {x_snap,P_snap,j,agents{j}.connections};
                 x_conn_snap = agents{agents{j}.connections(k)}.local_filter.x;
                 P_conn_snap = agents{agents{j}.connections(k)}.local_filter.P;
-                ci_inbox{j}{end+1} = {x_conn_snap,P_conn_snap,agents{j}.connections(k)};
+                if isempty(agents{agents{j}.connections(k)}.connections)
+                    disp('break')
+                end
+                ci_inbox{j}{end+1} = {x_conn_snap,P_conn_snap,agents{j}.connections(k),agents{agents{j}.connections(k)}.connections};
+%                 disp(ci_inbox{j}{end}{4})
                 
             end
         end
@@ -197,18 +211,95 @@ for i = 2:length(input_tvec)
     
     for j=1:length(agents)
         for k=1:length(ci_inbox{j})
-            if ~isempty(ci_inbox{j}(k))
+            if ~isempty(ci_inbox{j}{k})
                 xa = agents{j}.local_filter.x;
                 Pa = agents{j}.local_filter.P;
                 
                 xb = ci_inbox{j}{k}{1};
                 Pb = ci_inbox{j}{k}{2};
-                alpha = ones(4*N,1);
-                [xc,Pc] = covar_intersect(xa,xb,Pa,Pb,alpha);
+                b_id = ci_inbox{j}{k}{3};
+                b_connections = ci_inbox{j}{k}{4};
+                
+                % construct transformation matrices
+%                 agent_loc = find(sort([obj.connections,obj.agent_id]) == obj.agent_id);
+
+                % a
+                a_conn = sort([agents{j}.connections,agents{j}.agent_id]); % construct ordered list of all agent ids, including self and connections
+                
+                a_loc = find(a_conn == agents{j}.agent_id); % find location in ordered list of self
+                b_loc = find(a_conn == b_id); % find location of target to fuse with
+                
+                a_conn_loc = 1:length(a_conn);
+                a_conn_loc(a_conn_loc == find(a_conn == agents{j}.agent_id)) = []; % remove self agent id from list
+                a_conn_loc(a_conn_loc == find(a_conn == b_id)) = []; % remove fuse target id from list
+                
+                if a_loc < b_loc
+                    a_conn_loc = [a_loc,b_loc,a_conn_loc]; % add removed ids back, at beginning of list
+                elseif b_loc < a_loc
+                    a_conn_loc = [b_loc,a_loc,a_conn_loc];
+                end
+                
+                Ta = zeros(size(Pa));
+                for ii=1:length(a_conn_loc)
+                    Ta(4*(a_conn_loc(ii)-1)+1:4*(a_conn_loc(ii)-1)+4,4*(ii-1)+1:4*(ii-1)+4) = eye(4);
+                end
+                
+                % b 
+                b_conn = sort([b_connections,b_id]); % construct ordered list of all agent ids, including self and connections
+                
+                a_loc = find(b_conn == agents{j}.agent_id); % find location in ordered list of self
+                b_loc = find(b_conn == b_id); % find location of target to fuse with
+                
+                b_conn_loc = 1:length(b_conn);
+                b_conn_loc(b_conn_loc == find(b_conn == agents{j}.agent_id)) = []; % remove self agent id from list
+                b_conn_loc(b_conn_loc == find(b_conn == b_id)) = []; % remove fuse target id from list
+                
+                if a_loc < b_loc
+                    b_conn_loc = [a_loc,b_loc,b_conn_loc]; % add removed ids back, at beginning of list
+                elseif b_loc < a_loc
+                    b_conn_loc = [b_loc,a_loc,b_conn_loc];
+                end
+                
+                Tb = zeros(size(Pb));
+                for ii=1:length(b_conn_loc)
+                    Tb(4*(b_conn_loc(ii)-1)+1:4*(b_conn_loc(ii)-1)+4,4*(ii-1)+1:4*(ii-1)+4) = eye(4);
+                end
+                
+                if (size(Ta,1) ~= size(xa,1)) || (size(Tb,1) ~= size(xb,1))
+                    disp('break!')
+                end
+                
+                
+                % transform means and covariances to group common states at
+                % beginning of state vector/covariance
+                xaT = Ta\xa;
+                xaTred = xaT(1:8);
+                PaT = Ta\Pa*Ta;
+                PaTred = PaT(1:8,1:8);
+                
+                xbT = Tb\xb;
+                xbTred = xbT(1:8);
+                PbT = Tb\Pb*Tb;
+                PbTred = PbT(1:8,1:8);
+                
+                alpha = ones(size(PaTred,1),1);
+                [xc,Pc] = covar_intersect(xaTred,xbTred,PaTred,PbTred,alpha);
+                
+                % conditional gaussian update
+                V = inv(inv(PaT) + [inv(Pc) zeros(size(Pc,1),size(PaT,2)-size(Pc,2)); ...
+                    zeros(size(PaT,1)-size(Pc,1),size(Pc,2)) zeros(size(PaT)-size(Pc))]);
+                v = V*(PaT\xaT + [Pc\xc; zeros(size(PaT,1)-size(Pc,1),1)]);
+                
+                % transform back to normal state order
+                xa = Ta*v;
+                Pa = Ta*V/Ta;
+                
+%                 xb = Tb*v;
+%                 Pb = Tb*V/Tb;
                 
                 % update local estimates
-                agents{j}.local_filter.x = xc;
-                agents{j}.local_filter.P = Pc;
+                agents{j}.local_filter.x = xa;
+                agents{j}.local_filter.P = Pa;
                 
                 %                   agents{agents{j}.connections(k)}.local_filter.x = xc;
                 %                   agents{agents{j}.connections(k)}.local_filter.P = Pc;

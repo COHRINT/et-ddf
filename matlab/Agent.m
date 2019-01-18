@@ -85,12 +85,14 @@ classdef Agent < handle
 
                 % determine location of src and destination elements of
                 % state vector
-                src_loc = find(obj.connections == local_measurements{i}.src);
+%                 src_loc = find(obj.connections == local_measurements{i}.src);
+                src_loc = find(sort([obj.connections,obj.agent_id]) == local_measurements{i}.src);
                 if isempty(src_loc)
                     src_loc = agent_loc;
                 end
                 src_loc_list(i) = src_loc;
-                dest_loc = find(obj.connections == local_measurements{i}.dest)+1;
+%                 dest_loc = find(obj.connections == local_measurements{i}.dest)+1;
+                dest_loc = find(sort([obj.connections,obj.agent_id]) == local_measurements{i}.dest);
                 if isempty(dest_loc)
                     dest_loc = agent_loc;
                 end
@@ -134,7 +136,7 @@ classdef Agent < handle
 %                             for ii=1:length(obj.common_estimates)
 %                                 if obj.common_estimates{ii}.connection == src
 %                                     disp(type(1,j))
-                                if dest_loc_list(i) > agent_loc
+                                if dest_loc_list(k) > agent_loc
                                     src_id = 1;
                                     dest_id = 2;
                                 else
@@ -152,20 +154,34 @@ classdef Agent < handle
 %                         end
                         else % implicit update
                             ii = i;
+                            
+                            if dest_loc_list(k) > agent_loc
+                                x_local = [obj.local_filter.x(4*(agent_loc-1)+1:4*(agent_loc-1)+4); obj.local_filter.x(4*(dest_loc_list(k)-1)+1:4*(dest_loc_list(k)-1)+4)];
+                                P_local = obj.local_filter.P([4*(agent_loc-1)+1:4*(agent_loc-1)+4,4*(dest_loc_list(k)-1)+1:4*(dest_loc_list(k)-1)+4],...
+                                                [4*(agent_loc-1)+1:4*(agent_loc-1)+4,4*(dest_loc_list(k)-1)+1:4*(dest_loc_list(k)-1)+4]);
+                                src_id = 1;
+                                dest_id = 2;
+                            else
+                                x_local = [obj.local_filter.x(4*(dest_loc_list(k)-1)+1:4*(dest_loc_list(k)-1)+4); obj.local_filter.x(4*(agent_loc-1)+1:4*(agent_loc-1)+4)];
+                                P_local = obj.local_filter.P([4*(dest_loc_list(k)-1)+1:4*(dest_loc_list(k)-1)+4,4*(agent_loc-1)+1:4*(agent_loc-1)+4],...
+                                                [4*(dest_loc_list(k)-1)+1:4*(dest_loc_list(k)-1)+4,4*(agent_loc-1)+1:4*(agent_loc-1)+4]);
+                                src_id = 2;
+                                dest_id = 1;
+                            end
 %                             for ii=1:length(obj.common_estimates)
 %                                 if obj.common_estimates{ii}.connection == src
 %                                 obj.common_estimates{ii}.implicit_update(msg(k),type(k),obj.agent_id,obj.local_filter.x,obj.local_filter.P);
-                                if dest_loc_list(i) > agent_loc
-                                    x_local = [obj.local_filter.x(4*(agent_loc-1)+1:4*(agent_loc-1)+4); obj.local_filter.x(4*(dest_loc_list(i)-1)+1:4*(dest_loc_list(i)-1)+4)];
-                                    P_local = obj.local_filter.P([4*(agent_loc-1)+1:4*(agent_loc-1)+4,4*(dest_loc_list(i)-1)+1:4*(dest_loc_list(i)-1)+4],...
-                                                                    [4*(agent_loc-1)+1:4*(agent_loc-1)+4,4*(dest_loc_list(i)-1)+1:4*(dest_loc_list(i)-1)+4]);
-                                else
-                                    x_local = [obj.local_filter.x(4*(dest_loc_list(i)-1)+1:4*(dest_loc_list(i)-1)+4); obj.local_filter.x(4*(agent_loc-1)+1:4*(agent_loc-1)+4)];
-                                    P_local = obj.local_filter.P([4*(dest_loc_list(i)-1)+1:4*(dest_loc_list(i)-1)+4,4*(agent_loc-1)+1:4*(agent_loc-1)+4],...
-                                                                    [4*(dest_loc_list(i)-1)+1:4*(dest_loc_list(i)-1)+4,4*(agent_loc-1)+1:4*(agent_loc-1)+4]);
-                                end
+%                                 if dest_loc_list(i) > agent_loc
+%                                     x_local = [obj.local_filter.x(4*(agent_loc-1)+1:4*(agent_loc-1)+4); obj.local_filter.x(4*(dest_loc_list(i)-1)+1:4*(dest_loc_list(i)-1)+4)];
+%                                     P_local = obj.local_filter.P([4*(agent_loc-1)+1:4*(agent_loc-1)+4,4*(dest_loc_list(i)-1)+1:4*(dest_loc_list(i)-1)+4],...
+%                                                                     [4*(agent_loc-1)+1:4*(agent_loc-1)+4,4*(dest_loc_list(i)-1)+1:4*(dest_loc_list(i)-1)+4]);
+%                                 else
+%                                     x_local = [obj.local_filter.x(4*(dest_loc_list(i)-1)+1:4*(dest_loc_list(i)-1)+4); obj.local_filter.x(4*(agent_loc-1)+1:4*(agent_loc-1)+4)];
+%                                     P_local = obj.local_filter.P([4*(dest_loc_list(i)-1)+1:4*(dest_loc_list(i)-1)+4,4*(agent_loc-1)+1:4*(agent_loc-1)+4],...
+%                                                                     [4*(dest_loc_list(i)-1)+1:4*(dest_loc_list(i)-1)+4,4*(agent_loc-1)+1:4*(agent_loc-1)+4]);
+%                                 end
                                     
-                                obj.common_estimates{ii}.implicit_update(msg(k),type(k),dest_loc_list(i),x_local,P_local);
+                                obj.common_estimates{ii}.implicit_update(msg(k),type(k),src_id,dest_id,x_local,P_local);
 %                                 end
 %                                 obj.total_msgs = obj.total_msgs + 1;
                                 
@@ -198,12 +214,14 @@ classdef Agent < handle
                     type = inbox{i}.type;
                     data = inbox{i}.data;
                     
-                    src_loc = find(obj.connections == src);
+%                     src_loc = find(obj.connections == src);
+                    src_loc = find(sort([obj.connections,obj.agent_id]) == src);
                     if isempty(src_loc)
                         src_loc = agent_loc;
                     end
 %                     src_loc_list(i) = src_loc;
-                    dest_loc = find(obj.connections == dest)+1;
+%                     dest_loc = find(obj.connections == dest);
+                    dest_loc = find(sort([obj.connections,obj.agent_id]) == dest);
                     if isempty(dest_loc)
                         dest_loc = agent_loc;
                     end
@@ -225,12 +243,12 @@ classdef Agent < handle
                             for k=1:length(obj.common_estimates)
                                 if obj.common_estimates{k}.connection == src
 %                                     disp(type(1,j))
-                                    if dest_loc > agent_loc
-                                        src_loc = 1;
-                                        dest_loc = 2;
-                                    else
+                                    if src_loc > agent_loc % agent_loc is the the dest_loc
                                         src_loc = 2;
                                         dest_loc = 1;
+                                    else
+                                        src_loc = 1;
+                                        dest_loc = 2;
                                     end
                                     obj.common_estimates{k}.explicit_update(data(j),type(1,j),src_loc,dest_loc);
                                 end
@@ -239,33 +257,40 @@ classdef Agent < handle
                         else % implicit update
                             local_est = obj.local_filter.x; local_cov = obj.local_filter.P;
                             
-                            if dest_loc > agent_loc
-                                    x_local = [obj.local_filter.x(4*(agent_loc-1)+1:4*(agent_loc-1)+4); obj.local_filter.x(4*(dest_loc-1)+1:4*(dest_loc-1)+4)];
-                                    P_local = obj.local_filter.P([4*(agent_loc-1)+1:4*(agent_loc-1)+4,4*(dest_loc-1)+1:4*(dest_loc-1)+4],...
-                                                                    [4*(agent_loc-1)+1:4*(agent_loc-1)+4,4*(dest_loc-1)+1:4*(dest_loc-1)+4]);
-                            else
-                                x_local = [obj.local_filter.x(4*(dest_loc-1)+1:4*(dest_loc-1)+4); obj.local_filter.x(4*(agent_loc-1)+1:4*(agent_loc-1)+4)];
-                                P_local = obj.local_filter.P([4*(dest_loc-1)+1:4*(dest_loc-1)+4,4*(agent_loc-1)+1:4*(agent_loc-1)+4],...
-                                                            [4*(dest_loc-1)+1:4*(dest_loc-1)+4,4*(agent_loc-1)+1:4*(agent_loc-1)+4]);
-                            end
+%                             if dest_loc > agent_loc
+%                                     x_local = [obj.local_filter.x(4*(agent_loc-1)+1:4*(agent_loc-1)+4); obj.local_filter.x(4*(dest_loc-1)+1:4*(dest_loc-1)+4)];
+%                                     P_local = obj.local_filter.P([4*(agent_loc-1)+1:4*(agent_loc-1)+4,4*(dest_loc-1)+1:4*(dest_loc-1)+4],...
+%                                                                     [4*(agent_loc-1)+1:4*(agent_loc-1)+4,4*(dest_loc-1)+1:4*(dest_loc-1)+4]);
+%                             else
+%                                 x_local = [obj.local_filter.x(4*(dest_loc-1)+1:4*(dest_loc-1)+4); obj.local_filter.x(4*(agent_loc-1)+1:4*(agent_loc-1)+4)];
+%                                 P_local = obj.local_filter.P([4*(dest_loc-1)+1:4*(dest_loc-1)+4,4*(agent_loc-1)+1:4*(agent_loc-1)+4],...
+%                                                             [4*(dest_loc-1)+1:4*(dest_loc-1)+4,4*(agent_loc-1)+1:4*(agent_loc-1)+4]);
+%                             end
                             
                             if (sum(isnan(local_est)) > 0) || (sum(isinf(local_est)) > 0)
                                 disp('help!')
                             end
-                            obj.local_filter.implicit_update(data(j),type(j),src_loc,x_local,P_local);
+                            obj.local_filter.implicit_update(data(j),type(j),src_loc,dest_loc,local_est,local_cov);
                             if (sum(isnan(obj.local_filter.x)) > 0) || (sum(isinf(obj.local_filter.x)) > 0)
                                 disp('help!')
                             end
                             for k=1:length(obj.common_estimates)
                                 if obj.common_estimates{k}.connection == src
-                                    if dest_loc > agent_loc
-                                        src_loc = 1;
-                                        dest_loc = 2;
-                                    else
+                                    if src_loc > agent_loc
+                                        x_local = [obj.local_filter.x(4*(agent_loc-1)+1:4*(agent_loc-1)+4); obj.local_filter.x(4*(src_loc-1)+1:4*(src_loc-1)+4)];
+                                        P_local = obj.local_filter.P([4*(agent_loc-1)+1:4*(agent_loc-1)+4,4*(src_loc-1)+1:4*(src_loc-1)+4],...
+                                                        [4*(agent_loc-1)+1:4*(agent_loc-1)+4,4*(src_loc-1)+1:4*(src_loc-1)+4]);
                                         src_loc = 2;
                                         dest_loc = 1;
+                                        
+                                    else
+                                        x_local = [obj.local_filter.x(4*(src_loc-1)+1:4*(src_loc-1)+4); obj.local_filter.x(4*(agent_loc-1)+1:4*(agent_loc-1)+4)];
+                                        P_local = obj.local_filter.P([4*(src_loc-1)+1:4*(src_loc-1)+4,4*(agent_loc-1)+1:4*(agent_loc-1)+4],...
+                                                            [4*(src_loc-1)+1:4*(src_loc-1)+4,4*(agent_loc-1)+1:4*(agent_loc-1)+4]);
+                                        src_loc = 1;
+                                        dest_loc = 2;
                                     end
-                                    obj.common_estimates{k}.implicit_update(data(j),type(j),src_loc,x_local,P_local);
+                                    obj.common_estimates{k}.implicit_update(data(j),type(j),src_loc,dest_loc,x_local,P_local);
                                 end
                             end
                         end

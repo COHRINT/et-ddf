@@ -200,9 +200,9 @@ classdef ETKF < handle
 %             obj.cov_history(:,:,end) = P_curr;
         end
         
-        function [x_curr,P_curr] = implicit_update(obj,meas_val,type,dest_id,x_local,P_local)
+        function [x_curr,P_curr] = implicit_update(obj,meas_val,type,src_id,dest_id,x_local,P_local)
             
-            src_id = 1;
+%             src_id = 1;
             
 %             R_imp = 10;
             if isempty(type{1})
@@ -222,8 +222,8 @@ classdef ETKF < handle
                     H_local(1,(i-1)*2+1) = 1;
                     R = obj.R_rel(i,i);
                 elseif strcmp(type{1},'rel')
-                    H(1,4*(dest_id-1)+(i-1)*2+1) = 1; %H(2,4*(src_id-1)+3) = 1;
-                    H(1,4*(src_id-1)+(i-1)*2+1) = -1; %H(2,4*(obj.agent_id-1)+3) = -1;
+                    H(1,4*(src_id-1)+(i-1)*2+1) = 1; %H(2,4*(src_id-1)+3) = 1;
+                    H(1,4*(dest_id-1)+(i-1)*2+1) = -1; %H(2,4*(obj.agent_id-1)+3) = -1;
 %                     H_local(1,(i-1)*2+1) = 1;
 %                     H_local(1,(i-1)*2+3) = -1;
 %                     H_local(1,1) = 1;
