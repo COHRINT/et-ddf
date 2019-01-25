@@ -67,7 +67,7 @@ classdef Agent < handle
             
             % predict and update local filter
             input_vec = zeros(size(obj.local_filter.G,2),1);
-            input_vec(2*(agent_loc-1)+1:2*(agent_loc-1)+2) = input;
+            input_vec(2*(agent_loc-1)+1:2*(agent_loc-1)+2,1) = input;
 %             input_vec(1:length(input)) = input;
             obj.local_filter.predict(input_vec);
             if (sum(isnan(obj.local_filter.x)) > 0) || (sum(isinf(obj.local_filter.x)) > 0)
@@ -119,7 +119,7 @@ classdef Agent < handle
             for i=1:length(obj.common_estimates)
                 
                 % propagate common estimate
-                obj.common_estimates{i}.predict(zeros(size(2*obj.common_estimates{i}.G,2),1));
+                obj.common_estimates{i}.predict(zeros(size(obj.common_estimates{i}.G,2),1));
                 
                 % for each connection, threshold local measurements
                 for j=1:length(obj.common_estimates{i}.connection)
@@ -244,13 +244,13 @@ classdef Agent < handle
                                 if obj.common_estimates{k}.connection == src
 %                                     disp(type(1,j))
                                     if src_loc > agent_loc % agent_loc is the the dest_loc
-                                        src_loc = 2;
-                                        dest_loc = 1;
+                                        src_loc_new = 2;
+                                        dest_loc_new = 1;
                                     else
-                                        src_loc = 1;
-                                        dest_loc = 2;
+                                        src_loc_new = 1;
+                                        dest_loc_new = 2;
                                     end
-                                    obj.common_estimates{k}.explicit_update(data(j),type(1,j),src_loc,dest_loc);
+                                    obj.common_estimates{k}.explicit_update(data(j),type(1,j),src_loc_new,dest_loc_new);
                                 end
                             end
 %                         end
@@ -296,9 +296,6 @@ classdef Agent < handle
                         end
                     end
                 end
-                    
-
-            
             end
         end
     end
