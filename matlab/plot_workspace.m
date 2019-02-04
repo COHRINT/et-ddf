@@ -9,7 +9,7 @@
 % plot(agents{N}.true_state(1,:),agents{N}.true_state(3,:))
 
 %% compute statistics
-chain = 1;
+chain = 0;
 comms_plots = 0;
 
 msg_sent = 0;

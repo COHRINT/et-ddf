@@ -30,6 +30,7 @@ classdef ETKF < handle
         connection
         state_history
         cov_history
+        innovation_history = [];
     end
     methods
         function obj = ETKF(F_,G_,H_,M_,Q_,R_abs,R_rel,x0,P0,delta,agent_id,connections)
@@ -59,41 +60,8 @@ classdef ETKF < handle
             obj.x = x_curr;
             obj.xpred = x_curr;
             obj.P = P_curr;
-%             obj.state_history(:,end+1) = x_curr;
-%             obj.cov_history(:,:,end+1) = P_curr;
+
         end
-        
-%         function [x_curr,P_curr] = update(obj,meas,loc)
-%             for i=1:size(meas,2)
-%                 
-%                 % extract actual measurement
-%                 meas_val = meas(:,i);
-%                 
-%                 % loop through elements of measurement
-%                 for j=1:size(meas_val,1)
-%                     % compute predicted measurement and innovation
-%                     meas_pred = obj.H(loc+j-1,:)*obj.x;
-%                     innov = meas_val(j) - meas_pred;
-%                     
-%                     % if surprising enough, perform explicit update
-%                     if abs(innov) > obj.delta
-%                         [x_curr,P_curr] = obj.explicit_update(meas_val(j),j+loc-1);
-%                     elseif abs(innov) <= obj.delta
-%                         [x_curr,P_curr] = obj.implicit_update(meas_val(j),j+loc-1);
-%                     end
-%                 end
-%    
-%             end
-%         end
-
-%         function [stuff] = process_measurements(obj,threshold,meas)
-%             % based on measurements trasnmitted, perform either explicit or
-%             % implicit updates
-%             
-%             
-%         end
-    
-
         
         function [transmit,types,data] = threshold(obj,meas,src_loc_list,dest_loc_list)
             % thresholds each measurement component against pred and
@@ -120,6 +88,8 @@ classdef ETKF < handle
 %                     src_agent_id = src_loc_list(i);
                         src_agent_id = 1;
                         rel_agent_id = 2;
+                    elseif src_loc_list(i) == dest_loc_list(i)
+                        src_agent_id = src_loc_list(i);
                     else
                         src_agent_id = 2;
                         rel_agent_id = 1;
@@ -176,28 +146,25 @@ classdef ETKF < handle
                 H(1,4*(dest_id-1)+1) = -1; H(2,4*(dest_id-1)+3) = -1;
                 R = obj.R_rel;
             end
-                
-%             R_rel = [10 0; 0 10];
             
             % compute predicted measurement and innovation
             meas_pred = H*obj.x;
             innov = meas_val{1} - meas_pred;
+            obj.innovation_history(:,end+1) = innov;
             
             % compute Kalman gain
             K = obj.P*H'/(H*obj.P*H' + R);
 
             % update state
             x_curr = obj.x + K*innov;
+            
             % update covariance
             P_curr = (eye(size(obj.F,1))-K*H)*obj.P;
             
             % update filter values
             obj.x = x_curr;
             obj.P = 0.5*P_curr + 0.5*P_curr';
-%             obj.msg_sent(1) = obj.msg_sent(1) + 1;
-            
-%             obj.state_history(:,end) = x_curr;
-%             obj.cov_history(:,:,end) = P_curr;
+
         end
         
         function [x_curr,P_curr] = implicit_update(obj,meas_val,type,src_id,dest_id,x_local,P_local)
@@ -218,8 +185,8 @@ classdef ETKF < handle
                 H = zeros(1,size(obj.F,1));
                 H_local = zeros(1,size(x_local,1));
                 if strcmp(type{1},'abs')
-                    H(1,4*(dest_id-1)+(i-1)*2+1) = 1; %H(2,4*(src_id-1)+2*i) = 1;
-                    H_local(1,(i-1)*2+1) = 1;
+                    H(1,4*(src_id-1)+(i-1)*2+1) = 1; %H(2,4*(src_id-1)+2*i) = 1;
+                    H_local(1,4*(src_id-1)+(i-1)*2+1) = 1;
                     R = obj.R_rel(i,i);
                 elseif strcmp(type{1},'rel')
                     H(1,4*(src_id-1)+(i-1)*2+1) = 1; %H(2,4*(src_id-1)+3) = 1;
@@ -231,17 +198,14 @@ classdef ETKF < handle
                     H_local = H;
                     R = obj.R_rel(i,i);
                 end
-                
-                if ~exist('R','var')
-                    disp('break pnt');
-                end
 
                 mu = H*obj.x - H_local*x_local;
+%                 mu = H*obj.x - H_local*obj.xpred;
+                
                 Qe = H_local*P_local*H_local' + R;
-                % a = h(x_ref) - h(xbar(k))
-%                 a = meas_val{1}(i)-H*obj.xpred;
-%                 a = H*obj.x-H*obj.xpred;
+                
                 a = H*obj.x - H_local*x_local;
+%                 a = H*x_local - H_local*obj.xpred;
 
                 arg1 = (-obj.delta+a-mu)/sqrt(Qe);
                 arg2 = (obj.delta+a-mu)/sqrt(Qe);
@@ -251,12 +215,9 @@ classdef ETKF < handle
                             ((arg1)*phi(arg1)-arg2*phi(arg2)/(Qfxn(arg1)-Qfxn(arg2)));
 
                 K = obj.P * H'/(H*obj.P*H' + R);
-    %             Kimplicit(:,i) = Kevent;
                 x_curr = obj.x + K*zbar;
                 invquant = H*obj.P*H' + R;
                 P_curr = obj.P - dcal*obj.P*H'/invquant*H*obj.P;
-    %             P(:,:,i) = P(:,:,i)-dcal*K*P(:,:,i);
-    %             P(:,:,i) = (eye(2)-dcal*Kevent*Hevent)*Hevent*P(:,:,i);
 
                 % update filter values
                 obj.x = x_curr;

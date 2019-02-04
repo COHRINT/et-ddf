@@ -1,16 +1,25 @@
 %% estimation error plots
 num_agents = N;
 sigma = 2;
-state_num = 3;
+state_num = 4;
+statenum2label = {'x','xdot','y','ydot'};
 
 % agent_plots_1 = [18 16 3 13 13 22];
 % agent_plots_2 = [18 18 10 13 15 30];
-% agent_plots_1 = [1 2 3 3 4 4];
-% agent_plots_2 = [3 3 3 4 5 6];
-agent_plots_1 = [1 2 3 4 4];
-agent_plots_2 = [3 3 4 5 6];
+% agent_plots_1 = [1 2 6 3 4 4];
+% agent_plots_2 = [3 3 6 4 5 6];
+% agent_plots_1 = [1 2 3 4 4];
+% agent_plots_2 = [3 3 4 5 6];
 % agent_plots_1 = [1 1 2 3 2];
 % agent_plots_2 = [2 4 6 8 3];
+% agent_plots_1 = [1 2 2 3 3 4];
+% agent_plots_2 = [2 2 3 3 4 4];
+agent_plots{1} = [1 2 3 4 5 6;
+                    1 2 3 4 5 6];
+agent_plots{2} = [1 2 3 4 4;
+                    3 3 4 5 6];
+% agent_plots{1} = [1 2; 1 2];
+% agent_plots{2} = [1 2;2 1];
 
 color_wheel = [0    0.4470    0.7410;
     0.8500    0.3250    0.0980;
@@ -21,14 +30,55 @@ color_wheel = [0    0.4470    0.7410;
     0.6350    0.0780    0.1840];
 
 
-figure
-for i=1:length(agent_plots_1)
-    
-j = agent_plots_1(i);
-k = agent_plots_2(i);
+% figure
+% hold on; grid on;
+% for i=1:num_agents
+%     plot(input_tvec,agents{i}.tau_history(:));
+% end
+% xlabel('Time [s]')
+% ylabel('\tau')
 
-j_loc = find(sort([agents{k}.connections,agents{k}.agent_id]) == agent_plots_1(i));
-k_loc = find(sort([agents{j}.connections,agents{j}.agent_id]) == agent_plots_2(i));
+% figure
+% subplot(2,2,1)
+% hold on; grid on;
+% plot(agents{1}.local_filter.innovation_history(1,:))
+% plot(agents{1}.local_filter.innovation_history(2,:))
+% legend('x component','y component')
+% title('Robot 1 local estimate innov')
+% 
+% subplot(2,2,2)
+% hold on; grid on;
+% plot(agents{2}.local_filter.innovation_history(1,:))
+% plot(agents{2}.local_filter.innovation_history(2,:))
+% legend('x component','y component')
+% title('Robot 2 local estimate innov')
+% 
+% subplot(2,2,3)
+% hold on; grid on;
+% plot(agents{1}.common_estimates{1}.innovation_history(1,:))
+% plot(agents{1}.common_estimates{1}.innovation_history(2,:))
+% legend('x component','y component')
+% title('Robot 1 common estimate innov')
+% 
+% subplot(2,2,4)
+% hold on; grid on;
+% plot(agents{2}.common_estimates{1}.innovation_history(1,:))
+% plot(agents{2}.common_estimates{1}.innovation_history(2,:))
+% legend('x component','y component')
+% title('Robot 2 common estimate innov')
+
+for state_num=1:4
+
+for ii=1:length(agent_plots)
+
+figure
+for i=1:length(agent_plots{ii})
+    
+j = agent_plots{ii}(1,i);
+k = agent_plots{ii}(2,i);
+
+j_loc = find(sort([agents{k}.connections,agents{k}.agent_id]) == agent_plots{ii}(1,i));
+k_loc = find(sort([agents{j}.connections,agents{j}.agent_id]) == agent_plots{ii}(2,i));
 
 
 
@@ -70,7 +120,7 @@ if j~=k
     legend(str1,strcat('\pm',num2str(sigma),'\sigma'),str2,strcat('\pm',num2str(sigma),'\sigma'),strcat('cent. KF  ',num2str(j)),strcat('cent. KF  ',num2str(k)))
     xlabel('Time [s]')
     ylabel('Est Error [m]')
-    title(['Estimation error in y pos, \delta=',num2str(delta),', ',num2str(j),'\leftrightarrow',num2str(k)])
+    title(['Estimation error in ',num2str(state_num),', \delta=',num2str(delta),', ',num2str(j),'\leftrightarrow',num2str(k)])
 
 else
     plot(input_tvec,agents{k}.local_filter.state_history((j_loc-1)*4+state_num,:)-agents{j}.true_state(state_num,:),'Color',[1 0 0])
@@ -89,7 +139,11 @@ else
     legend(str2,strcat('\pm',num2str(sigma),'\sigma'),strcat('cent. KF  ',num2str(j)))
     xlabel('Time [s]')
     ylabel('Est Error [m]')
-    title(['Estimation error in y pos, \delta=',num2str(delta),', ',num2str(j),'\leftrightarrow',num2str(k)])
+    title(['Estimation error in ',num2str(state_num),', \delta=',num2str(delta),', ',num2str(j),'\leftrightarrow',num2str(k)])
+end
+
+end
+
 end
 
 end
