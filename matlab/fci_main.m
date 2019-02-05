@@ -15,24 +15,24 @@ rng(200)
 
 %% Specify connections
 
-connections = {[3],[3],[1,2,4],[3,5,6],[4],[4]};
+% connections = {[3],[3],[1,2,4],[3,5,6],[4],[4]};
 
 % connections = {[2],[1,3],[2,4],[3]};
 
 % connections = {[5],[5],[6],[6],[1,2,7],[3,4,7],[5,6,8],[7,9,10],[8,11,12],...
 %                 [8,13,14],[9],[9],[10],[10]};
 
-% connections = {[9],[9],[10],[10],[11],[11],[12],[12],...
-%                 [1,2,13],[3,4,13],[5,6,14],[7,8,14],[9,10,15],[11,12,15],[13,14,16],...
-%                 [15,17,18],[16,19,20],[16,21,22],[17,23,24],[17,25,26],[18,27,28],...
-%                 [18,29,30],[19],[19],[20],[20],[21],[21],[22],[22]};
+connections = {[9],[9],[10],[10],[11],[11],[12],[12],...
+                [1,2,13],[3,4,13],[5,6,14],[7,8,14],[9,10,15],[11,12,15],[13,14,16],...
+                [15,17,18],[16,19,20],[16,21,22],[17,23,24],[17,25,26],[18,27,28],...
+                [18,29,30],[19],[19],[20],[20],[21],[21],[22],[22]};
 
 % connections = {[2,3,4,5],[1,3,6,7],[1,2,8,9],[1],[1],[2],[2],[3],[3]};
 
 % connections = {[2],[1]};
             
 % specify which platforms get gps-like measurements
-abs_meas_vec = [3 4];
+abs_meas_vec = [13 14 17 18];
 
 % number of agents
 N = length(connections);
@@ -40,13 +40,13 @@ N = length(connections);
 num_connections = 3;
 
 % event-triggering params
-delta = 0.1;
-tau_goal = 50;
-tau = 50;
+delta = 3;
+tau_goal = 100;
+tau = 100;
 msg_drop_prob = 0;
 
 % simulation params
-max_time = 50;
+max_time = 20;
 dt = 0.1;
 input_tvec = 0:dt:max_time;
 
@@ -115,7 +115,7 @@ for i=1:N
     
     P0 = 100*eye(4*(length(connections{i})+1));
     
-    local_filter = ETKF(F,G,0,0,Q_localfilter,R_abs,R_rel,x0,P0,delta,agent_id,0);
+    local_filter = ETKF(F,G,0,0,Q_localfilter,R_abs,R_rel,x0,P0,delta,agent_id,connections{i});
     
     % construct common estimates, will always only have two agents
     [F_comm,G_comm] = ncv_dyn(dt,2);
@@ -177,7 +177,7 @@ for i = 2:length(input_tvec)
 %             v = v_data{j}(:,i);
             y_abs = H_local*agents{j}.true_state(:,end) + v;
             y_abs_msg = struct('src',agents{j}.agent_id,'dest',agents{j}.agent_id,...
-                        'status',[],'type',"abs",'data',y_abs);
+                        'status',[1 1],'type',"abs",'data',y_abs);
             msgs = {y_abs_msg};
             
             baseline_filter.update(y_abs,'abs',agents{j}.agent_id,agents{j}.agent_id);
@@ -191,7 +191,7 @@ for i = 2:length(input_tvec)
                 y_rel = H_rel*[agents{j}.true_state(:,end); ...
                     agents{agents{j}.connections(k)}.true_state(:,end)] + v_rel;
                 y_rel_msg = struct('src',agents{j}.agent_id,'dest',agents{j}.connections(k),...
-                    'status',[],'type',"rel",'data',y_rel);
+                    'status',[1 1],'type',"rel",'data',y_rel);
                 msgs{end+1} = y_rel_msg;
                 
                 baseline_filter.update(y_rel,'rel',agents{j}.agent_id,agents{j}.connections(k));
@@ -206,7 +206,7 @@ for i = 2:length(input_tvec)
 %         add outgoing measurements to each agents "inbox"
         for k=1:length(outgoing)
             dest = outgoing{k}.dest;
-            inbox{dest,j} = outgoing{k};
+            inbox{dest,end+1} = outgoing{k};
         end
     end
     

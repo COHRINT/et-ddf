@@ -14,12 +14,15 @@ statenum2label = {'x','xdot','y','ydot'};
 % agent_plots_2 = [2 4 6 8 3];
 % agent_plots_1 = [1 2 2 3 3 4];
 % agent_plots_2 = [2 2 3 3 4 4];
-agent_plots{1} = [1 2 3 4 5 6;
-                    1 2 3 4 5 6];
-agent_plots{2} = [1 2 3 4 4;
-                    3 3 4 5 6];
+% agent_plots{1} = [1 2 3 4 5 6;
+%                     1 2 3 4 5 6];
+% agent_plots{2} = [1 2 3 4 4;
+%                     3 3 4 5 6];
 % agent_plots{1} = [1 2; 1 2];
 % agent_plots{2} = [1 2;2 1];
+agent_plots{1} = [18 16 4 13 13 22;
+                    18 18 10 13 15 30];
+agent_plots{2} = agent_plots{1};
 
 color_wheel = [0    0.4470    0.7410;
     0.8500    0.3250    0.0980;
@@ -66,6 +69,9 @@ color_wheel = [0    0.4470    0.7410;
 % plot(agents{2}.common_estimates{1}.innovation_history(2,:))
 % legend('x component','y component')
 % title('Robot 2 common estimate innov')
+
+figure
+heatmap(ci_trigger_mat);
 
 for state_num=1:4
 
