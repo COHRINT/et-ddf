@@ -472,7 +472,7 @@ data_trans_avg = mean(usage_vec);
 cost_val = w1*(covar_avg/max(covar_mean_vec)) + w2*(data_trans_avg/max(usage_vec));
 
 
-cost(loop_cnt,:) = [loop_cnt delta tau_state_goal est_err_avg ovar_avg data_trans_avg cost_val];
+cost(loop_cnt,:) = [loop_cnt delta tau_state_goal covar_avg data_trans_avg cost_val];
 
 loop_cnt = loop_cnt + 1;
 % cost(idx,3) = covar_avg;
