@@ -9,12 +9,13 @@ classdef Agent < handle
         common_estimates
         true_state
         ci_trigger_cnt
+        ci_trigger_rate
         msgs_sent
         total_msgs
         msg_success_prob
         tau_goal
         tau
-        connection_taus
+        connection_tau_rates
         epsilon_1
         epsilon_2
         tau_history = []
@@ -45,6 +46,7 @@ classdef Agent < handle
             
             % CI trigger count
             obj.ci_trigger_cnt = 0;
+            obj.ci_trigger_rate = 0;
             
             obj.msgs_sent = 0;
             obj.total_msgs = 0;
@@ -54,9 +56,9 @@ classdef Agent < handle
             % CI thresholding data
             obj.tau_goal = tau_goal;
             obj.tau = tau;
-            obj.connection_taus = tau*ones(length(obj.connections),1);
-            obj.epsilon_1 = 0.1;
-            obj.epsilon_2 = 0.01;
+            obj.connection_tau_rates = zeros(length(obj.connections),1);
+            obj.epsilon_1 = 0.05;
+            obj.epsilon_2 = 0.1;
             
             % struct of sensors available to agent
 %             obj.sensors = sensors;
@@ -97,26 +99,50 @@ classdef Agent < handle
             
             % create outgoing msg queue
             outgoing = {};
+            loopback = {};
             
             % process each collected measurement
             for i=1:length(local_measurements)
                 
+                % unpack msg
                 msg = local_measurements{i};
+                src = msg.src;
+                dest = msg.dest;
+                status = msg.status;
+                type = msg.type;
+                data = msg.data;
 
                 % source of local measurements is agent
-                assert(msg.src == obj.agent_id);
+                assert(src == obj.agent_id);
 
                 % update local filter
                 obj.local_filter.msg_update(msg);
                 
+                % increase total possible msg count (+1 for each element)
                 obj.total_msgs = obj.total_msgs + 2;
                 
                 % threshold measurement and update common estimate
                 for j=1:length(obj.common_estimates)
                     
-                    if (local_measurements{i}.dest == msg.src) && (strcmp(msg.type,"abs"))
+                    msg = local_measurements{i};
+%                     src = msg.src;
+%                     dest = msg.dest;
+%                     status = msg.status;
+%                     type = msg.type;
+%                     data = msg.data;
+                    
+                    if (dest == src) && (strcmp(type,"abs"))
                         dest = obj.common_estimates{j}.connection;
-                        msg = gen_msg(msg.src,dest,msg.status,msg.type,msg.data);                        
+                        
+                        if isempty(msg.data)
+                            disp('empty')
+                        end
+                        
+                        msg = gen_msg(src,dest,status,type,data);
+                        
+                        if isempty(msg.data)
+                            disp('empty data')
+                        end
                     end
                     
                     [~,src_idx] = obj.get_location(msg.src);
@@ -128,6 +154,11 @@ classdef Agent < handle
                         
                         % threshold measurement
                         [src_,dest_,status_,type_,data_] = obj.common_estimates{j}.threshold(msg);
+                        
+                        if isempty(status_)
+                            disp('empty msg')
+                        end
+                        
                         % generate msg from threshold results
                         msg = gen_msg(src_,dest_,status_,type_,data_);
                         
@@ -141,10 +172,37 @@ classdef Agent < handle
                         
                         % add msg to outgoing msg queue
                         outgoing{end+1} = msg;
+                        loopback{end+1} = {msg,x_local,P_local};
                         
                     end
                 end              
             end
+            
+%             for i=1:length(loopback)
+%                 
+%                 msg = loopback{i}{1};
+%                 x_local = loopback{i}{2};
+%                 P_local = loopback{i}{3};
+%                 
+%                 for j=1:length(obj.common_estimates)
+%                     
+% %                     [~,src_idx] = obj.get_location(msg.src);
+% %                     [~,dest_idx] = obj.get_location(msg.dest);
+% 
+%                     
+%                     % find common estimate associated with msg destination
+%                     if obj.common_estimates{j}.connection == msg.dest
+%                         
+%                         % update common estimate with thresholding result
+% %                         x_local = obj.local_filter.x(sort([src_idx,dest_idx]));
+% %                         P_local = obj.local_filter.P(sort([src_idx,dest_idx]),sort([src_idx,dest_idx]));
+%                         obj.common_estimates{j}.msg_update(msg,x_local,P_local);
+%                         
+%                     end
+%                 end
+%             end
+%                 
+                
         end
             
 %             outgoing_msgs = {};

@@ -9,15 +9,15 @@
 % network's states.
 
 clear; close all; clc;
-load('sensor_noise_data.mat');
+% load('sensor_noise_data.mat');
 
-rng(200)
+rng(238)
 
 %% Specify connections
 
 % connections = {[3],[3],[1,2,4],[3,5,6],[4],[4]};
 
-% connections = {[2],[1,3],[2,4],[3]};
+% connections = {[2],[1,3],[2,4],[3,5],[4,6],[5]};
 
 % connections = {[5],[5],[6],[6],[1,2,7],[3,4,7],[5,6,8],[7,9,10],[8,11,12],...
 %                 [8,13,14],[9],[9],[10],[10]};
@@ -32,17 +32,42 @@ connections = {[9],[9],[10],[10],[11],[11],[12],[12],...
 % connections = {[2],[1]};
             
 % specify which platforms get gps-like measurements
-abs_meas_vec = [13 14 17 18];
+abs_meas_vec = [10 18];
 
 % number of agents
 N = length(connections);
 % connection topology: tree
 num_connections = 3;
 
-% event-triggering params
-delta = 3;
-tau_goal = 100;
-tau = 100;
+delta_vec = 0:0.5:5;
+tau_state_goal_vec = 5:0.5:15;
+% tau_state_vec = 0:0.5:25;
+
+% cost = zeros(length(delta_vec),length(tau_state_goal_vec),5);
+w1 = 0.5;
+w2 = 0.5;
+
+loop_cnt = 1;
+
+cost = zeros(length(delta_vec)*length(tau_state_goal_vec),6);
+
+for idx1=1:length(delta_vec)
+for idx2=1:length(tau_state_goal_vec)   
+
+% event-triggering  and covariance intersection params
+% delta = 3;
+delta = delta_vec(idx1);
+% tau_goal = 100;
+% tau = 70;
+% tau_state_goal = 12.5;
+tau_state_goal = tau_state_goal_vec(idx2);
+% tau_state = 8.75;
+% tau_state = tau_state_vec(idx3);
+tau_state = 0.75*tau_state_goal;
+
+use_adaptive = true;
+
+% comms modeling params
 msg_drop_prob = 0;
 
 % simulation params
@@ -57,7 +82,7 @@ for i=1:N
     x_true_vec((i-1)*4+1:(i-1)*4+4,1) = x_true;
     
     % generate input for platforms
-    u((i-1)*2+1:(i-1)*2+2,:) = [2*cos(0.75*input_tvec);2*sin(input_tvec)];
+    u((i-1)*2+1:(i-1)*2+2,:) = [2*cos(0.75*input_tvec);2*sin(0.75*input_tvec)];
 %     u((i-1)*2+1:(i-1)*2+2,:) = [0.05*input_tvec;0.5*input_tvec];
 end
 
@@ -73,7 +98,8 @@ Q_local = [0.0017 0.025 0 0;
             0 0 0.0017 0.025;
             0 0 0.025 0.5];
 
-R_abs = 1*eye(2);
+% R_abs = 1*eye(2);
+R_abs = diag([1 1]);
 R_rel = 3*eye(2);
 
 % generate dynamics matrices for baseline filter
@@ -137,7 +163,7 @@ for i=1:N
         common_estimates{j} = ETKF(F_comm,G_comm,0,0,Q_comm,R_abs,R_rel,x0_comm,P0_comm,delta,agent_id,connections{i}(j));
     end
     
-    agents{i} = Agent(agent_id,connections{i},local_filter,common_estimates,x_true_vec((i-1)*4+1:(i-1)*4+4,1),msg_drop_prob,tau_goal,tau);
+    agents{i} = Agent(agent_id,connections{i},local_filter,common_estimates,x_true_vec((i-1)*4+1:(i-1)*4+4,1),msg_drop_prob,length(x0)*tau_state_goal,length(x0)*tau_state);
     
 end
 
@@ -150,10 +176,15 @@ H_rel = [1 0 0 0 -1 0 0 0; 0 0 1 0 0 0 -1 0];
 
 
 ci_time_vec = zeros(N,length(input_tvec));
+all_msgs = {};
+abs_meas_mat = zeros(N,length(input_tvec),2);
+rel_meas_mat = zeros(N,length(input_tvec),2);
 
 for i = 2:length(input_tvec)
 %     tic
     clc;
+    fprintf('Iteration %i of %i\n',loop_cnt,length(delta_vec)*length(tau_state_goal_vec));
+    fprintf('Delta: %f \t State tau goal: %f\n',delta,tau_state_goal);
     fprintf('Time step %i of %i, %f seconds of %f total\n',i,length(input_tvec),i*dt,length(input_tvec)*dt);
     
     % create measurement inbox
@@ -163,8 +194,12 @@ for i = 2:length(input_tvec)
 %     baseline_filter.predict(zeros(size(u(:,i))));
     
     % process local measurements and determine which to send to connections
-    for j=1:length(agents)
+    for j=randperm(length(agents))
         msgs = {};
+        
+        if i == 107 && j == 16
+            disp('break')
+        end
         
         % propagate true state
         w = mvnrnd([0,0,0,0],Q_local_true)';
@@ -181,11 +216,14 @@ for i = 2:length(input_tvec)
             msgs = {y_abs_msg};
             
             baseline_filter.update(y_abs,'abs',agents{j}.agent_id,agents{j}.agent_id);
+            
+            abs_meas_mat(j,i,1) = y_abs(1);
+            abs_meas_mat(j,i,2) = y_abs(2);
         end
         
         % relative position
-        for k=1:length(agents{j}.connections)
-            if agents{j}.connections(k) > 0
+        for k=randperm(length(agents{j}.connections))
+%             if agents{j}.connections(k) > 0
                 v_rel = mvnrnd([0,0],R_rel)';
 %                 v_rel = v_rel_data{j}(:,i);
                 y_rel = H_rel*[agents{j}.true_state(:,end); ...
@@ -195,7 +233,10 @@ for i = 2:length(input_tvec)
                 msgs{end+1} = y_rel_msg;
                 
                 baseline_filter.update(y_rel,'rel',agents{j}.agent_id,agents{j}.connections(k));
-            end
+                
+                rel_meas_mat(j,i,1) = y_rel(1);
+                rel_meas_mat(j,i,2) = y_rel(2);
+%             end
         end
 
         %% Process the generated measurements locally, determine which to send
@@ -204,15 +245,19 @@ for i = 2:length(input_tvec)
         outgoing = agents{j}.process_local_measurements(input,msgs);
         
 %         add outgoing measurements to each agents "inbox"
-        for k=1:length(outgoing)
+        for k=randperm(length(outgoing))
             dest = outgoing{k}.dest;
             inbox{dest,end+1} = outgoing{k};
+            all_msgs{end+1} = outgoing{k};
         end
     end
     
     %% All agents now process received measurements, performing implicit and
     % explicit measurement updates
-    for j=1:length(agents)
+    for j=randperm(length(agents))
+        if j == 16 && i == 107
+            disp('break')
+        end
         agents{j}.process_received_measurements({inbox{j,:}});
     end
     
@@ -222,12 +267,13 @@ for i = 2:length(input_tvec)
     % covariance intersection between agents
     ci_trigger_list = zeros(1,length(agents));
     
-    for j=1:length(agents)
+    for j=randperm(length(agents))
         alpha = ones(4*(length(agents{j}.connections)+1),1);
 
         % check trace of cov to determine if CI should be triggered
         if trace(agents{j}.local_filter.P*diag(alpha)) > agents{j}.tau
             agents{j}.ci_trigger_cnt = agents{j}.ci_trigger_cnt + 1;
+            agents{j}.ci_trigger_rate = agents{j}.ci_trigger_cnt / (i-1);
             ci_trigger_list(j) = 1;
             ci_trigger_mat(j,i) = 1;
             
@@ -237,7 +283,7 @@ for i = 2:length(input_tvec)
             % connection inboxes
             x_snap = agents{j}.local_filter.x;
             P_snap = agents{j}.local_filter.P;
-            for k=1:length(agents{j}.connections)
+            for k=randperm(length(agents{j}.connections))
     
                 % compute transforms for platform and connection, and
                 % number of intersecting states
@@ -266,7 +312,7 @@ for i = 2:length(input_tvec)
                 PbTred = PbT(1:il_b,1:il_b);
                 
 %                 ci_inbox{j}{end+1} = {x_conn_snap,P_conn_snap,agents{j}.connections(k),agents{agents{j}.connections(k)}.connections};
-                ci_inbox{j}{end+1} = {xbTred,PbTred,agents{j}.connections(k),agents{agents{j}.connections(k)}.connections,agents{agents{j}.connections(k)}.tau};
+                ci_inbox{j}{end+1} = {xbTred,PbTred,agents{j}.connections(k),agents{agents{j}.connections(k)}.connections,agents{agents{j}.connections(k)}.ci_trigger_rate};
                 
                 if isempty(agents{agents{j}.connections(k)}.connections)
                     disp('break')
@@ -279,8 +325,17 @@ for i = 2:length(input_tvec)
     end
     
     %% Acutal covariance intersection performed (w/ conditional updates on full states)
-    for j=1:length(agents)
-        for k=1:length(ci_inbox{j})
+    for j=randperm(length(agents))
+        
+%         if ((i > 100 && j == 16) && abs(agents{j}.local_filter.x(5) - agents{j}.true_state(1,end)) > 4)
+%             disp('break')
+%         end
+        
+%         if i == 106 && j == 16
+%             disp('break')
+%         end
+        
+        for k=randperm(length(ci_inbox{j}))
             if ~isempty(ci_inbox{j}{k})
                 xa = agents{j}.local_filter.x;
                 Pa = agents{j}.local_filter.P;
@@ -289,7 +344,7 @@ for i = 2:length(input_tvec)
                 Pb = ci_inbox{j}{k}{2};
                 b_id = ci_inbox{j}{k}{3};
                 b_connections = ci_inbox{j}{k}{4};
-                b_tau = ci_inbox{j}{k}{5};
+                b_rate = ci_inbox{j}{k}{5};
                 
                 % construct transformation
                 [Ta,il_a,inter] = gen_sim_transform(agents{j}.agent_id,agents{j}.connections,b_id,b_connections);
@@ -325,13 +380,13 @@ for i = 2:length(input_tvec)
                 agents{j}.local_filter.P = Pa;
                 
                 % update common estimates
-                for ii=1:length(agents{j}.common_estimates)
+                for ii=randperm(length(agents{j}.common_estimates))
                     if agents{j}.common_estimates{ii}.connection == ci_inbox{j}{k}{3}
 %                         conn_loc = inter==agents{j}.common_estimates{ii}.connection;
                         agents{j}.common_estimates{ii}.x = xc;
                         agents{j}.common_estimates{ii}.P = Pc;
                         
-                        agents{j}.connection_taus(ii) = b_tau;
+                        agents{j}.connection_tau_rates(ii) = b_rate;
                     end
                 end
                 
@@ -342,11 +397,15 @@ for i = 2:length(input_tvec)
                 
             end
         end
-%         agents{j}.tau = min(agents{j}.tau_goal,agents{j}.tau + ...
-%                     agents{j}.epsilon_1*sum(-agents{j}.connection_taus+agents{j}.tau*ones(length(agents{j}.connection_taus),1)) + ...
-%                     agents{j}.epsilon_2*(agents{j}.tau_goal-agents{j}.tau));
+        
+        if use_adaptive
+            agents{j}.tau = min(agents{j}.tau_goal,agents{j}.tau + ...
+                        agents{j}.epsilon_1*sum(-agents{j}.connection_tau_rates+agents{j}.ci_trigger_rate*ones(length(agents{j}.connection_tau_rates),1)) + ...
+                        agents{j}.epsilon_2*(agents{j}.tau_goal-agents{j}.tau));
+        end
     end
 
+    %% Update state history of each agent (for plotting)
     for j=1:length(agents)
         agents{j}.local_filter.state_history(:,i) = agents{j}.local_filter.x;
         agents{j}.local_filter.cov_history(:,:,i) = agents{j}.local_filter.P;
@@ -361,3 +420,64 @@ for i = 2:length(input_tvec)
 %     toc
 end
 
+%% compute costs and FOMs
+
+% compute average covariance trace
+% est_err_vec = zeros(1,N);
+covar_mean_vec = zeros(1,N);
+for jj=1:length(agents)
+%     err_vec = zeros(1,size(agents{jj}.local_filter.state_history,2));
+    trace_vec = zeros(1,size(agents{jj}.local_filter.cov_history,3));
+    for kk=1:size(agents{jj}.local_filter.cov_history,3)
+        trace_vec(kk) = trace(agents{jj}.local_filter.cov_history(:,:,kk));
+    end
+    covar_mean_vec(jj) = mean(trace_vec);
+end
+% est_err_avg = mean(est_err_vec);
+covar_avg = mean(covar_mean_vec);
+
+% compute total and average data transfer
+
+%  dim1=src agent, dim2=dest agent, dim3=meas type, dim4=element [x or y]
+comms_mat_sent = zeros(N,N,2,2);
+comms_mat_total = zeros(N,N,2,2);
+for jj=1:length(all_msgs)
+    msg = all_msgs{jj};
+    
+    type = msg.type=="rel";
+    
+    for kk=1:length(msg.status)
+        comms_mat_total(msg.src,msg.dest,type+1,kk) = comms_mat_total(msg.src,msg.dest,type+1,kk) + 1;
+        if msg.status(kk)
+            comms_mat_sent(msg.src,msg.dest,type+1,kk) = comms_mat_sent(msg.src,msg.dest,type+1,kk) + 1;
+        end
+    end  
+end
+
+ci_trigger_vec = zeros(1,N);
+usage_vec_ci = zeros(1,N);
+
+for jj=1:length(agents)
+    ci_trigger_vec(1,jj) = agents{jj}.ci_trigger_cnt;
+%     usage_vec_ci(1,i) = agents{i}.ci_trigger_cnt * (size(agents{i}.local_filter.x,1)^2 + size(agents{i}.local_filter.x,1)) * length(agents{i}.connections);
+    usage_vec_ci(1,jj) = agents{jj}.ci_trigger_cnt * (72) * length(agents{jj}.connections);
+end
+
+usage_vec_msg = sum(comms_mat_sent(:,:,1,1),2)' + sum(comms_mat_sent(:,:,1,2),2)' + sum(comms_mat_sent(:,:,2,1),2)' + sum(comms_mat_sent(:,:,1,2),2)';
+usage_vec = usage_vec_ci + usage_vec_msg;
+
+data_trans_avg = mean(usage_vec);
+
+% compute cost fxn
+cost_val = w1*(covar_avg/max(covar_mean_vec)) + w2*(data_trans_avg/max(usage_vec));
+
+
+cost(loop_cnt,:) = [loop_cnt delta tau_state_goal est_err_avg ovar_avg data_trans_avg cost_val];
+
+loop_cnt = loop_cnt + 1;
+% cost(idx,3) = covar_avg;
+% cost(idx,4) = data_trans_avg;
+% cost(idx,5) = cost_val;
+
+end
+end

@@ -205,7 +205,7 @@ classdef ETKF < handle
             % compute predicted measurement and innovation
             meas_pred = H*obj.x;
             innov = meas_val - meas_pred;
-            obj.innovation_history(:,end+1) = innov;
+            obj.innovation_history(i,end+1) = innov;
             
             % compute Kalman gain
             K = obj.P*H'/(H*obj.P*H' + R);
@@ -259,13 +259,13 @@ classdef ETKF < handle
                     R = obj.R_rel(i,i);
                 end
 
-                mu = H*obj.x - H_local*x_local;
-%                 mu = H*obj.x - H_local*obj.xpred;
+%                 mu = H*obj.x - H_local*x_local;
+                mu = H*obj.x - H_local*obj.xpred;
                 
                 Qe = H_local*P_local*H_local' + R;
                 
-                a = H*obj.x - H_local*x_local;
-%                 a = H*x_local - H_local*obj.xpred;
+%                 a = H*obj.x - H_local*x_local;
+                a = H*x_local - H_local*obj.xpred;
 
                 arg1 = (-obj.delta+a-mu)/sqrt(Qe);
                 arg2 = (obj.delta+a-mu)/sqrt(Qe);
