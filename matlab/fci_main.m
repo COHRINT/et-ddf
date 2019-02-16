@@ -49,7 +49,7 @@ w2 = 0.5;
 
 loop_cnt = 1;
 
-cost = zeros(length(delta_vec)*length(tau_state_goal_vec),6);
+cost = zeros(length(delta_vec)*length(tau_state_goal_vec),7);
 
 for idx1=1:length(delta_vec)
 for idx2=1:length(tau_state_goal_vec)   
@@ -471,8 +471,18 @@ data_trans_avg = mean(usage_vec);
 % compute cost fxn
 cost_val = w1*(covar_avg/max(covar_mean_vec)) + w2*(data_trans_avg/max(usage_vec));
 
+% compute estimation error average
+err_vec = zeros(1,N);
+for jj=1:length(agents)
+    
+    % get location
+    [loc,iidx] = agents{jj}.get_location(agents{jj}.agent_id);
+    % compute average est err per agent
+    err_vec(jj) = mean(mean((agents{jj}.local_filter.state_history(iidx,:) - agents{jj}.true_state(:,:)),2));
+end
+est_err = mean(err_vec);
 
-cost(loop_cnt,:) = [loop_cnt delta tau_state_goal covar_avg data_trans_avg cost_val];
+cost(loop_cnt,:) = [loop_cnt delta tau_state_goal covar_avg data_trans_avg cost_val est_err];
 
 loop_cnt = loop_cnt + 1;
 % cost(idx,3) = covar_avg;
