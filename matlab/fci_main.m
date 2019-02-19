@@ -39,9 +39,12 @@ N = length(connections);
 % connection topology: tree
 num_connections = 3;
 
-delta_vec = 0:0.5:5;
-tau_state_goal_vec = 5:0.5:15;
+% delta_vec = 0:0.5:5;
+% tau_state_goal_vec = 5:0.5:15;
 % tau_state_vec = 0:0.5:25;
+
+delta_vec = 3;
+tau_state_goal_vec = 7;
 
 % cost = zeros(length(delta_vec),length(tau_state_goal_vec),5);
 w1 = 0.5;
@@ -49,7 +52,7 @@ w2 = 0.5;
 
 loop_cnt = 1;
 
-cost = zeros(length(delta_vec)*length(tau_state_goal_vec),7);
+cost = zeros(length(delta_vec)*length(tau_state_goal_vec),8);
 
 for idx1=1:length(delta_vec)
 for idx2=1:length(tau_state_goal_vec)   
@@ -482,7 +485,13 @@ for jj=1:length(agents)
 end
 est_err = mean(err_vec);
 
-cost(loop_cnt,:) = [loop_cnt delta tau_state_goal covar_avg data_trans_avg cost_val est_err];
+for jj=1:length(agents)
+    [loc,iidx] = agents{jj}.get_location(agents{jj}.agent_id);
+    err_vec(jj) = mean(sqrt(sum((agents{jj}.local_filter.state_history(iidx,:) - agents{jj}.true_state(:,:)).^2,2)./length(input_tvec)));
+end
+est_rmse = mean(err_vec);
+
+cost(loop_cnt,:) = [loop_cnt delta tau_state_goal covar_avg data_trans_avg cost_val est_err est_rmse];
 
 loop_cnt = loop_cnt + 1;
 % cost(idx,3) = covar_avg;
