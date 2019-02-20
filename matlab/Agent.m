@@ -119,14 +119,14 @@ classdef Agent < handle
                 obj.local_filter.msg_update(msg);
                 
                 % increase total possible msg count (+1 for each element)
-                obj.total_msgs = obj.total_msgs + 2;
+%                 obj.total_msgs = obj.total_msgs + 2;
                 
                 % threshold measurement and update common estimate
                 for j=1:length(obj.common_estimates)
                     
                     msg = local_measurements{i};
-%                     src = msg.src;
-%                     dest = msg.dest;
+                    src = msg.src;
+                    dest = msg.dest;
 %                     status = msg.status;
 %                     type = msg.type;
 %                     data = msg.data;
@@ -164,6 +164,7 @@ classdef Agent < handle
                         
                         % add measurement elements to be sent to sent cnt
                         obj.msgs_sent = obj.msgs_sent + sum(status_);
+                        obj.total_msgs = obj.total_msgs + 2;
                         
                         % update common estimate with thresholding result
                         x_local = obj.local_filter.x(sort([src_idx,dest_idx]));
@@ -308,6 +309,13 @@ classdef Agent < handle
 
                     [~,src_idx] = obj.get_location(inbox{i}.src);
                     [~,dest_idx] = obj.get_location(inbox{i}.dest);
+                    
+                    % communication failure simulation
+                    % draws array from binomial w/ msg success prob and
+                    % bitmasks msg status to simulate that element was not
+                    % sent
+                    inbox{i}.status = inbox{i}.status & ...
+                        binornd(1,obj.msg_success_prob,size(inbox{i}.status,1),size(inbox{i}.status,2));
 
                     % update local filter
                     x_local = obj.local_filter.x;

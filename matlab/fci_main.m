@@ -32,7 +32,7 @@ connections = {[9],[9],[10],[10],[11],[11],[12],[12],...
 % connections = {[2],[1]};
             
 % specify which platforms get gps-like measurements
-abs_meas_vec = [10 18];
+abs_meas_vec = [11 18];
 
 % number of agents
 N = length(connections);
@@ -43,8 +43,9 @@ num_connections = 3;
 % tau_state_goal_vec = 5:0.5:15;
 % tau_state_vec = 0:0.5:25;
 
-delta_vec = 3;
-tau_state_goal_vec = 7;
+delta_vec = 1;
+tau_state_goal_vec = 15;
+msg_drop_prob_vec = [0 .20 .50 .80];
 
 % cost = zeros(length(delta_vec),length(tau_state_goal_vec),5);
 w1 = 0.5;
@@ -52,10 +53,16 @@ w2 = 0.5;
 
 loop_cnt = 1;
 
-cost = zeros(length(delta_vec)*length(tau_state_goal_vec),8);
+max_time = 20;
+dt = 0.1;
+input_tvec = 0:dt:max_time;
+
+cost = zeros(length(delta_vec)*length(tau_state_goal_vec),9);
+network_mse = zeros(N,length(input_tvec),length(msg_drop_prob_vec));
 
 for idx1=1:length(delta_vec)
-for idx2=1:length(tau_state_goal_vec)   
+for idx2=1:length(tau_state_goal_vec) 
+for idx3=1:length(msg_drop_prob_vec)
 
 % event-triggering  and covariance intersection params
 % delta = 3;
@@ -71,7 +78,7 @@ tau_state = 0.75*tau_state_goal;
 use_adaptive = true;
 
 % comms modeling params
-msg_drop_prob = 0;
+msg_drop_prob = msg_drop_prob_vec(idx3);
 
 % simulation params
 max_time = 20;
@@ -218,7 +225,9 @@ for i = 2:length(input_tvec)
                         'status',[1 1],'type',"abs",'data',y_abs);
             msgs = {y_abs_msg};
             
+            if binornd(1,1-msg_drop_prob)
             baseline_filter.update(y_abs,'abs',agents{j}.agent_id,agents{j}.agent_id);
+            end
             
             abs_meas_mat(j,i,1) = y_abs(1);
             abs_meas_mat(j,i,2) = y_abs(2);
@@ -235,7 +244,9 @@ for i = 2:length(input_tvec)
                     'status',[1 1],'type',"rel",'data',y_rel);
                 msgs{end+1} = y_rel_msg;
                 
+                if binornd(1,1-msg_drop_prob)
                 baseline_filter.update(y_rel,'rel',agents{j}.agent_id,agents{j}.connections(k));
+                end
                 
                 rel_meas_mat(j,i,1) = y_rel(1);
                 rel_meas_mat(j,i,2) = y_rel(2);
@@ -418,9 +429,15 @@ for i = 2:length(input_tvec)
             agents{j}.common_estimates{k}.state_history(:,i) = agents{j}.common_estimates{k}.x;
             agents{j}.common_estimates{k}.cov_history(:,:,i) = agents{j}.common_estimates{k}.P;
         end
+        
+        [loc,iidx] = agents{j}.get_location(agents{j}.agent_id);
+        network_mse(j,i,idx3) = sum((agents{j}.local_filter.state_history(iidx,i) - agents{j}.true_state(:,i)).^2,1)./4;
+        
     end
               
 %     toc
+
+
 end
 
 %% compute costs and FOMs
@@ -491,12 +508,13 @@ for jj=1:length(agents)
 end
 est_rmse = mean(err_vec);
 
-cost(loop_cnt,:) = [loop_cnt delta tau_state_goal covar_avg data_trans_avg cost_val est_err est_rmse];
+cost(loop_cnt,:) = [loop_cnt delta tau_state_goal covar_avg msg_drop_prob data_trans_avg cost_val est_err est_rmse];
 
 loop_cnt = loop_cnt + 1;
 % cost(idx,3) = covar_avg;
 % cost(idx,4) = data_trans_avg;
 % cost(idx,5) = cost_val;
 
+end
 end
 end
