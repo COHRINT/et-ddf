@@ -1,7 +1,7 @@
 %% estimation error plots
 num_agents = N;
 sigma = 2;
-state_num = 4;
+num_states = 4;
 statenum2label = {'x','xdot','y','ydot'};
 
 % agent_plots_1 = [18 16 3 13 13 22];
@@ -15,16 +15,16 @@ statenum2label = {'x','xdot','y','ydot'};
 % agent_plots{1} = [1 2 2 3 3 4;
 %                     2 2 3 3 4 4];
 % agent_plots{2} = [4 5 5 6;5 5 6 6];
-% agent_plots{1} = [1 2 3 4 5 6;
-%                     1 2 3 4 5 6];
-% agent_plots{2} = [1 2 3 4 4;
-%                     3 3 4 5 6];
+agent_plots{1} = [1 2 3 4 5 6;
+                    1 2 3 4 5 6];
+agent_plots{2} = [1 2 3 4 4;
+                    3 3 4 5 6];
 % agent_plots{1} = [1 2; 1 2];
 % agent_plots{2} = [1 2;2 1];
-agent_plots{1} = [18 16 4 13 13 22;
-                    18 18 10 13 15 30];
-agent_plots{2} = [4 10 15 16 22 30;
-                    4 10 15 16 22 30];
+% agent_plots{1} = [18 16 4 13 13 22;
+%                     18 18 10 13 15 30];
+% agent_plots{2} = [4 10 15 16 22 30;
+%                     4 10 15 16 22 30];
 
 color_wheel = [0    0.4470    0.7410;
     0.8500    0.3250    0.0980;
@@ -107,34 +107,34 @@ title('CI threshold for connectivity group 6: 23-30')
 
 end
 
-figure
-subplot(2,2,1)
-hold on; grid on;
-plot(agents{18}.local_filter.innovation_history(1,:))
-plot(agents{18}.local_filter.innovation_history(2,:))
-legend('x component','y component')
-title('Robot 18 local estimate innov')
-
-subplot(2,2,2)
-hold on; grid on;
-plot(agents{22}.local_filter.innovation_history(1,:))
-plot(agents{22}.local_filter.innovation_history(2,:))
-legend('x component','y component')
-title('Robot 22 local estimate innov')
-
-subplot(2,2,3)
-hold on; grid on;
-plot(agents{18}.common_estimates{1}.innovation_history(1,:))
-plot(agents{18}.common_estimates{1}.innovation_history(2,:))
-legend('x component','y component')
-title('Robot 18 common estimate innov')
-
-subplot(2,2,4)
-hold on; grid on;
-plot(agents{22}.common_estimates{1}.innovation_history(1,:))
-plot(agents{22}.common_estimates{1}.innovation_history(2,:))
-legend('x component','y component')
-title('Robot 22 common estimate innov')
+% figure
+% subplot(2,2,1)
+% hold on; grid on;
+% plot(agents{18}.local_filter.innovation_history(1,:))
+% plot(agents{18}.local_filter.innovation_history(2,:))
+% legend('x component','y component')
+% title('Robot 18 local estimate innov')
+% 
+% subplot(2,2,2)
+% hold on; grid on;
+% plot(agents{22}.local_filter.innovation_history(1,:))
+% plot(agents{22}.local_filter.innovation_history(2,:))
+% legend('x component','y component')
+% title('Robot 22 local estimate innov')
+% 
+% subplot(2,2,3)
+% hold on; grid on;
+% plot(agents{18}.common_estimates{1}.innovation_history(1,:))
+% plot(agents{18}.common_estimates{1}.innovation_history(2,:))
+% legend('x component','y component')
+% title('Robot 18 common estimate innov')
+% 
+% subplot(2,2,4)
+% hold on; grid on;
+% plot(agents{22}.common_estimates{1}.innovation_history(1,:))
+% plot(agents{22}.common_estimates{1}.innovation_history(2,:))
+% legend('x component','y component')
+% title('Robot 22 common estimate innov')
 
 ci_trigger_mat_plotting = ci_trigger_mat;
 ci_trigger_mat_plotting(ci_trigger_mat_plotting == 0) = NaN;
@@ -144,7 +144,7 @@ abs_meas_mat(abs_meas_mat == 0) = NaN;
 figure
 heatmap(ci_trigger_mat);
 
-for state_num=1:4
+for state_num=1
 
 for ii=1:length(agent_plots)
 
@@ -160,10 +160,10 @@ k_loc = find(sort([agents{j}.connections,agents{j}.agent_id]) == agent_plots{ii}
 
 
 % if i>3
-% figure
+figure
 % end
 
-subplot(2,3,i)
+% subplot(2,3,i)
 hold on; grid on;
 
 set(gca,'FontSize',13)
@@ -188,19 +188,22 @@ if j~=k
 
     plot(input_tvec,baseline_filter.state_history((j-1)*4+state_num,:)-agents{j}.true_state(state_num,:),'Color',color_wheel(5,:))
     plot(input_tvec,baseline_filter.state_history((k-1)*4+state_num,:)-agents{k}.true_state(state_num,:),'Color',color_wheel(3,:))
-    % plot(input_tvec,2*sqrt(squeeze(baseline_filter.cov_history((j-1)*4+1,(j-1)*4+1,:))'),'k--')
-    % plot(input_tvec,-2*sqrt(squeeze(baseline_filter.cov_history((j-1)*4+1,(j-1)*4+1,:))'),'k--')
+%     plot(input_tvec,2*sqrt(squeeze(baseline_filter.cov_history((j-1)*4+state_num,(j-1)*4+state_num,:))'),'--','Color',color_wheel(5,:))
+%     plot(input_tvec,-2*sqrt(squeeze(baseline_filter.cov_history((j-1)*4+state_num,(j-1)*4+state_num,:))'),'--','Color',color_wheel(5,:))
+%     plot(input_tvec,2*sqrt(squeeze(baseline_filter.cov_history((k-1)*4+state_num,(k-1)*4+state_num,:))'),'--','Color',color_wheel(3,:))
+%     plot(input_tvec,-2*sqrt(squeeze(baseline_filter.cov_history((k-1)*4+state_num,(k-1)*4+state_num,:))'),'--','Color',color_wheel(3,:))
 
     str1 = strcat(num2str(j),' estimating ',num2str(k));
     str2 = strcat(num2str(k),' estimating ',num2str(j));
 %     legend(str1,strcat('\pm',num2str(sigma),'\sigma'),strcat('-',num2str(sigma),'\sigma'),str2,strcat(num2str(sigma),'\sigma'),strcat('-',num2str(sigma),'\sigma'),strcat('cent. KF  ',num2str(j)),strcat('cent. KF  ',num2str(k)))
-    legend(str1,strcat('\pm',num2str(sigma),'\sigma'),str2,strcat('\pm',num2str(sigma),'\sigma'),strcat('cent. KF  ',num2str(j)),strcat('cent. KF  ',num2str(k)))
+    l = legend(str1,strcat('\pm',num2str(sigma),'\sigma'),str2,strcat('\pm',num2str(sigma),'\sigma'),strcat('cent. KF  ',num2str(j)),strcat('cent. KF  ',num2str(k)));
+    l.FontSize = 10;
     xlabel('Time [s]')
     ylabel('Est Error [m]')
     title(['Estimation error in ',num2str(state_num),', \delta=',num2str(delta),', ',num2str(j),'\leftrightarrow',num2str(k)])
     
-    plot(input_tvec,ci_trigger_mat_plotting(j,:),'kx')
-    plot(input_tvec,ci_trigger_mat_plotting(k,:),'ko')
+%     plot(input_tvec,ci_trigger_mat_plotting(j,:),'kx')
+%     plot(input_tvec,ci_trigger_mat_plotting(k,:),'ko')
     
 %     if state_num==1
 %         plot(input_tvec,abs_meas_mat(j,:,1)-agents{j}.true_state(1,:),'bx')
@@ -219,17 +222,18 @@ else
     % plot(input_tvec,ci_time_vec,'x')
 
     plot(input_tvec,baseline_filter.state_history((j-1)*4+state_num,:)-agents{j}.true_state(state_num,:),'Color',color_wheel(5,:))
-    % plot(input_tvec,2*sqrt(squeeze(baseline_filter.cov_history((j-1)*4+1,(j-1)*4+1,:))'),'k--')
-    % plot(input_tvec,-2*sqrt(squeeze(baseline_filter.cov_history((j-1)*4+1,(j-1)*4+1,:))'),'k--')
+%     plot(input_tvec,2*sqrt(squeeze(baseline_filter.cov_history((j-1)*4+state_num,(j-1)*4+state_num,:))'),'--','Color',color_wheel(5,:))
+%     plot(input_tvec,-2*sqrt(squeeze(baseline_filter.cov_history((j-1)*4+state_num,(j-1)*4+state_num,:))'),'--','Color',color_wheel(5,:))
 
     str1 = strcat(num2str(j),' estimating ',num2str(k));
     str2 = strcat(num2str(k),' estimating ',num2str(j));
-    legend(str2,strcat('\pm',num2str(sigma),'\sigma'),strcat('cent. KF  ',num2str(j)))
+    l = legend(str2,strcat('\pm',num2str(sigma),'\sigma'),strcat('cent. KF  ',num2str(j)));
+    l.FontSize = 10;
     xlabel('Time [s]')
     ylabel('Est Error [m]')
     title(['Estimation error in ',num2str(state_num),', \delta=',num2str(delta),', ',num2str(j),'\leftrightarrow',num2str(k)])
     
-    plot(input_tvec,ci_trigger_mat_plotting(j,:),'kx')
+%     plot(input_tvec,ci_trigger_mat_plotting(j,:),'kx')
     
 %     if state_num==1
 %         plot(input_tvec,abs_meas_mat(j,:,1)-agents{j}.true_state(1,:),'rx')

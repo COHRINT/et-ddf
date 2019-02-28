@@ -15,24 +15,24 @@ rng(238)
 
 %% Specify connections
 
-% connections = {[3],[3],[1,2,4],[3,5,6],[4],[4]};
+connections = {[3],[3],[1,2,4],[3,5,6],[4],[4]};
 
 % connections = {[2],[1,3],[2,4],[3,5],[4,6],[5]};
 
 % connections = {[5],[5],[6],[6],[1,2,7],[3,4,7],[5,6,8],[7,9,10],[8,11,12],...
 %                 [8,13,14],[9],[9],[10],[10]};
 
-connections = {[9],[9],[10],[10],[11],[11],[12],[12],...
-                [1,2,13],[3,4,13],[5,6,14],[7,8,14],[9,10,15],[11,12,15],[13,14,16],...
-                [15,17,18],[16,19,20],[16,21,22],[17,23,24],[17,25,26],[18,27,28],...
-                [18,29,30],[19],[19],[20],[20],[21],[21],[22],[22]};
+% connections = {[9],[9],[10],[10],[11],[11],[12],[12],...
+%                 [1,2,13],[3,4,13],[5,6,14],[7,8,14],[9,10,15],[11,12,15],[13,14,16],...
+%                 [15,17,18],[16,19,20],[16,21,22],[17,23,24],[17,25,26],[18,27,28],...
+%                 [18,29,30],[19],[19],[20],[20],[21],[21],[22],[22]};
 
 % connections = {[2,3,4,5],[1,3,6,7],[1,2,8,9],[1],[1],[2],[2],[3],[3]};
 
 % connections = {[2],[1]};
             
 % specify which platforms get gps-like measurements
-abs_meas_vec = [11 18];
+abs_meas_vec = [1 6];
 
 % number of agents
 N = length(connections);
@@ -43,9 +43,9 @@ num_connections = 3;
 % tau_state_goal_vec = 5:0.5:15;
 % tau_state_vec = 0:0.5:25;
 
-delta_vec = 1;
+delta_vec = [1];
 tau_state_goal_vec = 15;
-msg_drop_prob_vec = [0 .20 .50 .80];
+msg_drop_prob_vec = 0;
 
 % cost = zeros(length(delta_vec),length(tau_state_goal_vec),5);
 w1 = 0.5;
@@ -53,11 +53,11 @@ w2 = 0.5;
 
 loop_cnt = 1;
 
-max_time = 20;
+max_time = 50;
 dt = 0.1;
 input_tvec = 0:dt:max_time;
 
-cost = zeros(length(delta_vec)*length(tau_state_goal_vec),9);
+cost = zeros(length(delta_vec)*length(tau_state_goal_vec)*length(msg_drop_prob_vec),9);
 network_mse = zeros(N,length(input_tvec),length(msg_drop_prob_vec));
 
 for idx1=1:length(delta_vec)
@@ -81,9 +81,9 @@ use_adaptive = true;
 msg_drop_prob = msg_drop_prob_vec(idx3);
 
 % simulation params
-max_time = 20;
-dt = 0.1;
-input_tvec = 0:dt:max_time;
+% max_time = 20;
+% dt = 0.1;
+% input_tvec = 0:dt:max_time;
 
 %% True starting position and input
 
@@ -207,9 +207,9 @@ for i = 2:length(input_tvec)
     for j=randperm(length(agents))
         msgs = {};
         
-        if i == 107 && j == 16
-            disp('break')
-        end
+%         if i == 107 && j == 16
+%             disp('break')
+%         end
         
         % propagate true state
         w = mvnrnd([0,0,0,0],Q_local_true)';
@@ -235,7 +235,7 @@ for i = 2:length(input_tvec)
         
         % relative position
         for k=randperm(length(agents{j}.connections))
-%             if agents{j}.connections(k) > 0
+%             if agents{j}.agent_id ~= 5
                 v_rel = mvnrnd([0,0],R_rel)';
 %                 v_rel = v_rel_data{j}(:,i);
                 y_rel = H_rel*[agents{j}.true_state(:,end); ...
@@ -269,9 +269,9 @@ for i = 2:length(input_tvec)
     %% All agents now process received measurements, performing implicit and
     % explicit measurement updates
     for j=randperm(length(agents))
-        if j == 16 && i == 107
-            disp('break')
-        end
+%         if j == 16 && i == 107
+%             disp('break')
+%         end
         agents{j}.process_received_measurements({inbox{j,:}});
     end
     
@@ -431,7 +431,8 @@ for i = 2:length(input_tvec)
         end
         
         [loc,iidx] = agents{j}.get_location(agents{j}.agent_id);
-        network_mse(j,i,idx3) = sum((agents{j}.local_filter.state_history(iidx,i) - agents{j}.true_state(:,i)).^2,1)./4;
+%         network_mse(j,i,idx1) = sum((agents{j}.local_filter.state_history(iidx,i) - agents{j}.true_state(:,i)).^2,1)./4;
+        network_mse(j,i,idx1) = norm(agents{j}.local_filter.state_history(iidx,i) - agents{j}.true_state(:,i))^2;
         
     end
               
@@ -439,6 +440,8 @@ for i = 2:length(input_tvec)
 
 
 end
+
+avg_mse = mean(network_mse,1);
 
 %% compute costs and FOMs
 

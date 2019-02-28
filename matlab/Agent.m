@@ -92,7 +92,7 @@ classdef Agent < handle
             
             % predict and update local filter, and common estimates
             obj.local_filter.predict(input_vec);
-            for i=1:length(obj.common_estimates)
+            for i=randperm(length(obj.common_estimates))
                 % propagate common estimate, giving no input
                 obj.common_estimates{i}.predict(zeros(size(obj.common_estimates{i}.G,2),1));
             end
@@ -102,7 +102,7 @@ classdef Agent < handle
             loopback = {};
             
             % process each collected measurement
-            for i=1:length(local_measurements)
+            for i=randperm(length(local_measurements))
                 
                 % unpack msg
                 msg = local_measurements{i};
@@ -122,7 +122,7 @@ classdef Agent < handle
 %                 obj.total_msgs = obj.total_msgs + 2;
                 
                 % threshold measurement and update common estimate
-                for j=1:length(obj.common_estimates)
+                for j=randperm(length(obj.common_estimates))
                     
                     msg = local_measurements{i};
                     src = msg.src;
@@ -169,7 +169,7 @@ classdef Agent < handle
                         % update common estimate with thresholding result
                         x_local = obj.local_filter.x(sort([src_idx,dest_idx]));
                         P_local = obj.local_filter.P(sort([src_idx,dest_idx]),sort([src_idx,dest_idx]));
-                        obj.common_estimates{j}.msg_update(msg,x_local,P_local);
+%                         obj.common_estimates{j}.msg_update(msg,x_local,P_local);
                         
                         % add msg to outgoing msg queue
                         outgoing{end+1} = msg;
@@ -179,29 +179,29 @@ classdef Agent < handle
                 end              
             end
             
-%             for i=1:length(loopback)
-%                 
-%                 msg = loopback{i}{1};
-%                 x_local = loopback{i}{2};
-%                 P_local = loopback{i}{3};
-%                 
-%                 for j=1:length(obj.common_estimates)
-%                     
-% %                     [~,src_idx] = obj.get_location(msg.src);
-% %                     [~,dest_idx] = obj.get_location(msg.dest);
-% 
-%                     
-%                     % find common estimate associated with msg destination
-%                     if obj.common_estimates{j}.connection == msg.dest
-%                         
-%                         % update common estimate with thresholding result
-% %                         x_local = obj.local_filter.x(sort([src_idx,dest_idx]));
-% %                         P_local = obj.local_filter.P(sort([src_idx,dest_idx]),sort([src_idx,dest_idx]));
-%                         obj.common_estimates{j}.msg_update(msg,x_local,P_local);
-%                         
-%                     end
-%                 end
-%             end
+            for i=randperm(length(loopback))
+                
+                msg = loopback{i}{1};
+                x_local = loopback{i}{2};
+                P_local = loopback{i}{3};
+                
+                for j=randperm(length(obj.common_estimates))
+                    
+%                     [~,src_idx] = obj.get_location(msg.src);
+%                     [~,dest_idx] = obj.get_location(msg.dest);
+
+                    
+                    % find common estimate associated with msg destination
+                    if obj.common_estimates{j}.connection == msg.dest
+                        
+                        % update common estimate with thresholding result
+%                         x_local = obj.local_filter.x(sort([src_idx,dest_idx]));
+%                         P_local = obj.local_filter.P(sort([src_idx,dest_idx]),sort([src_idx,dest_idx]));
+                        obj.common_estimates{j}.msg_update(msg,x_local,P_local);
+                        
+                    end
+                end
+            end
 %                 
                 
         end
@@ -301,7 +301,7 @@ classdef Agent < handle
         function process_received_measurements(obj,inbox)
             
             % process each collected measurement
-            for i=1:length(inbox)
+            for i=randperm(length(inbox))
                 if ~isempty(inbox{i})
 
                     % source of local measurements is agent
@@ -328,7 +328,7 @@ classdef Agent < handle
 %                     obj.total_msgs = obj.total_msgs + 1;
 
                     % threshold measurement and update common estimate
-                    for j=1:length(obj.common_estimates)
+                    for j=randperm(length(obj.common_estimates))
 
                         % find common estimate associated with msg destination
                         if obj.common_estimates{j}.connection == inbox{i}.src

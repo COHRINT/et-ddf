@@ -26,6 +26,16 @@ for i=1:length(all_msgs)
     
 end
 
+msgs_sent_vec = zeros(1,N);
+msgs_total_vec = zeros(1,N);
+for i=1:length(agents)
+    msgs_sent_vec(i) = agents{i}.msgs_sent;
+    msgs_total_vec(i) = agents{i}.total_msgs;
+end
+
+msgs_sent_total = sum(msgs_sent_vec);
+possible_msgs_total = sum(msgs_total_vec);
+    
 % comms heatmaps
 figure
 disp_mat = comms_mat_sent(:,:,1,1)./comms_mat_total(:,:,1,1);
