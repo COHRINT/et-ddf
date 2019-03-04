@@ -15,24 +15,24 @@ rng(238)
 
 %% Specify connections
 
-connections = {[3],[3],[1,2,4],[3,5,6],[4],[4]};
+% connections = {[3],[3],[1,2,4],[3,5,6],[4],[4]};
 
 % connections = {[2],[1,3],[2,4],[3,5],[4,6],[5]};
 
 % connections = {[5],[5],[6],[6],[1,2,7],[3,4,7],[5,6,8],[7,9,10],[8,11,12],...
 %                 [8,13,14],[9],[9],[10],[10]};
 
-% connections = {[9],[9],[10],[10],[11],[11],[12],[12],...
-%                 [1,2,13],[3,4,13],[5,6,14],[7,8,14],[9,10,15],[11,12,15],[13,14,16],...
-%                 [15,17,18],[16,19,20],[16,21,22],[17,23,24],[17,25,26],[18,27,28],...
-%                 [18,29,30],[19],[19],[20],[20],[21],[21],[22],[22]};
+connections = {[9],[9],[10],[10],[11],[11],[12],[12],...
+                [1,2,13],[3,4,13],[5,6,14],[7,8,14],[9,10,15],[11,12,15],[13,14,16],...
+                [15,17,18],[16,19,20],[16,21,22],[17,23,24],[17,25,26],[18,27,28],...
+                [18,29,30],[19],[19],[20],[20],[21],[21],[22],[22]};
 
 % connections = {[2,3,4,5],[1,3,6,7],[1,2,8,9],[1],[1],[2],[2],[3],[3]};
 
 % connections = {[2],[1]};
             
 % specify which platforms get gps-like measurements
-abs_meas_vec = [1 6];
+abs_meas_vec = [13 14 17 18];
 
 % number of agents
 N = length(connections);
@@ -43,7 +43,7 @@ num_connections = 3;
 % tau_state_goal_vec = 5:0.5:15;
 % tau_state_vec = 0:0.5:25;
 
-delta_vec = [1];
+delta_vec = [0.5 1 1.5 2];
 tau_state_goal_vec = 15;
 msg_drop_prob_vec = 0;
 
@@ -59,6 +59,7 @@ input_tvec = 0:dt:max_time;
 
 cost = zeros(length(delta_vec)*length(tau_state_goal_vec)*length(msg_drop_prob_vec),9);
 network_mse = zeros(N,length(input_tvec),length(msg_drop_prob_vec));
+baseline_mse = zeros(N,length(input_tvec),length(delta_vec));
 
 for idx1=1:length(delta_vec)
 for idx2=1:length(tau_state_goal_vec) 
@@ -88,7 +89,7 @@ msg_drop_prob = msg_drop_prob_vec(idx3);
 %% True starting position and input
 
 for i=1:N
-    x_true = [i*10,0,i*10,0]' + mvnrnd([0,0,0,0],diag([5 5 5 5]))';
+    x_true = [i*10,0,i*10,0]' + mvnrnd([0,0,0,0],diag([5 0.5 5 0.5]))';
     x_true_vec((i-1)*4+1:(i-1)*4+4,1) = x_true;
     
     % generate input for platforms
@@ -432,7 +433,9 @@ for i = 2:length(input_tvec)
         
         [loc,iidx] = agents{j}.get_location(agents{j}.agent_id);
 %         network_mse(j,i,idx1) = sum((agents{j}.local_filter.state_history(iidx,i) - agents{j}.true_state(:,i)).^2,1)./4;
-        network_mse(j,i,idx1) = norm(agents{j}.local_filter.state_history(iidx,i) - agents{j}.true_state(:,i))^2;
+        network_mse(j,i,idx1) = norm(agents{j}.local_filter.state_history([iidx(1),iidx(3)],i) - agents{j}.true_state([1 3],i))^2;
+        
+        baseline_mse(j,i,idx1) = norm(baseline_filter.state_history([4*(j-1)+1,4*(j-1)+3],i) - agents{j}.true_state([1 3],i))^2;
         
     end
               
