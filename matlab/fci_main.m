@@ -43,8 +43,8 @@ num_connections = 3;
 % tau_state_goal_vec = 5:0.5:15;
 % tau_state_vec = 0:0.5:25;
 
-delta_vec = [0.5 1 1.5 2];
-tau_state_goal_vec = 15;
+delta_vec = [1];
+tau_state_goal_vec = 10;
 msg_drop_prob_vec = 0;
 
 % cost = zeros(length(delta_vec),length(tau_state_goal_vec),5);
@@ -136,45 +136,85 @@ for i=1:N
     
     agent_id = i;
     
+    ids = sort([agent_id,connections{i}]);
+    % add shortest path to gps node to estimate
+%     gps_sp_ids = setdiff(shortest_paths{i},ids);
+    neighbor_conn_ids = [];
+    for j=1:length(connections{i})
+        for k=1:length(connections{connections{i}(j)})
+            if ~any(neighbor_conn_ids == connections{connections{i}(j)}(k))
+                neighbor_conn_ids = [neighbor_conn_ids,connections{connections{i}(j)}];
+            end
+        end
+    end
+    neighbor_conn_ids = neighbor_conn_ids(neighbor_conn_ids~=agent_id);
+%     ids = sort([ids,gps_sp_ids]);
+    ids = sort([ids,neighbor_conn_ids]);
+%     connections_new = sort([gps_sp_ids,connections{i}]);
+    connections_new = sort([neighbor_conn_ids,connections{i}]);
+    meas_connections = connections{i};
+    
+    est_state_length = length(ids);
+    
     % construct local estimates
-    n = (length(connections{i})+1)*4;
-    [F,G] = ncv_dyn(dt,length(connections{i})+1);
+    n = (est_state_length)*4;
+    [F,G] = ncv_dyn(dt,est_state_length);
 %     Q_localfilter = 1*eye(n);
-    Q_localfilter_cell = cell(1,length(connections{i})+1);
+    Q_localfilter_cell = cell(1,est_state_length);
+    
+%     % construct local estimates
+%     n = (length(connections{i})+1)*4;
+%     [F,G] = ncv_dyn(dt,length(connections{i})+1);
+% %     Q_localfilter = 1*eye(n);
+%     Q_localfilter_cell = cell(1,length(connections{i})+1);
     [Q_localfilter_cell{:}] = deal(Q_local);
     Q_localfilter = blkdiag(Q_localfilter_cell{:});
 
-    ids = sort([agent_id,connections{i}]);
+    ids = sort([agent_id,connections_new]);
     x0 = [];
     for j=1:length(ids)
         x0 = [x0; x_true_vec((ids(j)-1)*4+1:(ids(j)-1)*4+4,1)];
     end
     
-    P0 = 100*eye(4*(length(connections{i})+1));
+    P0 = 100*eye(4*est_state_length);
     
-    local_filter = ETKF(F,G,0,0,Q_localfilter,R_abs,R_rel,x0,P0,delta,agent_id,connections{i});
+    local_filter = ETKF(F,G,0,0,Q_localfilter,R_abs,R_rel,x0,P0,delta,agent_id,connections_new);
     
-    % construct common estimates, will always only have two agents
-    [F_comm,G_comm] = ncv_dyn(dt,2);
-%     Q_comm = 1*eye(8);
-    Q_comm = blkdiag(Q_local,Q_local);
+    % construct common estimates, with intersection of states
+    % loop over meas_connections, aka direct connections
     common_estimates = {};
-    
-    for j=1:length(connections{i})
+    for j=1:length(meas_connections)
+        
+        % find intersection of states
+%         inter_states = intersect([agent_id,connections_new],[connections{i}(j),connections{connections{i}(j)}]); 
+        inter_states = unique([meas_connections,connections{connections{i}(j)}]);
         
         % make sure common estimate state vector is ordered by agent id
-        comm_ids = sort([agent_id,connections{i}(j)]);
+%         comm_ids = sort([agent_id,connections{i}(j)]);
+        comm_ids = inter_states;
         x0_comm = [];
         
         for k=1:length(comm_ids)
             x0_comm = [x0_comm; x_true_vec((comm_ids(k)-1)*4+1:(comm_ids(k)-1)*4+4,1)];
         end
 
-        P0_comm = 100*eye(8);
-        common_estimates{j} = ETKF(F_comm,G_comm,0,0,Q_comm,R_abs,R_rel,x0_comm,P0_comm,delta,agent_id,connections{i}(j));
+        P0_comm = 100*eye(4*length(comm_ids));
+        
+        [F_comm,G_comm] = ncv_dyn(dt,length(comm_ids));
+%         Q_comm = 1*eye(8);
+        Q_comm_cell = cell(1,length(comm_ids));
+        [Q_comm_cell{:}] = deal(Q_local);
+        Q_comm = blkdiag(Q_comm_cell{:});
+        
+%         common_estimates = {};
+        comm_ids = comm_ids(comm_ids~=agent_id);
+    
+        common_estimates{j} = ETKF(F_comm,G_comm,0,0,Q_comm,R_abs,R_rel,x0_comm,P0_comm,delta,agent_id,comm_ids);
     end
     
-    agents{i} = Agent(agent_id,connections{i},local_filter,common_estimates,x_true_vec((i-1)*4+1:(i-1)*4+4,1),msg_drop_prob,length(x0)*tau_state_goal,length(x0)*tau_state);
+    agents{i} = Agent(agent_id,connections_new,meas_connections,neighbor_conn_ids,...
+                        local_filter,common_estimates,x_true_vec((i-1)*4+1:(i-1)*4+4,1),...
+                        msg_drop_prob,length(x0)*tau_state_goal,length(x0)*tau_state);
     
 end
 
@@ -223,7 +263,7 @@ for i = 2:length(input_tvec)
 %             v = v_data{j}(:,i);
             y_abs = H_local*agents{j}.true_state(:,end) + v;
             y_abs_msg = struct('src',agents{j}.agent_id,'dest',agents{j}.agent_id,...
-                        'status',[1 1],'type',"abs",'data',y_abs);
+                        'target',agents{j}.agent_id,'status',[1 1],'type',"abs",'data',y_abs);
             msgs = {y_abs_msg};
             
             if binornd(1,1-msg_drop_prob)
@@ -235,18 +275,18 @@ for i = 2:length(input_tvec)
         end
         
         % relative position
-        for k=randperm(length(agents{j}.connections))
+        for k=randperm(length(agents{j}.meas_connections))
 %             if agents{j}.agent_id ~= 5
                 v_rel = mvnrnd([0,0],R_rel)';
 %                 v_rel = v_rel_data{j}(:,i);
                 y_rel = H_rel*[agents{j}.true_state(:,end); ...
-                    agents{agents{j}.connections(k)}.true_state(:,end)] + v_rel;
-                y_rel_msg = struct('src',agents{j}.agent_id,'dest',agents{j}.connections(k),...
-                    'status',[1 1],'type',"rel",'data',y_rel);
+                    agents{agents{j}.meas_connections(k)}.true_state(:,end)] + v_rel;
+                y_rel_msg = struct('src',agents{j}.agent_id,'dest',agents{j}.meas_connections(k),...
+                    'target',agents{j}.meas_connections(k),'status',[1 1],'type',"rel",'data',y_rel);
                 msgs{end+1} = y_rel_msg;
                 
                 if binornd(1,1-msg_drop_prob)
-                baseline_filter.update(y_rel,'rel',agents{j}.agent_id,agents{j}.connections(k));
+                baseline_filter.update(y_rel,'rel',agents{j}.agent_id,agents{j}.meas_connections(k));
                 end
                 
                 rel_meas_mat(j,i,1) = y_rel(1);
@@ -286,7 +326,7 @@ for i = 2:length(input_tvec)
         alpha = ones(4*(length(agents{j}.connections)+1),1);
 
         % check trace of cov to determine if CI should be triggered
-        if trace(agents{j}.local_filter.P*diag(alpha)) > agents{j}.tau
+        if trace(agents{j}.local_filter.P*diag(alpha)) > agents{j}.tau || i<10
             agents{j}.ci_trigger_cnt = agents{j}.ci_trigger_cnt + 1;
             agents{j}.ci_trigger_rate = agents{j}.ci_trigger_cnt / (i-1);
             ci_trigger_list(j) = 1;

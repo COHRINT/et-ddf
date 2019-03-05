@@ -78,7 +78,7 @@ classdef ETKF < handle
 
         end
         
-        function [src,dest,outgoing_status,type,outgoing_data] = threshold(obj,msg)
+        function [src,dest,target,outgoing_status,type,outgoing_data] = threshold(obj,msg)
             % thresholds each measurement component against pred and
             % creates boolean vector of whether to trasmit each component
             % or not
@@ -86,13 +86,14 @@ classdef ETKF < handle
             % unpack message
             src = msg.src;
             dest = msg.dest;
+            target = msg.target;
             status = msg.status;
             type = msg.type;
             data = msg.data;
             
-            % get locations in state estimate of measurement src and dest
+            % get locations in state estimate of measurement src and target
             src_loc = obj.get_location(src);
-            dest_loc = obj.get_location(dest);
+            target_loc = obj.get_location(target);
             
             % initialize new status and data arrays
             outgoing_status = zeros(1,length(data));
@@ -107,7 +108,7 @@ classdef ETKF < handle
                     H(1,4*(src_loc-1)+(i-1)*2+1) = 1; %H(2,4*(src_loc-1)+3) = 1;
                 elseif strcmp(type,"rel")
                     H(1,4*(src_loc-1)+(i-1)*2+1) = 1; %H(2,4*(src_loc-1)+3) = 1;
-                    H(1,4*(dest_loc-1)+(i-1)*2+1) = -1; %H(2,4*(dest_loc-1)+3) = -1;
+                    H(1,4*(target_loc-1)+(i-1)*2+1) = -1; %H(2,4*(dest_loc-1)+3) = -1;
                 end
                 
                 % filter predicted measurement
@@ -189,7 +190,7 @@ classdef ETKF < handle
             
         end
         
-        function [x_curr,P_curr] = explicit_update(obj,src_id,dest_id,type,meas_val,data_idx)
+        function [x_curr,P_curr] = explicit_update(obj,src_id,target_id,type,meas_val,data_idx)
             
             i=data_idx;
             H = zeros(1,size(obj.F,1));
@@ -198,7 +199,7 @@ classdef ETKF < handle
                 R = obj.R_abs(1,1);
             elseif strcmp(type,"rel")
                 H(1,4*(src_id-1)+(i-1)*2+1) = 1; %H(2,4*(src_id-1)+3) = 1;
-                H(1,4*(dest_id-1)+(i-1)*2+1) = -1; %H(2,4*(dest_id-1)+3) = -1;
+                H(1,4*(target_id-1)+(i-1)*2+1) = -1; %H(2,4*(dest_id-1)+3) = -1;
                 R = obj.R_rel(1,1);
             end
             
@@ -222,7 +223,7 @@ classdef ETKF < handle
 
         end
         
-        function [x_curr,P_curr] = implicit_update(obj,src_id,dest_id,type,x_local,P_local,data_idx)
+        function [x_curr,P_curr] = implicit_update(obj,src_id,target_id,type,x_local,P_local,data_idx)
             
 %             src_id = 1;
             
@@ -231,7 +232,7 @@ classdef ETKF < handle
                 type{1} = 'abs';
             end
             
-            if isempty(src_id) || isempty(dest_id)
+            if isempty(src_id) || isempty(target_id)
                 breakpoint = 0;
             end
             
@@ -250,7 +251,7 @@ classdef ETKF < handle
                     R = obj.R_rel(i,i);
                 elseif strcmp(type,"rel")
                     H(1,4*(src_id-1)+(i-1)*2+1) = 1; %H(2,4*(src_id-1)+3) = 1;
-                    H(1,4*(dest_id-1)+(i-1)*2+1) = -1; %H(2,4*(obj.agent_id-1)+3) = -1;
+                    H(1,4*(target_id-1)+(i-1)*2+1) = -1; %H(2,4*(obj.agent_id-1)+3) = -1;
 %                     H_local(1,(i-1)*2+1) = 1;
 %                     H_local(1,(i-1)*2+3) = -1;
 %                     H_local(1,1) = 1;
@@ -301,15 +302,16 @@ classdef ETKF < handle
             % unpack message
             src = msg.src;
             dest = msg.dest;
+            target = msg.target;
             status = msg.status;
             type = msg.type;
             data = msg.data;
             
             % get locations in state estimate of measurement src and dest
             src_loc = obj.get_location(src);
-            dest_loc = obj.get_location(dest);
+            target_loc = obj.get_location(target);
             
-            if isempty(src_loc) || isempty(dest_loc)
+            if (isempty(src_loc) || isempty(target_loc))
                 breakpoint = 0;
             end
             
@@ -319,12 +321,12 @@ classdef ETKF < handle
                 
                 % if status for element is true, explicit update
                 if status(i)
-                    obj.explicit_update(src_loc,dest_loc,type,data(data_cnt),i);
+                    obj.explicit_update(src_loc,target_loc,type,data(data_cnt),i);
                     data_cnt = data_cnt + 1;
                     
                 % otherwise, implicit update
                 else
-                    obj.implicit_update(src_loc,dest_loc,type,x_local,P_local,i);
+                    obj.implicit_update(src_loc,target_loc,type,x_local,P_local,i);
                 end  
             end    
         end    

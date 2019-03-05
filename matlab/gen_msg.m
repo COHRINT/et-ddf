@@ -3,7 +3,7 @@
 % Ian Loefgren
 % 2.4.2019
 
-function [msg] = gen_msg(src_id,dest_id,status,type,data)
+function [msg] = gen_msg(src_id,dest_id,target_id,status,type,data)
 
 % type checking for each msg component
 % assert(isinteger(src_id) == true);
@@ -21,6 +21,11 @@ if ~isempty(status)
     assert(sum(status) == length(data));
 end
 
-msg = struct('src',src_id,'dest',dest_id,'status',status,'type',type,'data',data);
+msg = struct('src',src_id,...
+            'dest',dest_id,...
+            'target',target_id,...
+            'status',status,...
+            'type',type,...
+            'data',data);
 
 end
