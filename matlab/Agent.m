@@ -166,7 +166,7 @@ classdef Agent < handle
                     end
                     
                     % find common estimate associated with msg destination
-                    if any(obj.common_estimates{j}.connection == msg.dest)
+%                     if any(obj.common_estimates{j}.connection == msg.dest)
                         
                         % threshold measurement
                         [src_,dest_,target_,status_,type_,data_] = obj.common_estimates{j}.threshold(msg);
@@ -194,7 +194,7 @@ classdef Agent < handle
                         outgoing{end+1} = msg;
                         loopback{end+1} = {msg,x_local,P_local};
                         
-                    end
+%                     end
                 end              
             end
             

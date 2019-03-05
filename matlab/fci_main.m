@@ -15,36 +15,36 @@ rng(238)
 
 %% Specify connections
 
-% connections = {[3],[3],[1,2,4],[3,5,6],[4],[4]};
+connections = {[3],[3],[1,2,4],[3,5,6],[4],[4]};
 
 % connections = {[2],[1,3],[2,4],[3,5],[4,6],[5]};
 
 % connections = {[5],[5],[6],[6],[1,2,7],[3,4,7],[5,6,8],[7,9,10],[8,11,12],...
 %                 [8,13,14],[9],[9],[10],[10]};
 
-connections = {[9],[9],[10],[10],[11],[11],[12],[12],...
-                [1,2,13],[3,4,13],[5,6,14],[7,8,14],[9,10,15],[11,12,15],[13,14,16],...
-                [15,17,18],[16,19,20],[16,21,22],[17,23,24],[17,25,26],[18,27,28],...
-                [18,29,30],[19],[19],[20],[20],[21],[21],[22],[22]};
+% connections = {[9],[9],[10],[10],[11],[11],[12],[12],...
+%                 [1,2,13],[3,4,13],[5,6,14],[7,8,14],[9,10,15],[11,12,15],[13,14,16],...
+%                 [15,17,18],[16,19,20],[16,21,22],[17,23,24],[17,25,26],[18,27,28],...
+%                 [18,29,30],[19],[19],[20],[20],[21],[21],[22],[22]};
 
 % connections = {[2,3,4,5],[1,3,6,7],[1,2,8,9],[1],[1],[2],[2],[3],[3]};
 
 % connections = {[2],[1]};
             
 % specify which platforms get gps-like measurements
-abs_meas_vec = [13 14 17 18];
+abs_meas_vec = [1 6];
 
 % number of agents
 N = length(connections);
 % connection topology: tree
-num_connections = 3;
+num_connections = 2;
 
 % delta_vec = 0:0.5:5;
 % tau_state_goal_vec = 5:0.5:15;
 % tau_state_vec = 0:0.5:25;
 
 delta_vec = [1];
-tau_state_goal_vec = 10;
+tau_state_goal_vec = 4;
 msg_drop_prob_vec = 0;
 
 % cost = zeros(length(delta_vec),length(tau_state_goal_vec),5);
@@ -310,9 +310,9 @@ for i = 2:length(input_tvec)
     %% All agents now process received measurements, performing implicit and
     % explicit measurement updates
     for j=randperm(length(agents))
-%         if j == 16 && i == 107
-%             disp('break')
-%         end
+        if j == 5 && i == 100
+            disp('break')
+        end
         agents{j}.process_received_measurements({inbox{j,:}});
     end
     
@@ -338,15 +338,15 @@ for i = 2:length(input_tvec)
             % connection inboxes
             x_snap = agents{j}.local_filter.x;
             P_snap = agents{j}.local_filter.P;
-            for k=randperm(length(agents{j}.connections))
+            for k=randperm(length(agents{j}.meas_connections))
     
                 % compute transforms for platform and connection, and
                 % number of intersecting states
                 
                 [Ta,il_a] = gen_sim_transform(agents{j}.agent_id,agents{j}.connections,...
-                    agents{agents{j}.connections(k)}.agent_id,agents{agents{j}.connections(k)}.connections);
-                [Tb,il_b] = gen_sim_transform(agents{agents{j}.connections(k)}.agent_id,...
-                    agents{agents{j}.connections(k)}.connections,agents{j}.agent_id,agents{j}.connections);
+                    agents{agents{j}.meas_connections(k)}.agent_id,agents{agents{j}.meas_connections(k)}.connections);
+                [Tb,il_b] = gen_sim_transform(agents{agents{j}.meas_connections(k)}.agent_id,...
+                    agents{agents{j}.meas_connections(k)}.connections,agents{j}.agent_id,agents{j}.connections);
 
                 % transform means and covariances to group common states at
                 % beginning of state vector/covariance
@@ -356,10 +356,10 @@ for i = 2:length(input_tvec)
                 PaTred = PaT(1:il_a,1:il_a);
                 
 %                 ci_inbox{agents{j}.connections(k)}{end+1} = {x_snap,P_snap,agents{j}.agent_id,agents{j}.connections};
-                ci_inbox{agents{j}.connections(k)}{end+1} = {xaTred,PaTred,agents{j}.agent_id,agents{j}.connections,agents{j}.tau};
+                ci_inbox{agents{j}.meas_connections(k)}{end+1} = {xaTred,PaTred,agents{j}.agent_id,agents{j}.connections,agents{j}.tau};
                 
-                x_conn_snap = agents{agents{j}.connections(k)}.local_filter.x;
-                P_conn_snap = agents{agents{j}.connections(k)}.local_filter.P;
+                x_conn_snap = agents{agents{j}.meas_connections(k)}.local_filter.x;
+                P_conn_snap = agents{agents{j}.meas_connections(k)}.local_filter.P;
                 
                 xbT = Tb\x_conn_snap;
                 xbTred = xbT(1:il_b);
@@ -367,9 +367,9 @@ for i = 2:length(input_tvec)
                 PbTred = PbT(1:il_b,1:il_b);
                 
 %                 ci_inbox{j}{end+1} = {x_conn_snap,P_conn_snap,agents{j}.connections(k),agents{agents{j}.connections(k)}.connections};
-                ci_inbox{j}{end+1} = {xbTred,PbTred,agents{j}.connections(k),agents{agents{j}.connections(k)}.connections,agents{agents{j}.connections(k)}.ci_trigger_rate};
+                ci_inbox{j}{end+1} = {xbTred,PbTred,agents{j}.meas_connections(k),agents{agents{j}.meas_connections(k)}.connections,agents{agents{j}.meas_connections(k)}.ci_trigger_rate};
                 
-                if isempty(agents{agents{j}.connections(k)}.connections)
+                if isempty(agents{agents{j}.meas_connections(k)}.connections)
                     disp('break')
                 end
                 
@@ -429,6 +429,10 @@ for i = 2:length(input_tvec)
                 % transform back to normal state order
                 xa = Ta*v;
                 Pa = Ta*V/Ta;
+                
+                if i==100
+                    bp = 1;
+                end
                 
                 % update local estimates
                 agents{j}.local_filter.x = xa;
