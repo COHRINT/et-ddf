@@ -70,7 +70,7 @@ usage_vec_ci = zeros(1,N);
 for i=1:length(agents)
     ci_trigger_vec(1,i) = agents{i}.ci_trigger_cnt;
 %     usage_vec_ci(1,i) = agents{i}.ci_trigger_cnt * (size(agents{i}.local_filter.x,1)^2 + size(agents{i}.local_filter.x,1)) * length(agents{i}.connections);
-    usage_vec_ci(1,i) = agents{i}.ci_trigger_cnt * (72) * length(agents{i}.connections);
+    usage_vec_ci(1,i) = agents{i}.ci_trigger_cnt * (size(agents{i}.local_filter.x,1))^2 * length(agents{i}.meas_connections);
 end
 
 figure
@@ -84,6 +84,7 @@ subplot(2,1,2)
 heatmap(ci_trigger_vec./((max_time/dt)))
 title('CI trigger rate of each agent')
 xlabel('Agent id')
+
 ylabel(' ')
         
 
