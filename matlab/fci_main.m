@@ -8,31 +8,31 @@
 % in that the state vectors of each agent are reduced from the whole
 % network's states.
 
-clear; close all; clc;
+clear; %close all; clc;
 % load('sensor_noise_data.mat');
 
-rng(238)
+rng(999)
 
 %% Specify connections
 
-connections = {[3],[3],[1,2,4],[3,5,6],[4],[4]};
+% connections = {[3],[3],[1,2,4],[3,5,6],[4],[4]};
 
 % connections = {[2],[1,3],[2,4],[3,5],[4,6],[5]};
 
 % connections = {[5],[5],[6],[6],[1,2,7],[3,4,7],[5,6,8],[7,9,10],[8,11,12],...
 %                 [8,13,14],[9],[9],[10],[10]};
 
-% connections = {[9],[9],[10],[10],[11],[11],[12],[12],...
-%                 [1,2,13],[3,4,13],[5,6,14],[7,8,14],[9,10,15],[11,12,15],[13,14,16],...
-%                 [15,17,18],[16,19,20],[16,21,22],[17,23,24],[17,25,26],[18,27,28],...
-%                 [18,29,30],[19],[19],[20],[20],[21],[21],[22],[22]};
+connections = {[9],[9],[10],[10],[11],[11],[12],[12],...
+                [1,2,13],[3,4,13],[5,6,14],[7,8,14],[9,10,15],[11,12,15],[13,14,16],...
+                [15,17,18],[16,19,20],[16,21,22],[17,23,24],[17,25,26],[18,27,28],...
+                [18,29,30],[19],[19],[20],[20],[21],[21],[22],[22]};
 
 % connections = {[2,3,4,5],[1,3,6,7],[1,2,8,9],[1],[1],[2],[2],[3],[3]};
 
 % connections = {[2],[1]};
             
 % specify which platforms get gps-like measurements
-abs_meas_vec = [1 6];
+abs_meas_vec = [13 14 17 18];
 
 % number of agents
 N = length(connections);
@@ -43,8 +43,8 @@ num_connections = 2;
 % tau_state_goal_vec = 5:0.5:15;
 % tau_state_vec = 0:0.5:25;
 
-delta_vec = [1];
-tau_state_goal_vec = 4;
+delta_vec = [1.5];
+tau_state_goal_vec = 2;
 msg_drop_prob_vec = 0;
 
 % cost = zeros(length(delta_vec),length(tau_state_goal_vec),5);
@@ -53,7 +53,7 @@ w2 = 0.5;
 
 loop_cnt = 1;
 
-max_time = 50;
+max_time = 20;
 dt = 0.1;
 input_tvec = 0:dt:max_time;
 
@@ -178,7 +178,7 @@ for i=1:N
     
     P0 = 100*eye(4*est_state_length);
     
-    local_filter = ETKF(F,G,0,0,Q_localfilter,R_abs,R_rel,x0,P0,delta,agent_id,connections_new);
+    local_filter = ETKF(F,G,0,0,Q_localfilter,R_abs,R_rel,x0,P0,delta,agent_id,connections_new,-1);
     
     % construct common estimates, with intersection of states
     % loop over meas_connections, aka direct connections
@@ -209,7 +209,7 @@ for i=1:N
 %         common_estimates = {};
         comm_ids = comm_ids(comm_ids~=agent_id);
     
-        common_estimates{j} = ETKF(F_comm,G_comm,0,0,Q_comm,R_abs,R_rel,x0_comm,P0_comm,delta,agent_id,comm_ids);
+        common_estimates{j} = ETKF(F_comm,G_comm,0,0,Q_comm,R_abs,R_rel,x0_comm,P0_comm,delta,agent_id,comm_ids,meas_connections(j));
     end
     
     agents{i} = Agent(agent_id,connections_new,meas_connections,neighbor_conn_ids,...
@@ -440,7 +440,7 @@ for i = 2:length(input_tvec)
                 
                 % update common estimates
                 for ii=randperm(length(agents{j}.common_estimates))
-                    if agents{j}.common_estimates{ii}.connection == ci_inbox{j}{k}{3}
+                    if agents{j}.common_estimates{ii}.meas_connection == ci_inbox{j}{k}{3}
 %                         conn_loc = inter==agents{j}.common_estimates{ii}.connection;
                         agents{j}.common_estimates{ii}.x = xc;
                         agents{j}.common_estimates{ii}.P = Pc;
@@ -480,6 +480,22 @@ for i = 2:length(input_tvec)
         network_mse(j,i,idx1) = norm(agents{j}.local_filter.state_history([iidx(1),iidx(3)],i) - agents{j}.true_state([1 3],i))^2;
         
         baseline_mse(j,i,idx1) = norm(baseline_filter.state_history([4*(j-1)+1,4*(j-1)+3],i) - agents{j}.true_state([1 3],i))^2;
+        
+        for k=1:length(agents{j}.common_estimates)
+            [rel_loc,rel_iidx] = agents{j}.get_location(agents{j}.meas_connections(k));
+            rel_network_mse(j,agents{j}.meas_connections(k),i,idx1) = ...
+                        norm( (agents{j}.local_filter.state_history([iidx(1),iidx(3)],i) -...
+                        agents{j}.local_filter.state_history([rel_iidx(1),rel_iidx(3)],i)) - ...
+                        (agents{j}.true_state([1 3],i) - agents{agents{j}.meas_connections(k)}.true_state([1 3],i)) )^2;
+            
+            m = agents{j}.meas_connections(k);
+            rel_baseline_mse(j,agents{j}.meas_connections(k),i,idx1) = ...
+                        norm( (baseline_filter.state_history([4*(j-1)+1,4*(j-1)+3],i) -...
+                        baseline_filter.state_history([4*(m-1)+1,4*(m-1)+3],i)) - ...
+                        (agents{j}.true_state([1 3],i) - agents{m}.true_state([1 3],i)) )^2;
+        end
+        
+        
         
     end
               

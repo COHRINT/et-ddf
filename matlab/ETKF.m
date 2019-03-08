@@ -28,12 +28,13 @@ classdef ETKF < handle
         total_msg
         agent_id
         connection
+        meas_connection
         state_history
         cov_history
         innovation_history = [];
     end
     methods
-        function obj = ETKF(F_,G_,H_,M_,Q_,R_abs,R_rel,x0,P0,delta,agent_id,connections)
+        function obj = ETKF(F_,G_,H_,M_,Q_,R_abs,R_rel,x0,P0,delta,agent_id,connections,meas_connections)
             obj.F = F_;
             obj.G = G_;
             obj.H = H_;
@@ -48,6 +49,7 @@ classdef ETKF < handle
             obj.total_msg = 0;
             obj.agent_id = agent_id;
             obj.connection = connections;
+            obj.meas_connection = meas_connections;
             obj.state_history(:,1) = x0;
             obj.cov_history(:,:,1) = P0;
         end
