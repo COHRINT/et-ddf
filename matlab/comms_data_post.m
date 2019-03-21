@@ -66,11 +66,14 @@ title('Relative msg y elements sent')
 
 ci_trigger_vec = zeros(1,N);
 usage_vec_ci = zeros(1,N);
+usage_vec_ci_wmeans = zeros(1,N);
+usage_vec_ci_fullstate = zeros(1,N);
 
 for i=1:length(agents)
     ci_trigger_vec(1,i) = agents{i}.ci_trigger_cnt;
-%     usage_vec_ci(1,i) = agents{i}.ci_trigger_cnt * (size(agents{i}.local_filter.x,1)^2 + size(agents{i}.local_filter.x,1)) * length(agents{i}.connections);
+    usage_vec_ci_wmeans(1,i) = agents{i}.ci_trigger_cnt * (size(agents{i}.local_filter.x,1)^2 + size(agents{i}.local_filter.x,1)) * length(agents{i}.meas_connections);
     usage_vec_ci(1,i) = agents{i}.ci_trigger_cnt * (size(agents{i}.local_filter.x,1))^2 * length(agents{i}.meas_connections);
+    usage_vec_ci_fullstate(1,i) = agents{i}.ci_trigger_cnt * ((4*N)^2 + (4*N)) * length(agents{i}.meas_connections);
 end
 
 figure
@@ -99,7 +102,8 @@ ylabel(' ')
 
 usage_vec_msg = sum(comms_mat_sent(:,:,1,1),2)' + sum(comms_mat_sent(:,:,1,2),2)' + sum(comms_mat_sent(:,:,2,1),2)' + sum(comms_mat_sent(:,:,1,2),2)';
 
-usage_vec = usage_vec_ci + usage_vec_msg;
+usage_vec = usage_vec_ci_wmeans + usage_vec_msg;
+usage_vec_fullstate = usage_vec_ci_fullstate + usage_vec_msg;
 
 figure
 % subplot(3,1,1)
@@ -116,4 +120,4 @@ figure
 heatmap(usage_vec/1000)
 title('Total data transfer by each agent (x1000)')
 
-
+fprintf('Total usage: %i \n expected full state usage: %i\n',sum(usage_vec),sum(usage_vec_fullstate));

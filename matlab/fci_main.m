@@ -44,7 +44,7 @@ num_connections = 2;
 % tau_state_vec = 0:0.5:25;
 
 delta_vec = [1.5];
-tau_state_goal_vec = 2;
+tau_state_goal_vec = [10];
 msg_drop_prob_vec = 0;
 
 % cost = zeros(length(delta_vec),length(tau_state_goal_vec),5);
@@ -477,19 +477,19 @@ for i = 2:length(input_tvec)
         
         [loc,iidx] = agents{j}.get_location(agents{j}.agent_id);
 %         network_mse(j,i,idx1) = sum((agents{j}.local_filter.state_history(iidx,i) - agents{j}.true_state(:,i)).^2,1)./4;
-        network_mse(j,i,idx1) = norm(agents{j}.local_filter.state_history([iidx(1),iidx(3)],i) - agents{j}.true_state([1 3],i))^2;
+        network_mse(j,i,idx2) = norm(agents{j}.local_filter.state_history([iidx(1),iidx(3)],i) - agents{j}.true_state([1 3],i))^2;
         
-        baseline_mse(j,i,idx1) = norm(baseline_filter.state_history([4*(j-1)+1,4*(j-1)+3],i) - agents{j}.true_state([1 3],i))^2;
+        baseline_mse(j,i,idx2) = norm(baseline_filter.state_history([4*(j-1)+1,4*(j-1)+3],i) - agents{j}.true_state([1 3],i))^2;
         
         for k=1:length(agents{j}.common_estimates)
             [rel_loc,rel_iidx] = agents{j}.get_location(agents{j}.meas_connections(k));
-            rel_network_mse(j,agents{j}.meas_connections(k),i,idx1) = ...
+            rel_network_mse(j,agents{j}.meas_connections(k),i,idx2) = ...
                         norm( (agents{j}.local_filter.state_history([iidx(1),iidx(3)],i) -...
                         agents{j}.local_filter.state_history([rel_iidx(1),rel_iidx(3)],i)) - ...
                         (agents{j}.true_state([1 3],i) - agents{agents{j}.meas_connections(k)}.true_state([1 3],i)) )^2;
             
             m = agents{j}.meas_connections(k);
-            rel_baseline_mse(j,agents{j}.meas_connections(k),i,idx1) = ...
+            rel_baseline_mse(j,agents{j}.meas_connections(k),i,idx2) = ...
                         norm( (baseline_filter.state_history([4*(j-1)+1,4*(j-1)+3],i) -...
                         baseline_filter.state_history([4*(m-1)+1,4*(m-1)+3],i)) - ...
                         (agents{j}.true_state([1 3],i) - agents{m}.true_state([1 3],i)) )^2;
