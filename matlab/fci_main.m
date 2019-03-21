@@ -448,15 +448,10 @@ for i = 2:length(input_tvec)
                         agents{j}.connection_tau_rates(ii) = b_rate;
                     end
                 end
-                
-                % update CI threshold tau
-%                 agents{j}.tau = min(agents{j}.tau_goal,agents{j}.tau + ...
-%                     agents{j}.epsilon_1*sum(agents{j}.connection_taus-agents{j}.tau*ones(length(agents{j}.connection_taus),1)) + ...
-%                     agents{j}.epsilon_2*(agents{j}.tau_goal-agents{j}.tau));
-                
             end
         end
         
+        % update CI threshold if using adaptive method
         if use_adaptive
             agents{j}.tau = min(agents{j}.tau_goal,agents{j}.tau + ...
                         agents{j}.epsilon_1*sum(-agents{j}.connection_tau_rates+agents{j}.ci_trigger_rate*ones(length(agents{j}.connection_tau_rates),1)) + ...

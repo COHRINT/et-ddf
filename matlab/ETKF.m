@@ -2,12 +2,16 @@
 % Event-triggered Kalman Filter implementation
 %
 % Ian Loefgren
-% Last modified: 11.11.2018
+% Last modified: 3.21.2019
 %
 % Implements an event-triggered linear kalman filter with implicit
 % measurement fusion.
 %
 % Usage:
+%   - Filter is updated using msg_update() and passing a measurement-type
+%   message, and mean and cov of current est
+%   - Based on status field of message, elements are updated explicitly or
+%   implicitly
 %   
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -121,75 +125,8 @@ classdef ETKF < handle
                 if abs(innov) > obj.delta
                     outgoing_status(i) = 1;
                     outgoing_data = [outgoing_data,data(i)];
-                end
-                
+                end  
             end    
-            
-%             % initialize tramsit vector
-% %             transmit = zeros(2,1);
-%             types = cell(2,1);
-%             data = cell(1,1);
-%             
-%             % loop through measurement elements
-%             for i=1:length(meas)
-%                 
-%                 % take only msgs addressed to the agent this estimate is
-%                 % with
-%                 if (strcmp(meas{i}.type,'abs') || (meas{i}.dest == obj.connection)) || (meas{i}.dest == obj.agent_id)
-%                 
-%                     % extract actual measurement
-%                     meas_val = meas{i}.data;
-%                     meas_type = meas{i}.type;
-% %                     rel_agent_id = meas{i}.dest;
-%                     if src_loc_list(i) < dest_loc_list(i)
-% %                     src_agent_id = src_loc_list(i);
-%                         src_agent_id = 1;
-%                         rel_agent_id = 2;
-%                     elseif src_loc_list(i) == dest_loc_list(i)
-%                         src_agent_id = src_loc_list(i);
-%                     else
-%                         src_agent_id = 2;
-%                         rel_agent_id = 1;
-%                     end
-% %                     rel_agent_id = dest_loc_list(i);
-%                     
-%                     data{i} = zeros(size(meas_val,1),1);
-% 
-%                     % loop through elements of measurement
-%                     for j=1:size(meas_val,1)
-% 
-%                         % compute predicted measurement and innovation
-%                         H = zeros(2,size(obj.F,1));
-%                         if meas_type == 'abs'
-% %                             H(1,4*(obj.agent_id-1)+1) = 1; H(2,4*(obj.agent_id-1)+3) = 1;
-%                             H(1,4*(src_agent_id-1)+1) = 1; H(2,4*(src_agent_id-1)+3) = 1;
-%                             R = obj.R_abs;
-%                         elseif meas_type == 'rel'
-% %                             H(1,4*(obj.agent_id-1)+1) = 1; H(2,4*(obj.agent_id-1)+3) = 1;
-%                             H(1,4*(src_agent_id-1)+1) = 1; H(2,4*(src_agent_id-1)+3) = 1;
-%                             H(1,4*(rel_agent_id-1)+1) = -1; H(2,4*(rel_agent_id-1)+3) = -1;
-%                             R = obj.R_rel;
-%                         end
-% 
-%                         meas_pred = H(j,:)*obj.x;
-%                         innov = meas_val(j) - meas_pred;
-% 
-%                         % if surprising enough, send
-%                         if abs(innov) > obj.delta
-%                             transmit(j,i) = 1;
-%                         else
-%                             transmit(j,i) = 0;
-%                         end
-%                         types{j,i} = meas_type;
-%                         data{i}(j) = meas_val(j);
-%                     end
-% %                     if all(transmit(:,i))
-% %                         obj.msg_sent = obj.msg_sent + 1;
-% %                     end
-%                 end
-%    
-%             end
-            
         end
         
         function [x_curr,P_curr] = explicit_update(obj,src_id,target_id,type,meas_val,data_idx)
