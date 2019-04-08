@@ -11,9 +11,10 @@ Usage:
 """
 
 import numpy as np
+from copy import deepcopy
+# import pudb; pudb.set_trace()
 
-# from src.filters import ETKF
-# from utils import meas_msg
+from .helpers.msg_handling import MeasurementMsg
 
 class Agent(object):
     
@@ -37,7 +38,7 @@ class Agent(object):
         self.common_estimates = common_estimates
         
         # true starting position
-        self.true_state = x_true
+        self.true_state = [x_true]
         
         # CI trigger count
         self.ci_trigger_cnt = 0
@@ -51,7 +52,7 @@ class Agent(object):
         # CI thresholding data
         self.tau_goal = tau_goal
         self.tau = tau
-        self.connection_tau_rates = np.zeros(len(self.connections),1)
+        self.connection_tau_rates = np.zeros( (len(self.connections),1) )
         self.epsilon_1 = 0.05
         self.epsilon_2 = 0.1
 
@@ -64,13 +65,14 @@ class Agent(object):
         TODO:
         - add support for list of ids
         """
+        # pudb.set_trace()
         loc = []
         idx = []
 
         # create list of agents in state estimate, incl. self
-        ids = self.connections
+        ids = deepcopy(self.connections)
         ids.append(self.agent_id)
-        ordered_ids = sort(ids)
+        ordered_ids = sorted(ids)
 
         # find location of id in state estimate ids, as well as indices
         loc = ordered_ids.index(id_)
@@ -86,13 +88,13 @@ class Agent(object):
         """
         ids = self.connections
         ids.append(self.agent_id)
-        ordered_ids = sort(ids)
+        ordered_ids = sorted(ids)
         return ordered_ids[loc]
 
     def process_local_measurements(self,input_,local_measurements):
         """
         Handle control input and locally collected measurements.
-        Propagates local and common informatin filters, and handles measurement
+        Propagates local and common information filters, and handles measurement
         messages.
 
         :param input -> np.array - control input vector
@@ -106,14 +108,14 @@ class Agent(object):
 
         # create correctly-sized input vector to apply from local control input
         input_vec = np.zeros( (self.local_filter.G.shape[1],1) )
-        input_vec[2*agent_loc:2*agent_loc+1,1] = input_
+        input_vec[2*agent_loc:2*agent_loc+2] = np.reshape(input_,(input_.shape[0],1))
 
         # propagate local and common info filters
         self.local_filter.predict(input_vec)
         for filter_ in self.common_estimates:
             # common information filters get no knowledge of control input
             # b/c others have no idea what your control input was
-            filter_.predict(np.zeros(filter_.G.shape[1],1))
+            filter_.predict(np.zeros( (filter_.G.shape[1],1) ))
 
         # create outgoing and 'loopback' message queues
         outgoing = []
@@ -127,7 +129,7 @@ class Agent(object):
             dest = msg.dest
             target = msg.target
             status = msg.status
-            type_ = msg.type
+            type_ = msg.type_
             data = msg.data
 
             # make sure source of measurement is current agent
@@ -143,7 +145,7 @@ class Agent(object):
                 dest = id_
 
                 # regenerate message
-                msg = gen_msg(src,dest,target,status,type_,data)
+                msg = MeasurementMsg(src,dest,target,status,type_,data)
 
                 # find common estimate associated w/ msg destination
                 for filter_ in self.common_estimates:
@@ -154,14 +156,19 @@ class Agent(object):
                         # threshold measurement
                         src_,dest_,target_,status_,type_,data_ = filter_.threshold(msg)
 
-                        # TODO: update to call w/ list of ids, not induvidual
-                        idx = [agent_idx]
-                        loc,idx1 = self.get_location(filter_.connection)
-                        idx.append(idx1)
+                        # TODO: update to call w/ list of ids, not individual
+                        idx = deepcopy(agent_idx)
+                        for conn_id in filter_.connection:
+                            loc,idx1 = self.get_location(conn_id)
+                            idx += idx1
+                        # get unique ids by converting to set object
+                        idx = set(idx)
+                        # convert back to list and sort
+                        idx = list(idx)
                         idx.sort()
 
                         # generate new message
-                        msg = gen_msg(src_,dest_,target_,status_,type_,data_)
+                        msg = MeasurementMsg(src_,dest_,target_,status_,type_,data_)
 
                         # increment msg sent counts
                         self.msgs_sent += sum(status_)
@@ -170,7 +177,10 @@ class Agent(object):
                         # add msg to update filter to loopback queue and outgoing
                         # (this is so as to not affect thresholding w/ updates)
                         x_local = self.local_filter.x[idx]
-                        P_local = self.local_filter.P[idx,idx]
+
+                        # extract submatrix
+                        idxgrid = np.ix_(idx,idx) # creates correct row and column references
+                        P_local = self.local_filter.P[idxgrid]
 
                         outgoing.append(msg)
                         loopback.append([msg,x_local,P_local])
@@ -185,10 +195,12 @@ class Agent(object):
             for filter_ in self.common_estimates:
 
                 # find estimate associated w/ msg destination
-                if filter_.meas_connection is msg.dest:
+                if filter_.meas_connection == msg_.dest:
 
                     # update filter
-                    filter_.msg_update(msg,x_local,P_local)
+                    filter_.msg_update(msg_,x_local,P_local)
+
+        return outgoing
 
     def process_received_measurements(self,inbox):
         """
@@ -196,10 +208,14 @@ class Agent(object):
 
         :param inbox -> list - list of recevied messages
         """
+
+        # get self location and index
+        agent_loc,agent_idx = self.get_location(self.agent_id)
+
         for msg in inbox:
 
             # make sure message dest is current agent
-            assert(msg.dest is self.agent_id)
+            assert(msg.dest == self.agent_id)
 
             # imperfect comms sim: coin flip for dropping message
             # TODO: add binomial draw w/ msgs drop prob here
@@ -212,18 +228,34 @@ class Agent(object):
             # update common information filters
             for filter_ in self.common_estimates:
 
-                # TODO: update to call w/ list of ids, not induvidual
-                # TODO: filter_.connection might be a vector in matlab code
-                idx = [agent_idx]
-                loc,idx1 = self.get_location(filter_.connection)
-                idx.append(idx1)
+                # # TODO: update to call w/ list of ids, not induvidual
+                # # TODO: filter_.connection might be a vector in matlab code
+                # idx = [agent_idx]
+                # loc,idx1 = self.get_location(filter_.connection)
+                # idx.append(idx1)
+                # idx.sort()
+
+                # TODO: update to call w/ list of ids, not individual
+                idx = deepcopy(agent_idx)
+                for conn_id in filter_.connection:
+                    loc,idx1 = self.get_location(conn_id)
+                    idx += idx1
+                # get unique ids by converting to set object
+                idx = set(idx)
+                # convert back to list and sort
+                idx = list(idx)
                 idx.sort()
 
+
+
                 x_local_comm = self.local_filter.x[idx]
-                P_local_comm = self.local_filter.P[idx,idx]
+
+                # extract submatrix
+                idxgrid = np.ix_(idx,idx) # creates correct row and column references
+                P_local_comm = self.local_filter.P[idxgrid]
 
                 # find common estimate associated w/ msg source
-                if filter_.meas_connection is msg.src:
+                if filter_.meas_connection == msg.src:
                     filter_.msg_update(msg,x_local_comm,P_local_comm)
 
 

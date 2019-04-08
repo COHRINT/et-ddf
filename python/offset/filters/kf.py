@@ -40,8 +40,8 @@ class KF(object):
 
     def update(self,meas,meas_type,src_id,rel_agent_id):
 
-        for i in range(0,meas.size[0]):
-            H = np.zeros([2,self.F.size[0]])
+        for i in range(0,meas.shape[0]):
+            H = np.zeros([2,self.F.shape[0]])
             if meas_type is 'abs':
                 H[0,4*(src_id-1)] = 1
                 H[1,4*(src_id-1)+2] = 1
@@ -57,7 +57,8 @@ class KF(object):
                 continue
 
             # extract measurement
-            meas_val = meas[:,i:i+1]
+            # meas_val = meas[:,i:i+1]
+            meas_val = meas
 
             # compute predicted measurement and innovation
             meas_pred = np.dot(H,self.x)

@@ -12,11 +12,13 @@ Usage:
 
 import numpy as np
 from scipy.stats import norm
+from copy import deepcopy
+import pudb
 
 class ETKF(object):
 
     def __init__(self,F,G,H,M,Q,R_abs,R_rel,x0,P0,delta,agent_id,
-                    connections,meas_connections):
+                    connections,meas_connection):
         self.F = F
         self.G = G
         self.H = H
@@ -30,14 +32,14 @@ class ETKF(object):
         self.msg_sent = 0
         self.total_msg = 0
         self.agent_id = agent_id
-        self.connections = connections
-        self.meas_connections = meas_connections
+        self.connection = connections
+        self.meas_connection = meas_connection
         self.state_history = [x0]
         self.cov_history = [P0]
 
     def get_location(self,id_):
         """
-        Get location of agent specified by :param id in state estimate, as well as indicies.
+        Get location of agent specified by :param id in state estimate.
 
         :param id - scalar id
 
@@ -45,18 +47,16 @@ class ETKF(object):
         - add support for list of ids
         """
         loc = []
-        idx = []
 
         # create list of agents in state estimate, incl. self
-        ids = self.connections
+        ids = deepcopy(self.connection)
         ids.append(self.agent_id)
-        ordered_ids = sort(ids)
+        ids.sort()
 
         # find location of id in state estimate ids, as well as indices
-        loc = ordered_ids.index(id_)
-        idx = list(range(self.num_states*loc,self.num_states*loc+self.num_states))
+        loc = ids.index(id_)
 
-        return loc, idx
+        return loc
 
     def get_id(self,loc):
         """ 
@@ -64,9 +64,9 @@ class ETKF(object):
         
         :param loc -> int - location in state estimate
         """
-        ids = self.connections
+        ids = self.connection
         ids.append(self.agent_id)
-        ordered_ids = sort(ids)
+        ordered_ids = ids.sort()
         return ordered_ids[loc]
 
     def predict(self,u):
@@ -83,7 +83,7 @@ class ETKF(object):
 
             None
         """
-        
+
         x_curr = np.dot(self.F,self.x) + np.dot(self.G,u)
         P_curr = np.dot(self.F,np.dot(self.P,self.F.transpose())) + self.Q
 
@@ -118,7 +118,7 @@ class ETKF(object):
         dest = msg.dest
         target = msg.target
         status = msg.status
-        type_ = msg.type
+        type_ = msg.type_
         data = msg.data
 
         # get locations in state estimate of measurement src and target
@@ -127,7 +127,7 @@ class ETKF(object):
 
         # initialize new status and data arrays
         outgoing_status = []
-        outgoing data = []
+        outgoing_data = []
 
         # threshold each measurement element
         for i in range(0,len(data)):
@@ -135,12 +135,12 @@ class ETKF(object):
             # create measurement fxn
             #TODO this needs to be generalized to measurements are any length
             # as well as of any type
-            H = np.zeros(1,self.F.shape[0])
+            H = np.zeros( (1,self.F.shape[0]) )
             if type_ == "abs":
-                H[1,self.num_states*src_loc+2*i+1] = 1
+                H[0,4*src_loc+2*i] = 1
             elif type_ == "rel":
-                H[1,self.num_states*src_loc+2*i+1] = 1
-                H[1,self.num_states*target_loc+2*i+1] = -1
+                H[0,4*src_loc+2*i] = 1
+                H[0,4*target_loc+2*i] = -1
 
             # predicted measurement by filter
             meas_pred = np.dot(H,self.x)
@@ -179,14 +179,14 @@ class ETKF(object):
         # create measurement fxn
         #TODO this needs to be generalized to measurements are any length
         # as well as of any type
-        H = np.zeros(1,self.F.shape[0])
+        H = np.zeros( (1,self.F.shape[0]) )
         if type_ == "abs":
-            H[1,self.num_states*src_loc+2*i+1] = 1
-            R = self.R_abs[1,1]
+            H[0,4*src_loc+2*i] = 1
+            R = self.R_abs[0,0]
         elif type_ == "rel":
-            H[1,self.num_states*src_loc+2*i+1] = 1
-            H[1,self.num_states*target_loc+2*i+1] = -1
-            R = self.R_rel[1,1]
+            H[0,4*src_loc+2*i] = 1
+            H[0,4*target_loc+2*i] = -1
+            R = self.R_rel[0,0]
 
         # compute predicted measurement and innovation
         meas_pred = np.dot(H,self.x)
@@ -237,14 +237,14 @@ class ETKF(object):
         # create measurement fxn
         #TODO this needs to be generalized to measurements are any length
         # as well as of any type
-        H = np.zeros(1,self.F.shape[0])
+        H = np.zeros( (1,self.F.shape[0]) )
         if type_ == "abs":
-            H[1,self.num_states*src_loc+2*i+1] = 1
-            R = self.R_abs[1,1]
+            H[0,4*src_loc+2*i] = 1
+            R = self.R_abs[0,0]
         elif type_ == "rel":
-            H[1,self.num_states*src_loc+2*i+1] = 1
-            H[1,self.num_states*target_loc+2*i+1] = -1
-            R = self.R_rel[1,1]
+            H[0,4*src_loc+2*i] = 1
+            H[0,4*target_loc+2*i] = -1
+            R = self.R_rel[0,0]
 
         #
         mu = np.dot(H,self.x) - np.dot(H,self.xpred)
@@ -258,20 +258,19 @@ class ETKF(object):
         arg1 = (-self.delta + a - mu)/np.sqrt(Qe)
         arg2 = (self.delta + a - mu)/np.sqrt(Qe)
 
-        zbar = ((phi(arg1)-phi(arg2))/(Qfxn(arg1)-Qfxn(arg2)))*sqrt(Qe)
-        dcal = ((phi(arg1)-phi(arg2))/(Qfxn(arg1)-Qfxn(arg2))^2) - ...
-                    ((arg1)*phi(arg1)-arg2*phi(arg2)/(Qfxn(arg1)-Qfxn(arg2)))
+        zbar = ((phi(arg1)-phi(arg2))/(Qfxn(arg1)-Qfxn(arg2)))*np.sqrt(Qe)
+        dcal = ((phi(arg1)-phi(arg2))/(Qfxn(arg1)-Qfxn(arg2))**2) - ((arg1)*phi(arg1)-arg2*phi(arg2)/(Qfxn(arg1)-Qfxn(arg2)))
 
-        # compute Kalman gian
+        # compute Kalman gain
         K = np.dot(np.dot(self.P,H.transpose()),np.linalg.inv(np.dot(np.dot(H,self.P),
                 H.transpose()) + R))
 
         x_curr = self.x + np.dot(K,zbar)
 
+        # P = P - dcal * P * H^T * inv(H * P * H^T + R) * H * P
         invquant = np.dot(H,np.dot(self.P,H.transpose())) + R
-        P_curr = self.P - np.dot(dcal,np.dot(self.P,np.dot(H.transpose(),
-                    np.dot(np.linalg.inv(np.dot(np.dot(H,self.P),H.transpose())
-                     + R)),self.P)))
+        P_curr = self.P - np.multiply(dcal,np.dot(self.P,np.dot(
+            H.transpose(),np.dot(np.linalg.inv(invquant),np.dot(H,self.P)))))
 
         # update filter values
         self.x = x_curr
@@ -302,7 +301,7 @@ class ETKF(object):
         dest = msg.dest
         target = msg.target
         status = msg.status
-        type_ = msg.type
+        type_ = msg.type_
         data = msg.data
         
         # get locations in state estimate of measurement src and target
@@ -315,11 +314,15 @@ class ETKF(object):
 
             # if status for element is true, fuse explicitly
             if status[i]:
+                prev_shape = self.x.shape
                 self.explicit_update(src_loc,target_loc,type_,data[data_cnt],i)
+                assert(self.x.shape == prev_shape)
                 data_cnt += 1
             # else, implcit update
             else:
+                prev_shape = self.x.shape
                 self.implicit_update(src_loc,target_loc,type_,x_local,P_local,i)
+                assert(self.x.shape == prev_shape)
 
 def test_etkf():
     pass

@@ -19,6 +19,16 @@ def lin_ncv(dt,n=1):
         G -- control input to state matrix
     """
 
+    # Q_local_true = [0.0003 0.005 0 0;
+    #                 0.005 0.1 0 0;
+    #                 0 0 0.0003 0.005;
+    #                 0 0 0.005 0.1]
+                
+    q = np.array( ((0.0017,0.025,0,0),
+                (0.025,0.5,0,0),
+                (0,0,0.0017,0.025),
+                (0,0,0.025,0.5)) )
+
     f = np.array(((1,dt,0,0),
                 (0,1,0,0),
                 (0,0,1,dt),
@@ -31,12 +41,14 @@ def lin_ncv(dt,n=1):
 
     F = f
     G = g
+    Q = q
 
     for i in range(1,n):
         F = block_diag(F,f)
         G = block_diag(G,g)
+        Q = block_diag(Q,q)
 
-    return F, G
+    return F, G, Q
 
 if __name__ == "__main__":
 
