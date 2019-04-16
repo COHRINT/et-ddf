@@ -9,7 +9,8 @@ import sys
 import yaml
 import numpy as np
 import scipy.linalg
-# import pudb; pudb.set_trace()
+import pudb
+import argparse
 from copy import deepcopy
 
 from .agent import Agent
@@ -18,18 +19,15 @@ from .filters.etkf import ETKF
 from .dynamics import *
 from .helpers.config_handling import load_config
 from .helpers.msg_handling import MeasurementMsg, StateMsg
-from .helpers.data_handling import package_results
+from .helpers.data_handling import package_results, save_sim_data
+from .helpers.data_viz import mse_plots
 
 class SimInstance(object):
     """
     Run one simulation instance with the specified parameters.
 
     Keyword arguments:
-
-        conns           -- nested list of all agents direct connections, e.g. [[2],[1,3],[2]]
-                            for a 3 agent chain                    
-        abs_meas_vec    -- list of agents that have absolute positioning capabilities
-                            TODO: phase out, use agent config struct  
+ 
         delta           -- event-triggering threshold, allowed values=[0,inf)  
         tau             -- covariance intersection threshold per state, allowed values=[0,inf)  
         msg_drop_prob   -- probability that a message will be dropped in transit, values=[0,1]  
@@ -227,7 +225,8 @@ class SimInstance(object):
             # create agent instance
             new_agent = Agent(agent_id,connections_new,meas_connections,neighbor_conn_ids,
                                 local_filter,common_estimates,x_true_vec[4*i:4*i+4],
-                                self.msg_drop_prob,len(x0)*self.tau_state_goal,len(x0)*self.tau)
+                                self.msg_drop_prob,len(x0)*self.tau_state_goal,len(x0)*self.tau,
+                                self.use_adaptive_tau)
 
             agents.append(new_agent)
 
@@ -244,10 +243,12 @@ class SimInstance(object):
         R_abs = sensors['lin_abs_pos']['noise']
         R_rel = sensors['lin_rel_range']['noise']
 
-        # initialize msg inbox
+        # initialize msg inbox and ci inbox
         inbox = []
+        ci_inbox = []
         for i in range(0,self.num_agents):
             inbox.append([])
+            ci_inbox.append([])
 
         # agent updates -- ground truth, local thresholding, and processing
         for j in range(0,self.num_agents):
@@ -315,6 +316,53 @@ class SimInstance(object):
 
         # covariance intersection
         # TODO: THIS ENTIRE GODDAMN THING
+        # this loop is a proxy for a service request and response framework.
+        # The agent that triggers CI creates a request in the form of a StateMsg message
+        # populated with its info, and sends it to its direct (distance-one) connections.
+        # The connections popluate the remaining empty fields of the received message with 
+        # their own information, and responsd with a new message of the same type with their info.
+        # Everyone adds these messages to their inbox to be processed.
+        for j, agent in enumerate(self.agents):
+            
+        #     # check covaraince trace for triggering CI
+            if np.trace(agent.local_filter.P) > agent.tau:
+                agent.ci_trigger_cnt += 1
+                agent.ci_trigger_rate = agent.ci_trigger_cnt / (i-1)
+
+                for conn_id in agent.meas_connections:
+                    
+                    # generate message
+                    msg_a = agent.gen_ci_message(conn_id,self.agents[conn_id].connections)
+                    msg_b = self.agents[conn_id].gen_ci_message(agent.agent_id,agent.connections)
+                    # add messages to ci inbox
+                    ci_inbox[conn_id].append(deepcopy(msg_a))
+                    ci_inbox[agent.agent_id].append(msg_b)
+
+        #         # generate similarity transforms
+
+        #         # collect transforms and generate outbound message
+
+        #         # add message to ci inbox
+
+        # # process inbox messages
+        for j, msg_list in enumerate(ci_inbox):
+            self.agents[j].process_ci_messages(msg_list)
+
+
+        #     # process message, perform CI
+
+        # update state history and mse 
+        for j, agent in enumerate(self.agents):
+            agent.local_filter.state_history.append(agent.local_filter.x)
+            agent.local_filter.cov_history.append(agent.local_filter.P)
+
+            for filter_ in agent.common_estimates:
+                filter_.state_history.append(filter_.x)
+                filter_.cov_history.append(filter_.P)
+
+            # record agent MSE and baseline MSE
+            # agent_mse = 
+            # network_mse[j].append()
 
     def run_sim(self,print_strs=None):
         """
@@ -332,7 +380,7 @@ class SimInstance(object):
         print_strs.append([])
 
         # sim update loop
-        while self.sim_time < self.max_time:
+        while self.sim_time < self.max_time+self.dt:
             # update printed status messages
             sim_time_str = 'Sim time: {} of {} sec, {}% complete'.format(
                 self.sim_time,self.max_time,100*(self.sim_time/self.max_time))
@@ -349,7 +397,7 @@ class SimInstance(object):
         # package simulation results
         # res = package_results()
 
-        return None
+        return [self.baseline_filter,self.agents]
 
     def print_status(self,print_strs):
         """
@@ -378,26 +426,33 @@ Q_local_true = np.array( ((0.0003,0.005,0,0),
 
 # main driver function
 
-def main():
+def main(plot=False,cfg_path=None,save_path=None):
     """
-    Main driver function. Called when running sim.py directly.
+    Main driver function. Called when running sim.py directly or as a module.
+
+    Inputs:
+
+        plot [optional] -- flag to determine if sim results will be plotted
+        cfg_path [optional] -- string path to config file (full path)
+        save_path [optional] --  string path to save location for sim results (full path)
+
+    Returns:
+
+        none
     """
 
     # load sim config
-    load_path = os.path.abspath(os.path.join(os.path.dirname(__file__),
-                    '../config/config.yaml'))
-    cfg = load_config(load_path)
+    if cfg_path is None:
+        cfg_path = os.path.abspath(os.path.join(os.path.dirname(__file__),
+                        '../config/config.yaml'))
+    cfg = load_config(cfg_path)
 
     # specify path for saving data
-    save_path = os.path.abspath(os.path.join(os.path.dirname(__file__),
-                    '../data/'))
-
-    # run simulation driver
-    # status = main(**cfg)
+    if save_path is None:
+        save_path = os.path.abspath(os.path.join(os.path.dirname(__file__),
+                        '../data/'))
 
     # extract config params
-
-    # number of Monte-Carlo sims
     num_mc_sim = cfg['num_mc_sims']
     delta_values = cfg['delta_values']
     tau_values = cfg['tau_values']
@@ -434,5 +489,30 @@ def main():
                     # add results to results container
                     results.append(res)
 
+                    sim_cnt += 1
+
+    # create metadata dictionary
+    metadata_dict = {'num_mc_sim': num_mc_sim, 'delta_values': delta_values,
+                        'tau_values': tau_values, 'msg_drop_prob_values': msg_drop_prob_values,
+                        'total_sims': total_sims}
+
+    # save data to pickle file
+    save_sim_data(metadata_dict,results,save_path)
+
+    # if plot flag is set, plot results
+    if plot:
+        pass
+
 if __name__ == "__main__":
-    main()
+
+    parser = argparse.ArgumentParser(description='Run a set of simulations using the ET-DDF framework.')
+    parser.add_argument('-p','--plot',dest='plot_flag',action='store_true',
+                            help='plot the simulation results at the end (not suggested unless you are only running one sim')
+    parser.add_argument('-c','--config-path', dest='config_path',action='store',
+                            help='specify the (full) path to a sim config file.')
+    parser.add_argument('-s','--save-path', dest='save_path',action='store',
+                            help='specify the (full) path to the location where sim data will be saved.')
+    args = parser.parse_args()
+
+    # run the sim driver with command line args
+    main(plot=args.plot_flag,cfg_path=args.config_path,save_path=args.save_path)
