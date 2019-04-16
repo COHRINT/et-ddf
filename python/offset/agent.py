@@ -11,15 +11,18 @@ Usage:
 """
 
 import numpy as np
+from numpy.linalg import inv
 from copy import deepcopy
 # import pudb; pudb.set_trace()
 
-from .helpers.msg_handling import MeasurementMsg
+from .covar_intersect import covar_intersect, gen_sim_transform
+from .helpers.msg_handling import MeasurementMsg, StateMsg
 
 class Agent(object):
     
     def __init__(self,agent_id,connections,meas_connections,neighbor_connections,
-                    local_filter,common_estimates,x_true,msg_drop_prob,tau_goal,tau):    
+                    local_filter,common_estimates,x_true,msg_drop_prob,tau_goal,
+                    tau,use_adaptive_tau):    
         # agent id
         self.agent_id = agent_id
         
@@ -56,6 +59,8 @@ class Agent(object):
         self.epsilon_1 = 0.05
         self.epsilon_2 = 0.1
 
+        self.use_adaptive_tau = use_adaptive_tau
+
     def get_location(self,id_):
         """
         Get location of agent specified by :param id in state estimate, as well as indicies.
@@ -65,7 +70,6 @@ class Agent(object):
         TODO:
         - add support for list of ids
         """
-        # pudb.set_trace()
         loc = []
         idx = []
 
@@ -228,13 +232,6 @@ class Agent(object):
             # update common information filters
             for filter_ in self.common_estimates:
 
-                # # TODO: update to call w/ list of ids, not induvidual
-                # # TODO: filter_.connection might be a vector in matlab code
-                # idx = [agent_idx]
-                # loc,idx1 = self.get_location(filter_.connection)
-                # idx.append(idx1)
-                # idx.sort()
-
                 # TODO: update to call w/ list of ids, not individual
                 idx = deepcopy(agent_idx)
                 for conn_id in filter_.connection:
@@ -246,8 +243,6 @@ class Agent(object):
                 idx = list(idx)
                 idx.sort()
 
-
-
                 x_local_comm = self.local_filter.x[idx]
 
                 # extract submatrix
@@ -258,6 +253,128 @@ class Agent(object):
                 if filter_.meas_connection == msg.src:
                     filter_.msg_update(msg,x_local_comm,P_local_comm)
 
+    def gen_ci_message(self,dest_id,dest_connections):
+        """
+        Generates messages to be sent to connections to perform CI.
+
+        Inputs:
+
+            dest_id             -- agent id of message destination
+            dest_connections    -- ids of connections to agent who is receiving message
+
+        Outputs:
+
+            msg -- CI message of type StateMsg
+        """
+
+        xa = deepcopy(self.local_filter.x)
+        Pa = deepcopy(self.local_filter.P)
+
+        # construct transform
+        Ta, il_a, inter = gen_sim_transform(self.agent_id,self.connections,
+                                            dest_id,dest_connections)
+
+        # compute reduced, transformed state estimate
+        xaT = np.dot(inv(Ta),xa)
+        xaTred = xaT[0:il_a]
+        PaT = np.dot(inv(Ta),np.dot(Pa,Ta))
+        PaTred_grid = np.ix_(np.arange(0,il_a),np.arange(0,il_a))
+        PaTred = PaT[PaTred_grid]
+
+        msg = StateMsg(self.agent_id,
+                        dest_id,
+                        self.meas_connections,
+                        self.connections,
+                        xaTred,
+                        PaTred,
+                        self.ci_trigger_rate)
+
+        return msg
+
+    def process_ci_messages(self,msgs):
+        """
+        Process received covariance intersection message, and perform factorized
+        covariance update on local and common information estimates.
+
+        Inputs:
+
+            msg -- covariance intersection message of type StateMsg
+
+        Returns:
+
+            none
+        """
+
+        for msg in msgs:
+            
+            # grab state estimate from local filter
+            xa = deepcopy(self.local_filter.x)
+            Pa = deepcopy(self.local_filter.P)
+
+            # unpack estimate from message
+            xb = msg.state_est
+            Pb = msg.est_cov
+            b_id = msg.src
+            b_connections = msg.src_connections
+            b_rate = msg.src_ci_rate
+
+            # construct transform
+            Ta, il_a, inter = gen_sim_transform(self.agent_id,self.connections,
+                                                b_id,b_connections)
+
+            # compute reduced, transformed state estimate
+            xaT = np.dot(inv(Ta),xa)
+            xaTred = xaT[0:il_a]
+            PaT = np.dot(inv(Ta),np.dot(Pa,Ta))
+            PaTred_grid = np.ix_(np.arange(0,il_a),np.arange(0,il_a))
+            PaTred = PaT[PaTred_grid]
+
+            # reduced estimate from sender is already reduced
+            xbTred = xb
+            PbTred = Pb
+
+            # perform covariance intersection with reduced estimates
+            alpha = np.ones((PaTred.shape[0],1))
+            xc, Pc = covar_intersect(xaTred,xbTred,PaTred,PbTred,alpha)
+
+            # compute information delta for conditional update
+            invD = inv(Pc) - inv(PaTred)
+            invDd = np.dot(inv(Pc),xc) - np.dot(inv(PaTred),xaTred)
+
+            # conditional gaussian update
+            if (PaT.shape[0]-Pc.shape[0] == 0) or (PaT.shape[1]-Pc.shape[1] == 0):
+                cond_cov = invD
+                cond_mean = invDd
+            else:
+                cond_cov_row1 = np.hstack( (invD,np.zeros((Pc.shape[0],PaT.shape[1]-Pc.shape[1]))) )
+                cond_cov_row2 = np.hstack( (np.zeros((PaT.shape[0]-Pc.shape[0],Pc.shape[1])),np.zeros((PaT.shape[0]-Pc.shape[0],PaT.shape[0]-Pc.shape[0]))) )
+                cond_cov = np.vstack( (cond_cov_row1,cond_cov_row2) )
+                cond_mean = np.vstack( (invDd,np.zeros((PaT.shape[0]-Pc.shape[0],1))) )
+            
+            V = inv(inv(PaT) + cond_cov)
+            v = np.dot(V,np.dot(inv(PaT),xaT) + cond_mean)
+
+            # transform back to normal state order
+            xa = np.dot(Ta,v)
+            Pa = np.dot(Ta,np.dot(V,inv(Ta)))
+
+            # update local estimates
+            self.local_filter.x = deepcopy(xa)
+            self.local_filter.P = deepcopy(Pa)
+
+            # update common estimates
+            for i, filter_ in enumerate(self.common_estimates):
+                if filter_.meas_connection == b_id:
+                    filter_.x = deepcopy(xc)
+                    filter_.P = deepcopy(Pc)
+                    self.connection_tau_rates[i] = b_rate
+
+            # update CI threshold w/ adaptive thresholding heuristic
+            if self.use_adaptive_tau:
+                self.tau = min(self.tau_goal,self.tau + 
+                                self.epsilon_1*sum(-self.connection_tau_rates +
+                                self.ci_trigger_rate) +
+                                self.epsilon_2*(self.tau_goal-self.tau))
 
 def test_agent():
     pass
