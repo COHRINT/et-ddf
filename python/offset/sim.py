@@ -20,7 +20,7 @@ from .dynamics import *
 from .helpers.config_handling import load_config
 from .helpers.msg_handling import MeasurementMsg, StateMsg
 from .helpers.data_handling import package_results, save_sim_data
-from .helpers.data_viz import mse_plots
+from .helpers.data_viz import mse_plots, time_trace_plots
 
 class SimInstance(object):
     """
@@ -250,12 +250,16 @@ class SimInstance(object):
             inbox.append([])
             ci_inbox.append([])
 
+        # generate control input
+        agent_control_input = np.array( ((2*np.cos(0.75*self.sim_time)),(2*np.sin(0.75*self.sim_time))) )
+        all_control_input = np.tile(agent_control_input,self.num_agents)
+
+        # propagate baseline estimate
+        self.baseline_filter.predict(all_control_input)
+
         # agent updates -- ground truth, local thresholding, and processing
         for j in range(0,self.num_agents):
             msgs = []
-
-            # generate control input
-            agent_control_input = np.array( ((2*np.cos(0.75*self.sim_time)),(2*np.sin(0.75*self.sim_time))) )
 
             # propagate agent true states
             w = np.random.multivariate_normal([0,0,0,0],Q_local_true).transpose()
@@ -267,7 +271,7 @@ class SimInstance(object):
                 # simulate measurement noise
                 v = np.random.multivariate_normal([0,0],R_abs)
                 # create measurement with agent true state and simmed noise
-                y_abs = np.dot(H_local,self.agents[j].true_state[:,-1]) + v
+                y_abs = np.dot(H_local,self.agents[j].true_state[-1]) + v
                 # generate message structure -> note dest will change in thresholding
                 y_abs_msg = MeasurementMsg(self.agents[j].agent_id,
                                             self.agents[j].agent_id,
@@ -396,8 +400,19 @@ class SimInstance(object):
             
         # package simulation results
         # res = package_results()
+        results_dict = {'baseline': self.baseline_filter, 'agents': self.agents}
+        # create metadata dictionary
+        metadata_dict = {'max_time': self.max_time, 
+                        'dt': self.dt,
+                        'connections': self.connections,
+                        'num_agents': self.num_agents,
+                        'delta': self.delta,
+                        'tau_goal': self.tau_state_goal,
+                        'msg_drop_prob': self.msg_drop_prob,
+                        'dynamics': self.dynamics,
+                        'sensors': self.sensors}
 
-        return [self.baseline_filter,self.agents]
+        return {'metadata': metadata_dict, 'results': results_dict}
 
     def print_status(self,print_strs):
         """
@@ -468,7 +483,7 @@ def main(plot=False,cfg_path=None,save_path=None):
     for i in delta_values:
         for j in tau_values:
             for k in msg_drop_prob_values:
-                for m in range(0,num_mc_sim):
+                for m in range(1,num_mc_sim+1):
                     # create simulation status strings to be printed
                     sim_print_str = 'Initializing simulation {} of {}'.format(sim_cnt,total_sims)
                     param_print_str = 'Params: delta={},\t tau={}, \t msg drop prob={}'.format(i,j,k)
@@ -492,16 +507,18 @@ def main(plot=False,cfg_path=None,save_path=None):
                     sim_cnt += 1
 
     # create metadata dictionary
-    metadata_dict = {'num_mc_sim': num_mc_sim, 'delta_values': delta_values,
-                        'tau_values': tau_values, 'msg_drop_prob_values': msg_drop_prob_values,
-                        'total_sims': total_sims}
+    metadata_dict = {'num_mc_sim': num_mc_sim,
+                    'delta_values': delta_values,
+                    'tau_values': tau_values,
+                    'msg_drop_prob_values': msg_drop_prob_values,
+                    'total_sims': total_sims}
 
     # save data to pickle file
     save_sim_data(metadata_dict,results,save_path)
 
     # if plot flag is set, plot results
     if plot:
-        pass
+        time_trace_plots(results,[0])
 
 if __name__ == "__main__":
 

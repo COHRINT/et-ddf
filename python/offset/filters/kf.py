@@ -8,6 +8,8 @@ Linear Kalman filter implementation.
 """
 
 import numpy as np
+# import pudb; pudb.set_trace()
+from copy import deepcopy
 
 class KF(object):
 
@@ -72,8 +74,8 @@ class KF(object):
             # update covariance
             P_curr = np.dot((np.eye(self.P.shape[0]) - np.dot(K,H)),self.P)
 
-            self.x = x_curr
-            self.P = P_curr
+            self.x = deepcopy(x_curr)
+            self.P = deepcopy(P_curr)
             self.state_history.append(x_curr)
             self.cov_history.append(P_curr)
 
