@@ -352,9 +352,6 @@ class SimInstance(object):
         for j, msg_list in enumerate(ci_inbox):
             self.agents[j].process_ci_messages(msg_list)
 
-
-        #     # process message, perform CI
-
         # update state history and mse 
         for j, agent in enumerate(self.agents):
             agent.local_filter.state_history.append(agent.local_filter.x)
@@ -367,6 +364,10 @@ class SimInstance(object):
             # record agent MSE and baseline MSE
             # agent_mse = 
             # network_mse[j].append()
+
+        # update baseline est and cov histories
+        self.baseline_filter.state_history.append(self.baseline_filter.x)
+        self.baseline_filter.cov_history.append(self.baseline_filter.P)
 
     def run_sim(self,print_strs=None):
         """

@@ -35,8 +35,8 @@ class KF(object):
         self.x = x_curr
         self.P = P_curr
 
-        self.state_history.append(x_curr)
-        self.cov_history.append(P_curr)
+        # self.state_history.append(x_curr)
+        # self.cov_history.append(P_curr)
 
         return x_curr, P_curr
 
@@ -45,14 +45,14 @@ class KF(object):
         for i in range(0,meas.shape[0]):
             H = np.zeros([2,self.F.shape[0]])
             if meas_type is 'abs':
-                H[0,4*(src_id-1)] = 1
-                H[1,4*(src_id-1)+2] = 1
+                H[0,4*(src_id)] = 1
+                H[1,4*(src_id)+2] = 1
                 R = self.R_abs
             elif meas_type is 'rel':
-                H[0,4*(src_id-1)] = 1
-                H[1,4*(src_id-1)+2] = 1
-                H[0,4*(rel_agent_id-1)] = -1
-                H[1,4*(rel_agent_id-1)+2] = -1
+                H[0,4*(src_id)] = 1
+                H[1,4*(src_id)+2] = 1
+                H[0,4*(rel_agent_id)] = -1
+                H[1,4*(rel_agent_id)+2] = -1
                 R = self.R_rel
             else:
                 print('Received invalid measurement type {}'.format(meas_type))
@@ -76,8 +76,8 @@ class KF(object):
 
             self.x = deepcopy(x_curr)
             self.P = deepcopy(P_curr)
-            self.state_history.append(x_curr)
-            self.cov_history.append(P_curr)
+            # self.state_history.append(x_curr)
+            # self.cov_history.append(P_curr)
 
             return x_curr,P_curr
 
