@@ -9,6 +9,7 @@ import sys
 import pprint
 import numpy as np
 import matplotlib.pyplot as plt
+import argparse
 # import pudb; pudb.set_trace()
 
 from .data_handling import load_sim_data
@@ -48,7 +49,6 @@ def time_trace_plots(metadata, data, agent_ids):
         # extract baseline data to plot
         b = data['baseline']
         bl_est_data = b.state_history
-        # print(bl_est_data[0])
         bl_cov_data = b.cov_history
 
         # get agent location in agent and baseline data
@@ -61,7 +61,6 @@ def time_trace_plots(metadata, data, agent_ids):
         var_data_vec = np.concatenate([np.expand_dims(np.diag(x[np.ix_(idx,idx)]),axis=1) for x in cov_data],axis=1)
 
         bl_est_data_vec = np.concatenate([np.expand_dims(np.array(x[bl_idx]),axis=1) for x in bl_est_data],axis=1)
-        # print(bl_est_data_vec.shape)
         bl_var_data_vec = np.concatenate([np.expand_dims(np.diag(x[np.ix_(bl_idx,bl_idx)]),axis=1) for x in bl_cov_data],axis=1)
 
         # create plot
@@ -73,31 +72,65 @@ def time_trace_plots(metadata, data, agent_ids):
 
         plt.grid()
 
-        plt.plot(time_vec,(est_data_vec[2,:]-truth_data_vec[2,:]),'r')
+        plt.plot(time_vec,(est_data_vec[0,:]-truth_data_vec[0,:]),'r')
         plt.plot(time_vec,2*np.sqrt(var_data_vec[0,:]),'r--')
         plt.plot(time_vec,-2*np.sqrt(var_data_vec[0,:]),'r--')
 
-        # plt.plot(time_vec,(bl_est_data_vec[2,:]-truth_data_vec[2,:]),'g')
-        # plt.plot(time_vec,2*np.sqrt(bl_var_data_vec[0,:]),'g--')
-        # plt.plot(time_vec,-2*np.sqrt(bl_var_data_vec[0,:]),'g--')
+        plt.plot(time_vec,(bl_est_data_vec[0,:]-truth_data_vec[0,:]),'g')
+        plt.plot(time_vec,2*np.sqrt(bl_var_data_vec[0,:]),'g--')
+        plt.plot(time_vec,-2*np.sqrt(bl_var_data_vec[0,:]),'g--')
 
         plt.xlabel('Time [s]')
         plt.ylabel('Est error [m]')
         plt.title(r'Agent {} ownship $\xi$ est. err: $\delta={}$, $\tau_g={}$, msg drop={}'.format(id_+1,metadata['delta'],metadata['tau_goal'],metadata['msg_drop_prob']))
-        plt.legend(['Est error',r'$\pm 2\sigma$','','bl est error',r'$\pm 2\sigma$',''])
+        plt.legend(['Est error',r'$\pm 2\sigma$','','BL est error',r'$\pm 2\sigma$',''])
 
     plt.show()
 
 def test_mse_plots():
 
-    save_path = '../../data/sim_20190417-122247.pckl'
+    save_path = '../../data/sim_20190418-010908.pckl'
     data = load_sim_data(save_path)
 
     # pprint.pprint(data)
     time_trace_plots(data['results'][0]['metadata'],
                 data['results'][0]['results'],
-                [0,14,22])
+                [0,2,4])
 
 if __name__ == "__main__":
 
-    test_mse_plots()
+    parser = argparse.ArgumentParser(description='Plot simulation results from simulation data structure, stored as pickle file.')
+    parser.add_argument('agents',metavar='A',type=int,action='store',nargs='+',
+                    help='ids of agents to plot (use -1 for all agents)')
+    parser.add_argument('-t','--time-trace',dest='tt_flag',action='store_true',
+                    help='plot time traces of estimate error')
+    parser.add_argument('-m','--mse',dest='mse_flag',action='store_true',
+                    help='plot mean-squared-errors (MSE)')
+    parser.add_argument('-f','--file-path',type=str,dest='file_path',action='store',
+                    help='specify file path of sim data')
+    args = parser.parse_args()
+
+    # TODO: add arg for local, common, or both
+    # TODO: figure out how to return plot objects and show after tt and mse plotting
+    # TODO: default to plotting most recently save pickle file, instead of hardcoded path
+
+    # set data path
+    if args.file_path is None:
+        save_path = '../../data/sim_20190418-010908.pckl'
+
+    # load data
+    data = load_sim_data(save_path)
+
+    # get all agent ids if param is all agents (-1)
+    agents = args.agents
+    if len(args.agents) == 1 and args.agents[0] == -1:
+        agents = list(range(0,data['results'][0]['metadata']['num_agents']))
+
+    # generate plots
+    if args.tt_flag:
+        time_trace_plots(data['results'][0]['metadata'],
+                data['results'][0]['results'],
+                agents)
+
+    if args.mse_flag:
+        pass
