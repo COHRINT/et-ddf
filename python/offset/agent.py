@@ -40,8 +40,9 @@ class Agent(object):
         # struct with ids of connections and filters estimating common
         self.common_estimates = common_estimates
         
-        # true starting position
+        # true starting position and MSE
         self.true_state = [x_true]
+        self.mse_history = []
         
         # CI trigger count
         self.ci_trigger_cnt = 0

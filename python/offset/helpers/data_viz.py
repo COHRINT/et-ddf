@@ -15,8 +15,47 @@ import argparse
 from .data_handling import load_sim_data
 
 def mse_plots(metadata,data,agent_ids):
-    pass
+    """
+    Creates mean-squared-error plors for provided agent ids.
 
+    Inputs:
+
+        metadata -- sim run metadata
+        data -- sim results data structure
+        agent_ids -- list of agent ids to plot
+
+    Outputs:
+
+        plots -- matplotlib plot objects
+    """
+    # create time vector -- common to all plots
+    time_vec = np.arange(start=0,
+                        stop=metadata['max_time']+metadata['dt'],
+                        step=metadata['dt'])
+
+    # for each agent generate mse plot
+    for id_ in agent_ids:
+
+        # extract agent data to plot
+        a = data['agents'][id_]
+        mse_data = a.mse_history
+
+        # create plot
+        plt.figure(id_)
+
+        # configure pyplot for using latex
+        plt.rc('text', usetex=True)
+        plt.rc('font',family='serif')
+
+        plt.grid()
+
+        plt.plot(time_vec,mse_data)
+
+        plt.xlabel('Time [s]')
+        plt.ylabel('Est error [m]')
+        plt.title(r'Agent {} ownship pos MSE: $\delta={}$, $\tau_g={}$, msg drop={}'.format(id_+1,metadata['delta'],metadata['tau_goal'],metadata['msg_drop_prob']))
+
+    plt.show()
 
 def time_trace_plots(metadata, data, agent_ids):
     """
@@ -32,6 +71,8 @@ def time_trace_plots(metadata, data, agent_ids):
 
         plots -- matplotlib plot objects
     """
+    dim = 2
+
     # create time vector -- common to all plots
     time_vec = np.arange(start=0,
                         stop=metadata['max_time']+2*metadata['dt'],
@@ -72,13 +113,13 @@ def time_trace_plots(metadata, data, agent_ids):
 
         plt.grid()
 
-        plt.plot(time_vec,(est_data_vec[0,:]-truth_data_vec[0,:]),'r')
-        plt.plot(time_vec,2*np.sqrt(var_data_vec[0,:]),'r--')
-        plt.plot(time_vec,-2*np.sqrt(var_data_vec[0,:]),'r--')
+        plt.plot(time_vec,(est_data_vec[dim,:]-truth_data_vec[dim,:]),'r')
+        plt.plot(time_vec,2*np.sqrt(var_data_vec[dim,:]),'r--')
+        plt.plot(time_vec,-2*np.sqrt(var_data_vec[dim,:]),'r--')
 
-        plt.plot(time_vec,(bl_est_data_vec[0,:]-truth_data_vec[0,:]),'g')
-        plt.plot(time_vec,2*np.sqrt(bl_var_data_vec[0,:]),'g--')
-        plt.plot(time_vec,-2*np.sqrt(bl_var_data_vec[0,:]),'g--')
+        plt.plot(time_vec,(bl_est_data_vec[dim,:]-truth_data_vec[dim,:]),'g')
+        plt.plot(time_vec,2*np.sqrt(bl_var_data_vec[dim,:]),'g--')
+        plt.plot(time_vec,-2*np.sqrt(bl_var_data_vec[dim,:]),'g--')
 
         plt.xlabel('Time [s]')
         plt.ylabel('Est error [m]')
@@ -117,6 +158,8 @@ if __name__ == "__main__":
     # set data path
     if args.file_path is None:
         save_path = '../../data/sim_20190418-010908.pckl'
+    else:
+        save_path = args.file_path
 
     # load data
     data = load_sim_data(save_path)
@@ -133,4 +176,6 @@ if __name__ == "__main__":
                 agents)
 
     if args.mse_flag:
-        pass
+        mse_plots(data['results'][0]['metadata'],
+                data['results'][0]['results'],
+                agents)

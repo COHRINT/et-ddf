@@ -9,7 +9,7 @@ import sys
 import yaml
 import numpy as np
 import scipy.linalg
-import pudb
+import pudb; #pudb.set_trace()
 import argparse
 from copy import deepcopy
 
@@ -361,9 +361,10 @@ class SimInstance(object):
                 filter_.state_history.append(filter_.x)
                 filter_.cov_history.append(filter_.P)
 
-            # record agent MSE and baseline MSE
-            # agent_mse = 
-            # network_mse[j].append()
+            # record agent (position) MSE and baseline MSE
+            _,idx = agent.get_location(agent.agent_id)
+            agent_mse = np.linalg.norm(np.take(agent.local_filter.x,[idx[0],idx[2]]) - np.take(agent.true_state[-1],[0,2]),ord=2)**2 
+            agent.mse_history.append(agent_mse)
 
         # update baseline est and cov histories
         self.baseline_filter.state_history.append(self.baseline_filter.x)
