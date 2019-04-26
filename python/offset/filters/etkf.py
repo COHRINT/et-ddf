@@ -228,10 +228,11 @@ class ETKF(object):
             P_curr -- updated estimate covariance
         """
 
-        # phi = lambda z: (1/np.sqrt(2*np.pi))*np.exp(-0.5*(z**2))
         # fxn handles for standard normal distribution pdf and cdf
-        phi = norm.pdf
-        Qfxn = norm.cdf
+        # phi = norm.pdf
+        phi = lambda z: (1/np.sqrt(2*np.pi))*np.exp(-0.5*(z**2)) 
+        # Qfxn = norm.cdf
+        Qfxn = lambda x: 1 - 0.5*(1+erf(x/np.sqrt(2)))
 
         i = data_idx
         # create measurement fxn
