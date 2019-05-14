@@ -22,8 +22,8 @@ def gss(f,a,b,tol=1e-5):
     # golden ratio
     gr = (1+math.sqrt(5))/2
 
-    c = b-(b-a)/gr;
-    d = a+(b-a)/gr;
+    c = b-(b-a)/gr
+    d = a+(b-a)/gr
 
     while abs(c-d) > tol:
         if f(c) < f(d):

@@ -9,18 +9,19 @@ import sys
 import yaml
 import numpy as np
 import scipy.linalg
-import pudb; #pudb.set_trace()
+import pudb; # pudb.set_trace()
 import argparse
 from copy import deepcopy
+import scipy.io
 
-from .agent import Agent
-from .filters.kf import KF
-from .filters.etkf import ETKF
-from .dynamics import *
-from .helpers.config_handling import load_config
-from .helpers.msg_handling import MeasurementMsg, StateMsg
-from .helpers.data_handling import package_results, save_sim_data
-from .helpers.data_viz import mse_plots, time_trace_plots
+from offset.agent import Agent
+from offset.filters.kf import KF
+from offset.filters.etkf import ETKF
+from offset.dynamics import *
+from offset.helpers.config_handling import load_config
+from offset.helpers.msg_handling import MeasurementMsg, StateMsg
+from offset.helpers.data_handling import package_results, save_sim_data
+from offset.helpers.data_viz import mse_plots, time_trace_plots
 
 class SimInstance(object):
     """
@@ -69,6 +70,14 @@ class SimInstance(object):
             np.random.seed(self.fixed_rng)
             print('Fixing random number generator with seed: {}'.format(self.fixed_rng))
 
+
+        # load matlab data for verification
+        # self.sensor_noise_data = scipy.io.loadmat('../matlab/sensor_data_6agents.mat')
+        # self.x_start_data = self.sensor_noise_data['x_start_data']
+        # self.w_data = self.sensor_noise_data['w_data']
+        # self.v_data = self.sensor_noise_data['v_data']
+        # self.v_rel_data = self.sensor_noise_data['v_rel_data']
+
         self.all_msgs = []
 
         # generate ground truth starting positions
@@ -90,7 +99,9 @@ class SimInstance(object):
         """
         x_true_vec = np.zeros(4*self.num_agents)
         for i in range(0,self.num_agents):
-            x_true = np.array((i*10,0,i*10,0)).T + np.random.normal([0,0,0,0],[5,0.5,5,0.5])
+            start_noise = np.random.normal([0,0,0,0],[5,0.5,5,0.5])
+            # start_noise = self.x_start_data[0,i]
+            x_true = np.array(((i+1)*10,0,(i+1)*10,0)).T + start_noise
             x_true_vec[4*i:4*i+4] = x_true
 
         return x_true_vec
@@ -238,6 +249,13 @@ class SimInstance(object):
         Update simulation by one timestep dt. First updates all ground truth.
         Then updates baseline and all agents filters.
         """
+
+        # print estimates for verification
+        # for i,a in enumerate(self.agents):
+        #     print('agent {} est: {}'.format(i+1,a.local_filter.x))
+
+        # input('press enter to continue to next time step')
+
         # get dynamics abnd sensor noise
         F_local, G_local, _ = globals()[dynamics_fxn](self.dt,1)
         R_abs = sensors['lin_abs_pos']['noise']
@@ -254,6 +272,8 @@ class SimInstance(object):
         agent_control_input = np.array( ((2*np.cos(0.75*self.sim_time)),(2*np.sin(0.75*self.sim_time))) )
         all_control_input = np.tile(agent_control_input,self.num_agents)
 
+        # print('agent crtl input: {}'.format(agent_control_input))
+
         # propagate baseline estimate
         self.baseline_filter.predict(all_control_input)
 
@@ -262,6 +282,8 @@ class SimInstance(object):
             msgs = []
 
             # propagate agent true states
+            # w = self.w_data[0,j][:,self.sim_time_step] # loaded from data file
+            # print('w: {}'.format(w))
             w = np.random.multivariate_normal([0,0,0,0],Q_local_true).transpose()
             self.agents[j].true_state.append(np.dot(F_local,self.agents[j].true_state[-1]) 
                 + np.dot(G_local,agent_control_input) + w)
@@ -269,6 +291,8 @@ class SimInstance(object):
             # generate measurements
             if self.agents[j].agent_id in self.sensors['lin_abs_pos']['agents']:
                 # simulate measurement noise
+                # v = self.v_data[0,j][:,self.sim_time_step] # loaded from data file
+                # print('v_abs: {}'.format(v))
                 v = np.random.multivariate_normal([0,0],R_abs)
                 # create measurement with agent true state and simmed noise
                 y_abs = np.dot(H_local,self.agents[j].true_state[-1]) + v
@@ -287,6 +311,8 @@ class SimInstance(object):
 
             for k in range(0,len(self.agents[j].meas_connections)):
                 # simulate measurement noise
+                # v_rel = self.v_rel_data[0,j][:,self.sim_time_step]
+                # print('v_rel: {}'.format(v_rel))
                 v_rel = np.random.multivariate_normal([0,0],R_rel)
                 # create measurement with agent and target true states and simmed noise
                 y_rel = np.dot(H_rel,np.hstack( (self.agents[j].true_state[-1],
@@ -336,8 +362,8 @@ class SimInstance(object):
                 for conn_id in agent.meas_connections:
                     
                     # generate message
-                    msg_a = agent.gen_ci_message(conn_id,self.agents[conn_id].connections)
-                    msg_b = self.agents[conn_id].gen_ci_message(agent.agent_id,agent.connections)
+                    msg_a = agent.gen_ci_message(conn_id,list(self.agents[conn_id].connections))
+                    msg_b = self.agents[conn_id].gen_ci_message(agent.agent_id,list(agent.connections))
                     # add messages to ci inbox
                     ci_inbox[conn_id].append(deepcopy(msg_a))
                     ci_inbox[agent.agent_id].append(msg_b)
@@ -370,6 +396,8 @@ class SimInstance(object):
         self.baseline_filter.state_history.append(self.baseline_filter.x)
         self.baseline_filter.cov_history.append(self.baseline_filter.P)
 
+        # input('press enter to continue to next time step')
+
     def run_sim(self,print_strs=None):
         """
         Run simulation with sim instance parameters, and package results data.
@@ -400,6 +428,10 @@ class SimInstance(object):
             self.sim_time += self.dt
             self.sim_time_step += 1
             
+        # print ci_process_worst_case_time for each agent
+        for i,a in enumerate(self.agents):
+            print('Agent {} worst case time: {}'.format(i,a.ci_process_worst_case_time))
+
         # package simulation results
         # res = package_results()
         results_dict = {'baseline': self.baseline_filter, 'agents': self.agents}

@@ -14,6 +14,7 @@ import numpy as np
 from numpy.linalg import inv
 from copy import deepcopy
 # import pudb; pudb.set_trace()
+import time
 
 from .covar_intersect import covar_intersect, gen_sim_transform
 from .helpers.msg_handling import MeasurementMsg, StateMsg
@@ -27,9 +28,9 @@ class Agent(object):
         self.agent_id = agent_id
         
         # ids of connections
-        self.connections = connections
-        self.meas_connections = meas_connections
-        self.neighbor_connections = neighbor_connections
+        self.connections = tuple(connections)
+        self.meas_connections = tuple(meas_connections)
+        self.neighbor_connections = tuple(neighbor_connections)
         
         # number of states per platform
         self.num_states = 4
@@ -62,6 +63,8 @@ class Agent(object):
 
         self.use_adaptive_tau = use_adaptive_tau
 
+        self.ci_process_worst_case_time = 0
+
     def get_location(self,id_):
         """
         Get location of agent specified by :param id in state estimate, as well as indicies.
@@ -75,7 +78,7 @@ class Agent(object):
         idx = []
 
         # create list of agents in state estimate, incl. self
-        ids = deepcopy(self.connections)
+        ids = list(self.connections)
         ids.append(self.agent_id)
         ordered_ids = sorted(ids)
 
@@ -91,7 +94,7 @@ class Agent(object):
         
         :param loc -> int - location in state estimate
         """
-        ids = self.connections
+        ids = list(self.connections)
         ids.append(self.agent_id)
         ordered_ids = sorted(ids)
         return ordered_ids[loc]
@@ -272,7 +275,7 @@ class Agent(object):
         Pa = deepcopy(self.local_filter.P)
 
         # construct transform
-        Ta, il_a, inter = gen_sim_transform(self.agent_id,self.connections,
+        Ta, il_a, inter = gen_sim_transform(self.agent_id,list(self.connections),
                                             dest_id,dest_connections)
 
         # compute reduced, transformed state estimate
@@ -308,6 +311,8 @@ class Agent(object):
 
         for msg in msgs:
             
+            start_time = time.clock()
+
             # grab state estimate from local filter
             xa = deepcopy(self.local_filter.x)
             Pa = deepcopy(self.local_filter.P)
@@ -320,8 +325,8 @@ class Agent(object):
             b_rate = msg.src_ci_rate
 
             # construct transform
-            Ta, il_a, inter = gen_sim_transform(self.agent_id,self.connections,
-                                                b_id,b_connections)
+            Ta, il_a, inter = gen_sim_transform(self.agent_id,list(self.connections),
+                                                b_id,list(b_connections))
 
             # compute reduced, transformed state estimate
             xaT = np.dot(inv(Ta),xa)
@@ -376,6 +381,9 @@ class Agent(object):
                                 self.epsilon_1*sum(-self.connection_tau_rates +
                                 self.ci_trigger_rate) +
                                 self.epsilon_2*(self.tau_goal-self.tau))
+
+            time_elapsed = time.clock() - start_time
+            if time_elapsed > self.ci_process_worst_case_time: self.ci_process_worst_case_time = time_elapsed
 
 def test_agent():
     pass

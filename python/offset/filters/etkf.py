@@ -12,6 +12,7 @@ Usage:
 
 import numpy as np
 from scipy.stats import norm
+from scipy.special import erf
 from copy import deepcopy
 import pudb
 
@@ -49,7 +50,7 @@ class ETKF(object):
         loc = []
 
         # create list of agents in state estimate, incl. self
-        ids = deepcopy(self.connection)
+        ids = list(self.connection)
         ids.append(self.agent_id)
         ids.sort()
 
@@ -64,7 +65,7 @@ class ETKF(object):
         
         :param loc -> int - location in state estimate
         """
-        ids = self.connection
+        ids = list(self.connection)
         ids.append(self.agent_id)
         ordered_ids = ids.sort()
         return ordered_ids[loc]
@@ -228,10 +229,11 @@ class ETKF(object):
             P_curr -- updated estimate covariance
         """
 
-        # phi = lambda z: (1/np.sqrt(2*np.pi))*np.exp(-0.5*(z**2))
         # fxn handles for standard normal distribution pdf and cdf
-        phi = norm.pdf
-        Qfxn = norm.cdf
+        # phi = norm.pdf
+        phi = lambda z: (1/np.sqrt(2*np.pi))*np.exp(-0.5*(z**2)) 
+        # Qfxn = norm.cdf
+        Qfxn = lambda x: 1 - 0.5*(1+erf(x/np.sqrt(2)))
 
         i = data_idx
         # create measurement fxn
