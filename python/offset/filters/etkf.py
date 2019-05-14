@@ -12,6 +12,7 @@ Usage:
 
 import numpy as np
 from scipy.stats import norm
+from scipy.special import erf
 from copy import deepcopy
 import pudb
 
@@ -49,7 +50,7 @@ class ETKF(object):
         loc = []
 
         # create list of agents in state estimate, incl. self
-        ids = deepcopy(self.connection)
+        ids = list(self.connection)
         ids.append(self.agent_id)
         ids.sort()
 
@@ -64,7 +65,7 @@ class ETKF(object):
         
         :param loc -> int - location in state estimate
         """
-        ids = self.connection
+        ids = list(self.connection)
         ids.append(self.agent_id)
         ordered_ids = ids.sort()
         return ordered_ids[loc]

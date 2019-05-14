@@ -9,7 +9,7 @@
 % network's states.
 
 clear; %close all; clc;
-% load('sensor_noise_data.mat');
+load('sensor_data_6agents.mat');
 
 rng(999)
 
@@ -43,8 +43,8 @@ num_connections = 2;
 % tau_state_goal_vec = 5:0.5:15;
 % tau_state_vec = 0:0.5:25;
 
-delta_vec = [1.5];
-tau_state_goal_vec = [10];
+delta_vec = [1];
+tau_state_goal_vec = [5];
 msg_drop_prob_vec = 0;
 
 % cost = zeros(length(delta_vec),length(tau_state_goal_vec),5);
@@ -60,6 +60,8 @@ input_tvec = 0:dt:max_time;
 cost = zeros(length(delta_vec)*length(tau_state_goal_vec)*length(msg_drop_prob_vec),9);
 network_mse = zeros(N,length(input_tvec),length(msg_drop_prob_vec));
 baseline_mse = zeros(N,length(input_tvec),length(delta_vec));
+
+worst_ci_process_times = zeros(1,N);
 
 for idx1=1:length(delta_vec)
 for idx2=1:length(tau_state_goal_vec) 
@@ -89,7 +91,9 @@ msg_drop_prob = msg_drop_prob_vec(idx3);
 %% True starting position and input
 
 for i=1:N
-    x_true = [i*10,0,i*10,0]' + mvnrnd([0,0,0,0],diag([5 0.5 5 0.5]))';
+    start_noise = mvnrnd([0,0,0,0],diag([5 0.5 5 0.5]))';
+%     start_noise = x_start_data{i};
+    x_true = [i*10,0,i*10,0]' + start_noise;
     x_true_vec((i-1)*4+1:(i-1)*4+4,1) = x_true;
     
     % generate input for platforms
@@ -233,6 +237,12 @@ rel_meas_mat = zeros(N,length(input_tvec),2);
 
 for i = 2:length(input_tvec)
 %     tic
+
+%     for j=1:length(agents)
+%         fprintf('agent %i est:\n',j)
+%         disp(agents{j}.local_filter.x)
+%     end
+
     clc;
     fprintf('Iteration %i of %i\n',loop_cnt,length(delta_vec)*length(tau_state_goal_vec));
     fprintf('Delta: %f \t State tau goal: %f\n',delta,tau_state_goal);
@@ -241,11 +251,13 @@ for i = 2:length(input_tvec)
     % create measurement inbox
     inbox = cell(N,1);
     
-    baseline_filter.predict(u(:,i));
+    baseline_filter.predict(u(:,i-1));
+%     disp(u(:,i-1))
 %     baseline_filter.predict(zeros(size(u(:,i))));
     
     % process local measurements and determine which to send to connections
-    for j=randperm(length(agents))
+%     for j=randperm(length(agents))
+    for j=1:length(agents)
         msgs = {};
         
 %         if i == 107 && j == 16
@@ -254,13 +266,13 @@ for i = 2:length(input_tvec)
         
         % propagate true state
         w = mvnrnd([0,0,0,0],Q_local_true)';
-%         w = w_data{j}(:,i);
-        agents{j}.true_state(:,end+1) = F_local*agents{j}.true_state(:,end) + G_local*u(2*(j-1)+1:2*(j-1)+2,i) + w;
+%         w = w_data{j}(:,i-1);
+        agents{j}.true_state(:,end+1) = F_local*agents{j}.true_state(:,end) + G_local*u(2*(j-1)+1:2*(j-1)+2,i-1) + w;
         
         % simulate measurements: absolute measurements
         if ismember(agents{j}.agent_id,abs_meas_vec)
             v = mvnrnd([0,0],R_abs)';
-%             v = v_data{j}(:,i);
+%             v = v_data{j}(:,i-1);
             y_abs = H_local*agents{j}.true_state(:,end) + v;
             y_abs_msg = struct('src',agents{j}.agent_id,'dest',agents{j}.agent_id,...
                         'target',agents{j}.agent_id,'status',[1 1],'type',"abs",'data',y_abs);
@@ -275,10 +287,11 @@ for i = 2:length(input_tvec)
         end
         
         % relative position
-        for k=randperm(length(agents{j}.meas_connections))
+%         for k=randperm(length(agents{j}.meas_connections))
+        for k=1:length(agents{j}.meas_connections)
 %             if agents{j}.agent_id ~= 5
                 v_rel = mvnrnd([0,0],R_rel)';
-%                 v_rel = v_rel_data{j}(:,i);
+%                 v_rel = v_rel_data{j}(:,i-1);
                 y_rel = H_rel*[agents{j}.true_state(:,end); ...
                     agents{agents{j}.meas_connections(k)}.true_state(:,end)] + v_rel;
                 y_rel_msg = struct('src',agents{j}.agent_id,'dest',agents{j}.meas_connections(k),...
@@ -300,7 +313,8 @@ for i = 2:length(input_tvec)
         outgoing = agents{j}.process_local_measurements(input,msgs);
         
 %         add outgoing measurements to each agents "inbox"
-        for k=randperm(length(outgoing))
+%         for k=randperm(length(outgoing))
+        for k=1:length(outgoing)
             dest = outgoing{k}.dest;
             inbox{dest,end+1} = outgoing{k};
             all_msgs{end+1} = outgoing{k};
@@ -309,7 +323,8 @@ for i = 2:length(input_tvec)
     
     %% All agents now process received measurements, performing implicit and
     % explicit measurement updates
-    for j=randperm(length(agents))
+%     for j=randperm(length(agents))
+    for j=1:length(agents)
         if j == 5 && i == 100
             disp('break')
         end
@@ -322,7 +337,8 @@ for i = 2:length(input_tvec)
     % covariance intersection between agents
     ci_trigger_list = zeros(1,length(agents));
     
-    for j=randperm(length(agents))
+%     for j=randperm(length(agents))
+    for j=1:length(agents)
         alpha = ones(4*(length(agents{j}.connections)+1),1);
 
         % check trace of cov to determine if CI should be triggered
@@ -338,7 +354,8 @@ for i = 2:length(input_tvec)
             % connection inboxes
             x_snap = agents{j}.local_filter.x;
             P_snap = agents{j}.local_filter.P;
-            for k=randperm(length(agents{j}.meas_connections))
+%             for k=randperm(length(agents{j}.meas_connections))
+            for k=1:length(agents{j}.meas_connections)
     
                 % compute transforms for platform and connection, and
                 % number of intersecting states
@@ -380,7 +397,8 @@ for i = 2:length(input_tvec)
     end
     
     %% Acutal covariance intersection performed (w/ conditional updates on full states)
-    for j=randperm(length(agents))
+%     for j=randperm(length(agents))
+    for j=1:length(agents)
         
 %         if ((i > 100 && j == 16) && abs(agents{j}.local_filter.x(5) - agents{j}.true_state(1,end)) > 4)
 %             disp('break')
@@ -390,8 +408,12 @@ for i = 2:length(input_tvec)
 %             disp('break')
 %         end
         
-        for k=randperm(length(ci_inbox{j}))
+%         for k=randperm(length(ci_inbox{j}))
+        for k=1:length(ci_inbox{j})
             if ~isempty(ci_inbox{j}{k})
+                
+                tic;
+                
                 xa = agents{j}.local_filter.x;
                 Pa = agents{j}.local_filter.P;
                 
@@ -439,7 +461,8 @@ for i = 2:length(input_tvec)
                 agents{j}.local_filter.P = Pa;
                 
                 % update common estimates
-                for ii=randperm(length(agents{j}.common_estimates))
+%                 for ii=randperm(length(agents{j}.common_estimates))
+                for ii=1:length(agents{j}.common_estimates)
                     if agents{j}.common_estimates{ii}.meas_connection == ci_inbox{j}{k}{3}
 %                         conn_loc = inter==agents{j}.common_estimates{ii}.connection;
                         agents{j}.common_estimates{ii}.x = xc;
@@ -448,6 +471,12 @@ for i = 2:length(input_tvec)
                         agents{j}.connection_tau_rates(ii) = b_rate;
                     end
                 end
+                
+                time_elapsed = toc;
+                if time_elapsed > worst_ci_process_times(j)
+                    worst_ci_process_times(j) = time_elapsed;
+                end
+                
             end
         end
         
@@ -497,6 +526,10 @@ for i = 2:length(input_tvec)
 %     toc
 
 
+end
+
+for iii=1:N
+    fprintf('Agent %i worst time: %f\n',iii,worst_ci_process_times(iii))
 end
 
 avg_mse = mean(network_mse,1);

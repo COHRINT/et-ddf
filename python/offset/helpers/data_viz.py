@@ -118,8 +118,8 @@ def time_trace_plots(metadata, data, agent_ids):
         plt.plot(time_vec,-2*np.sqrt(var_data_vec[dim,:]),'r--')
 
         plt.plot(time_vec,(bl_est_data_vec[dim,:]-truth_data_vec[dim,:]),'g')
-        plt.plot(time_vec,2*np.sqrt(bl_var_data_vec[dim,:]),'g--')
-        plt.plot(time_vec,-2*np.sqrt(bl_var_data_vec[dim,:]),'g--')
+        # plt.plot(time_vec,2*np.sqrt(bl_var_data_vec[dim,:]),'g--')
+        # plt.plot(time_vec,-2*np.sqrt(bl_var_data_vec[dim,:]),'g--')
 
         plt.xlabel('Time [s]')
         plt.ylabel('Est error [m]')
