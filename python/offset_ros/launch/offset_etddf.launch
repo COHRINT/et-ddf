@@ -1,0 +1,13 @@
+<launch>
+
+    <include file="$(find offset_etddf)/launch/agent.launch"> 
+        <arg name="id" value="0" />
+    </include>
+
+    <include file="$(find offset_etddf)/launch/agent.launch"> 
+        <arg name="id" value="1" />
+    </include>
+    <!-- <include file="$(find offset_etddf)/launch/agent_2.launch" /> -->
+    <!-- <include file="$(find offset_etddf)/launch/agent_3.launch" /> -->
+
+</launch>

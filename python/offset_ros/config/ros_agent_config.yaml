@@ -1,0 +1,29 @@
+
+
+connections: [[1,2,3],[0],[0],[0]]
+# meas_connections: [1,2,3]
+agent_id: 0
+agent_update_rate: 0.1
+
+# event-triggering parameters
+delta: 1.0    # measurement-sharing Kalman innovation threshold param
+tau: 5          # covariance intersection uncertainty per state threshold
+
+# adaptive CI thresholding params
+use_adaptive_tau: True
+epsilon_1: 0.1          # adaptive threshold heuristic param -- weight for change from old value
+epsilon_2: 0.01         # adaptive threshold heuristic param -- weight for balancing w/ neighbors
+
+start_pos:
+    x: 0.0
+    y: 0.0
+    z: 0.0
+    phi: 0.0
+    theta: 0.0
+    psi: 0.0
+dynamics: 'lin_ncv'
+sensors:
+    gps:
+        noise: [[1,0],[0,1]]
+    range_az_el:
+        noise: [[3,0],[0,3]]
