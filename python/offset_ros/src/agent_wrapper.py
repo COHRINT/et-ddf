@@ -11,13 +11,16 @@ import rospy
 import Queue as queue
 # import queue
 import numpy as np
+from copy import deepcopy
 
-import offset
 from offset.agent import Agent
 from offset.filters.etkf import ETKF
 from offset.dynamics import *
 
-from offset_etddf.msg import AgentMeasurement, AgentState
+from offset_ros.helpers.msg_conversion import gen_measurement_msg, python2ros_measurement, python2ros_state, ros2python_measurement, ros2python_state
+
+from geometry_msgs.msg import TwistStamped
+from offset_etddf.msg import AgentMeasurement, AgentState, gpsMeasurement, linrelMeasurement
 
 class AgentWrapper(object):
     """
@@ -53,6 +56,10 @@ class AgentWrapper(object):
         # TODO: add back z and zdot states
         start_state = np.array((start_state['x'],0,start_state['y'],0))
 
+        # create initial control input vector
+        self.recent_control_input = np.array([[0],[0]])
+        self.recent_twist = np.array([[0],[0]])
+
         # get availalbe sensors, and noise params
         sensors = rospy.get_param('sensors')
         
@@ -80,9 +87,13 @@ class AgentWrapper(object):
         self.local_ci_queue = queue.LifoQueue()
         self.recevied_ci_queue = queue.LifoQueue()
 
+        # create subscriber to control input
+        # rospy.Subscriber('~actuator_control',ActuatorControl,self.control_input_cb)
+        rospy.Subscriber('new_twist',TwistStamped,self.control_input_cb)
+
         # create subscribers to sensors
-        # rospy.Subscriber('depth', depthMeasurement, self.queue_local_measurement)
-        # rospy.Subscriber('usbl', usblMeasurement, self.queue_local_measurement)
+        rospy.Subscriber('gps', gpsMeasurement, self.queue_local_measurement)
+        rospy.Subscriber('lin_rel', linrelMeasurement, self.queue_local_measurement)
 
         # create subscribers to comms module
         rospy.Subscriber('agent_meas_incoming', AgentMeasurement, self.queue_received_measurement)
@@ -92,6 +103,9 @@ class AgentWrapper(object):
         self.comms_meas_pub = rospy.Publisher('agent_meas_outgoing', AgentMeasurement, queue_size=10)
         self.comms_state_pub = rospy.Publisher('agent_state_outgoing', AgentState, queue_size=10)
 
+        # create publisher of local esimate
+        self.local_est_pub = rospy.Publisher('local_estimate', AgentState, queue_size=10)
+
         # begin update loop
         while not rospy.is_shutdown():
 
@@ -100,6 +114,18 @@ class AgentWrapper(object):
 
             # sleep until next update
             rate.sleep()
+
+    def control_input_cb(self,msg):
+        """
+        Saves most recent control input.
+        """
+        # NOTE: currently faking this with differencing twist commands
+        twist_array = [[msg.twist.linear.x],[msg.twist.linear.y]]
+        twist_array = np.array(twist_array)
+        # print(twist_array.shape)
+        self.recent_control_input = (twist_array - self.recent_twist)/self.update_rate
+        # print(self.recent_control_input.shape)
+        self.recent_twist = np.array(twist_array)
 
     def queue_local_measurement(self,msg):
         """
@@ -145,34 +171,6 @@ class AgentWrapper(object):
         """
         pass
 
-    def gen_measurement_msg(self,msg):
-        """
-        Generate generic between-agent measurement message from local measurement
-        message.
-
-        Inputs:
-
-            msg -- local measurement message
-
-        Returns:
-
-            new_msg -- generated message
-        """
-        new_msg = AgentMeasurement()
-
-        new_msg.type = msg._type.split('/')[1]
-        new_msg.header.stamp = rospy.Time.now()
-        new_msg.src = self.agent_id
-
-        if msg._type == 'cohrint_minau/usblMeasurement':
-            new_msg.data = [msg.range, msg.azimuth, msg.elevation]
-        elif msg._type == 'cohrint_minau/depthMeasurement':
-            new_msg.data = [msg.data]
-
-        new_msg.status = [1 for x in new_msg.data]
-
-        return new_msg
-
     def update(self):
         """
         Main update function to process measurements, and ci messages.
@@ -181,15 +179,30 @@ class AgentWrapper(object):
         local_measurements = self.process_local_measurement_queue()
         received_measurements = self.process_received_measurement_queue()
 
+        # convert messages from AgentMeasurement and AgentState ROS msg types to
+        # MeasurementMsg and StateMsg python msg types (they're pretty much the same)
+        local_measurements_generic = gen_measurement_msg(self.agent_id,local_measurements)
+        local_measurements_python = ros2python_measurement(local_measurements_generic)
+        received_measurements_python = ros2python_measurement(received_measurements)
+
         # pass measurements to wrapped agent
-        # threshold_msgs = self.agent.process_local_measurements(local_measurements)
+        # print(local_measurements_generic)
+        threshold_measurements = self.agent.process_local_measurements(self.recent_control_input,local_measurements_python)
+        # threshold_measurements = self.agent.process_local_measurements(np.array(((0),(0))),local_measurements_python)
+
+        # convert messages back to ros type
+        # threshold_measurements_ros = python2ros_measurement(threshold_measurements)
 
         # published thresholded measurements to connections through comms module
-        if len(local_measurements) > 0:
-            msg = self.gen_measurement_msg(local_measurements[0])
-            self.comms_meas_pub.publish(msg)
+        # if len(local_measurements) > 0:
+        #     msg = self.gen_measurement_msg(local_measurements[0])
+        #     self.comms_meas_pub.publish(msg)
+        # for msg in threshold_measurements_ros:
+            # self.comms_meas_pub.pub(msg)
 
-        # self.agent.process_received_measurements(received_measurements)
+        # self.agent.process_received_measurements(received_measurements_python)
+
+        # check for CI updates
 
     def init_agent(self,start_state,dynamics_fxn='lin_ncv',sensors={}):
         """
@@ -209,7 +222,8 @@ class AgentWrapper(object):
         R_rel = sensors['range_az_el']['noise']
 
         agent_id = self.agent_id
-        ids = sorted(self.connections[agent_id])
+        ids = sorted(deepcopy(self.connections[agent_id]))
+        ids.append(agent_id)
 
         # build list of distance one and distance two neighbors for each agent
         # each agent gets full list of connections
@@ -234,11 +248,13 @@ class AgentWrapper(object):
         self.meas_connections = meas_connections
 
         est_state_length = len(ids)
+        print(ids)
 
         # construct local estimate
         # TODO: remove hardcoded 6
         n = (est_state_length)*4
         F,G,Q = globals()[dynamics_fxn](self.update_rate,est_state_length)
+        print('agent {} F shape: {} \t G shape: {} \t Q shape: {}'.format(self.agent_id,F.shape,G.shape,Q.shape))
 
         # sort all connections
         # ids = sorted([agent_id] + connections_new)
@@ -255,7 +271,9 @@ class AgentWrapper(object):
 
         local_filter = ETKF(F,G,0,0,Q,np.array(R_abs),np.array(R_rel),
                             x0.reshape((F.shape[0],1)),P0,self.delta,
-                            agent_id,self.connections,-1)
+                            agent_id,connections_new,-1)
+
+        print(local_filter.connection)
 
         # construct common information estimates
         common_estimates = []

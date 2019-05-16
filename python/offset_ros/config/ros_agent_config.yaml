@@ -1,9 +1,10 @@
 
 
-connections: [[1,2,3],[0],[0],[0]]
+# connections: [[1,2,3],[0],[0],[0]]
+connections: [[1],[0]]
 # meas_connections: [1,2,3]
 agent_id: 0
-agent_update_rate: 0.1
+agent_update_rate: 10 # [Hz]
 
 # event-triggering parameters
 delta: 1.0    # measurement-sharing Kalman innovation threshold param

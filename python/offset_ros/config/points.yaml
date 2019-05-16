@@ -1,0 +1,99 @@
+# point_sim_controller.py and point_planner.py config file
+
+sim:
+  update_freq: 50
+  random_pose_min_max: [-100, 100]
+  random_yaw: false
+  
+planners:
+  update_freq: 50
+  random_linear_vel_range: [-1,1]
+  random_angular_vel_range: [-0.0,0.0]
+
+sensors:
+  noise: true           # bool
+  depth_pub_rate: 0.00000001
+  usbl_pub_rate: 0.5
+  distance_res: 1       # m (number of decimal points)
+  angular_res: 1        # degrees (number of decimal points)
+  depth_res: 2          # m (number of decimal points)
+  positioning_res: 1    # m (number of decimal points)  
+  distance_noise: 1     # m
+  angular_noise: 1      # degrees
+  depth_noise: 0.03     # m
+  gps_noise: 1          # m^2 variance
+  lin_rel_noise: 1.77       # m^2 variance
+  gps_pub_rate: 1.0
+  lin_rel_pub_rate: 1.0
+  
+active_auvs:
+  - agent_0
+  - agent_1
+  # - case
+  # - deckard
+  # - hal
+  # - ava
+
+agent_0:
+  planner: linear
+  start_pos:           # either x,y,z,psi or 'random'
+    x: 5
+    y: 0
+    z: 3
+    psi: 1.57
+  start_twist:
+    x: 0.1
+    y: 0.0
+    z: 0
+    psi: 0
+  agent_id: 0
+  comm_drop_prob: 0.0
+  meas_connections: ['agent_1']
+  agent_update_rate: 10 # [Hz]
+
+agent_1:
+  planner: linear
+  start_pos:           # either x,y,z,psi or 'random'
+    x: 0
+    y: 5
+    z: 3
+    psi: 0
+  start_twist:
+    x: 0.0
+    y: 0.0
+    z: 0
+    psi: 0
+  agent_id: 1
+  comm_drop_prob: 0.0
+  meas_connections: ['agent_0']
+  agent_update_rate: 10 # [Hz]
+
+case:
+  planner: linear
+  start_pos: random
+  start_twist: random
+  agent_id: 2
+  comm_drop_prob: 0.0
+  connections: ['kipp']
+  agent_update_rate: 1.0 # [Hz]
+
+deckard:
+  planner: linear
+  start_pos: random
+  start_twist: random
+  agent_id: 3
+  comm_drop_prob: 0.0
+  connections: ['kipp']
+  agent_update_rate: 1.0 # [Hz]
+
+hal:
+  planner: linear
+  start_pos: random
+  start_twist: random
+  comm_drop_prob: 0.0
+
+ava:
+  planner: linear
+  start_pos: random
+  start_twist: random
+  comm_drop_prob: 0.0

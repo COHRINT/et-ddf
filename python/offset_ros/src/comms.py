@@ -8,7 +8,7 @@ a communications stack, including potential dropping of messages.
 import rospy
 import numpy as np
 
-from cohrint_minau.msg import AgentMeasurement, AgentState
+from offset_etddf.msg import AgentMeasurement, AgentState
 
 class CommsModule(object):
 
@@ -20,7 +20,7 @@ class CommsModule(object):
         # load parameters from the parameter server
         self.agent_name = rospy.get_namespace()
         self.drop_incoming_prob = rospy.get_param('comm_drop_prob')
-        self.connections = rospy.get_param('connections')
+        self.connections = rospy.get_param('meas_connections')
 
         # create topic subscriptions for incoming messages (i.e | connections -> comms |-> agent)
         for sub_name in self.connections:
@@ -62,9 +62,9 @@ class CommsModule(object):
         if np.random.binomial(1,self.drop_incoming_prob):
             return None
         else:
-            if msg._type == 'cohrint_minau/AgentMeasurement':
+            if msg._type == 'offset_etddf/AgentMeasurement':
                 self.agent_meas_pub.publish(msg)
-            elif msg._type == 'cohrint_minau/AgentState':
+            elif msg._type == 'offset_etddf/AgentState':
                 self.agent_state_pub.publish(msg)
         
 
@@ -80,9 +80,9 @@ class CommsModule(object):
 
             none
         """
-        if msg._type == 'cohrint_minau/AgentMeasurement':
+        if msg._type == 'offset_etddf/AgentMeasurement':
             self.comms_meas_pub.publish(msg)
-        elif msg._type == 'cohrint_minau/AgentState':
+        elif msg._type == 'offset_etddf/AgentState':
             self.comms_state_pub.publish(msg)
 
 

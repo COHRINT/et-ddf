@@ -8,9 +8,9 @@
         <rosparam command="load" file="$(find offset_etddf)/config/ros_agent_config.yaml" />
         <param name="agent_id" type="int" value="$(arg id)" />
 
-        <!-- <node name="planner0" pkg="cohrint_minau" type="planner.py" output="screen" />
-	    <node name="sensor_pub" pkg="cohrint_minau" type="publish_sensors.py" output="screen" />
-	    <node name="comms_module" pkg="cohrint_minau" type="comms.py" /> -->
+        <node name="planner" pkg="offset_etddf" type="point_planner.py" output="screen" />
+	    <node name="sensor_pub" pkg="offset_etddf" type="publish_sensors.py" output="screen" />
+	    <node name="comms_module" pkg="offset_etddf" type="comms.py" />
 	    <node name="agent" pkg="offset_etddf" type="agent_wrapper.py" output="screen" />
     
     </group>

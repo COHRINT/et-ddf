@@ -1,5 +1,14 @@
 <launch>
 
+    <arg name="config_file" default="points.yaml" />
+
+	<node pkg="tf" type="static_transform_publisher" name="world_transform"
+        args="0 0 0 0 0 0 world map 100"/>
+	
+	<rosparam command="load" file="$(find offset_etddf)/config/$(arg config_file)" />
+	
+	<node name="point_sim_controller" pkg="offset_etddf" type="point_sim.py" />
+
     <include file="$(find offset_etddf)/launch/agent.launch"> 
         <arg name="id" value="0" />
     </include>
