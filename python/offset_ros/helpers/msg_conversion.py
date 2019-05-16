@@ -188,7 +188,7 @@ def python2ros_measurement(msg_python):
             new_msg.dest = msg.dest
             new_msg.target = msg.target
             new_msg.status = msg.status
-            new_msg.type = msg.type
+            new_msg.type = msg.type_
             new_msg.data = msg.data
             new_msg.header.stamp = rospy.Time.now()
 
@@ -204,7 +204,7 @@ def python2ros_measurement(msg_python):
         new_msg.dest = msg.dest
         new_msg.target = msg.target
         new_msg.status = msg.status
-        new_msg.type = msg.type
+        new_msg.type = msg.type_
         new_msg.data = msg.data
         new_msg.header.stamp = rospy.Time.now()
 
@@ -227,7 +227,7 @@ def python2ros_state(msg_python):
 def inflate_covariance(covariance,cov_size):
     """
     Construct full NxN covariance matrix from flattened upper triangular elements.
-    Useful for sending covariance data over the wire, esp. in a ROS msg
+    Useful for reconstructing covariance data from over the wire, esp. from a ROS msg.
 
     Inputs:
 
@@ -246,6 +246,51 @@ def inflate_covariance(covariance,cov_size):
     loop_cnt = 0
     while cnt < cov_size:
         for i in range(el_cnt,cov_size):
-            inflated_covariance[loop_cnt,el_cnt] = covariance[]
-            inflate_covariance[el_cnt,loop_cnt] = 
-    
+            # inflated_covariance[loop_cnt,el_cnt] = covariance[]
+            # inflate_covariance[el_cnt,loop_cnt] = 
+            continue
+
+
+
+def deflate_covariance(covariance):
+    """
+    Create flattened upper triangular representation of covariance.
+    Useful for sending covariance data over the wire, esp. in a ROS msg.
+
+    Inputs:
+
+        covariance -- NxN covariance matrix in a numpy array
+
+    Returns:
+
+        deflated_covariance -- (N^2 + N)/2 length list of values represented flattened
+                                upper triangular covariance
+    """
+
+    # create list of indices to grad upper triangular
+    upper_tri_idx = np.triu_indices(covariance.shape[0])
+
+    # grab upper triangular elements from covariance using indices
+    upper_tri_cov = covariance[upper_tri_idx]
+
+    # convert array to list
+    deflated_covariance = upper_tri_cov.tolist()
+
+    return deflated_covariance
+
+def test_deflate_covariance():
+
+    cov = np.array( ( (3,1,2), (1,3,4), (2,4,3)) )
+
+    flat_cov = [3,1,2,3,4,3]
+
+    d_cov = deflate_covariance(cov)
+
+    print(flat_cov)
+    print(d_cov)
+
+    assert(flat_cov == d_cov)
+
+
+if __name__ == "__main__":
+    test_deflate_covariance()

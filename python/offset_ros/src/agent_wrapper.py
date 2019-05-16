@@ -17,7 +17,7 @@ from offset.agent import Agent
 from offset.filters.etkf import ETKF
 from offset.dynamics import *
 
-from offset_ros.helpers.msg_conversion import gen_measurement_msg, python2ros_measurement, python2ros_state, ros2python_measurement, ros2python_state
+from offset_ros.helpers.msg_conversion import *
 
 from geometry_msgs.msg import TwistStamped
 from offset_etddf.msg import AgentMeasurement, AgentState, gpsMeasurement, linrelMeasurement
@@ -112,6 +112,9 @@ class AgentWrapper(object):
             # process all queue measurements and ci messages
             self.update()
 
+            # publish state estimate
+            self.publish_estimate()
+
             # sleep until next update
             rate.sleep()
 
@@ -122,9 +125,7 @@ class AgentWrapper(object):
         # NOTE: currently faking this with differencing twist commands
         twist_array = [[msg.twist.linear.x],[msg.twist.linear.y]]
         twist_array = np.array(twist_array)
-        # print(twist_array.shape)
         self.recent_control_input = (twist_array - self.recent_twist)/self.update_rate
-        # print(self.recent_control_input.shape)
         self.recent_twist = np.array(twist_array)
 
     def queue_local_measurement(self,msg):
@@ -171,6 +172,29 @@ class AgentWrapper(object):
         """
         pass
 
+    def publish_estimate(self):
+        """
+        Publish local state estimate to ROS network.
+
+        Inputs:
+
+            none
+
+        Returns:
+
+            none
+        """
+
+        # create state message
+        msg = AgentState()
+        msg.header.stamp = rospy.Time.now()
+        msg.src = self.agent_id
+        msg.mean = self.agent.local_filter.x.transpose().tolist()[0]
+        msg.covariance = deflate_covariance(self.agent.local_filter.P)
+
+        # publish message
+        self.local_est_pub.publish(msg)
+
     def update(self):
         """
         Main update function to process measurements, and ci messages.
@@ -186,21 +210,17 @@ class AgentWrapper(object):
         received_measurements_python = ros2python_measurement(received_measurements)
 
         # pass measurements to wrapped agent
-        # print(local_measurements_generic)
         threshold_measurements = self.agent.process_local_measurements(self.recent_control_input,local_measurements_python)
-        # threshold_measurements = self.agent.process_local_measurements(np.array(((0),(0))),local_measurements_python)
 
         # convert messages back to ros type
-        # threshold_measurements_ros = python2ros_measurement(threshold_measurements)
+        threshold_measurements_ros = python2ros_measurement(threshold_measurements)
 
         # published thresholded measurements to connections through comms module
-        # if len(local_measurements) > 0:
-        #     msg = self.gen_measurement_msg(local_measurements[0])
-        #     self.comms_meas_pub.publish(msg)
-        # for msg in threshold_measurements_ros:
-            # self.comms_meas_pub.pub(msg)
+        for msg in threshold_measurements_ros:
+            self.comms_meas_pub.publish(msg)
 
-        # self.agent.process_received_measurements(received_measurements_python)
+        # process received measurements
+        self.agent.process_received_measurements(received_measurements_python)
 
         # check for CI updates
 
@@ -272,8 +292,6 @@ class AgentWrapper(object):
         local_filter = ETKF(F,G,0,0,Q,np.array(R_abs),np.array(R_rel),
                             x0.reshape((F.shape[0],1)),P0,self.delta,
                             agent_id,connections_new,-1)
-
-        print(local_filter.connection)
 
         # construct common information estimates
         common_estimates = []
