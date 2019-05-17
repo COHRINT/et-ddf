@@ -139,8 +139,9 @@ class AgentWrapper(object):
         """
         Add received measurment to queue.
         """
-        self.received_measurement_queue.put(msg)
-        self.received_measurement_cnt += 1
+        if msg.dest == self.agent_id:
+            self.received_measurement_queue.put(msg)
+            self.received_measurement_cnt += 1
 
     def process_local_measurement_queue(self):
         """
