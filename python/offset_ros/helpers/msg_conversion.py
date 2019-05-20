@@ -2,8 +2,8 @@
 
 """
 Message conversion utilities to go from ROS messages to python objects.
-This is to facilitate keeping the python etddf library under the hood as\
-seperate as possible.
+This is to facilitate keeping the python etddf library under the hood as
+seperate as possible from ROS.
 """
 
 import rospy
@@ -113,7 +113,6 @@ def ros2python_measurement(msg_ros):
 
         return msg_python
 
-
 def ros2python_state(msg_ros):
     """
     Convert a message from ROS to the corresponding python object.
@@ -126,7 +125,6 @@ def ros2python_state(msg_ros):
 
         msg_python -- a single python MeasurementMsg object or list of objects
     """
-    
     if type(msg_ros) is list:
 
         msg_python = []
@@ -139,7 +137,7 @@ def ros2python_state(msg_ros):
                                 msg.dest,
                                 msg.src_meas_connections,
                                 msg.src_connections,
-                                np.array(msg.mean),
+                                np.array(msg.mean,ndmin=2).transpose(),
                                 inflated_cov,
                                 msg.src_ci_rate,
                                 msg.header.stamp.to_sec())
@@ -150,16 +148,16 @@ def ros2python_state(msg_ros):
 
     else:
 
-        inflated_cov = inflate_covariance(msg.covariance)
+        inflated_cov = inflate_covariance(msg_ros.covariance)
 
-        new_msg = StateMsg(msg.src,
-                            msg.dest,
-                            msg.src_meas_connections,
-                            msg.src_connections,
-                            np.array(msg.mean),
+        msg_python = StateMsg(msg_ros.src,
+                            msg_ros.dest,
+                            msg_ros.src_meas_connections,
+                            msg_ros.src_connections,
+                            np.array(msg_ros.mean,ndmin=2).transpose(),
                             inflated_cov,
-                            msg.src_ci_rate,
-                            msg.header.stamp.to_sec())
+                            msg_ros.src_ci_rate,
+                            msg_ros.header.stamp.to_sec())
 
         return msg_python
 
@@ -216,15 +214,53 @@ def python2ros_state(msg_python):
 
     Inputs:
 
-        msg -- a single python StateMsg object or a list of objects
+        msg_python -- a single python StateMsg object or a list of objects
 
     Returns:
 
         msg_ros -- a single ROS AgentState message or list of messages
     """
-    pass
+    if type(msg_python) is list:
 
-def inflate_covariance(covariance,cov_size):
+        msg_ros = []
+
+        for msg in msg_python:
+
+            deflated_cov = deflate_covariance(msg.est_cov)
+
+            new_msg = AgentState()
+                
+            new_msg.header.stamp = rospy.Time.now()
+            new_msg.src = msg.src
+            new_msg.dest = msg.dest
+            new_msg.src_meas_connections = msg.src_meas_connections
+            new_msg.src_connections = msg.src_connections
+            new_msg.mean = msg.state_est.flatten().tolist()
+            new_msg.covariance = deflated_cov
+            new_msg.src_ci_rate = msg.src_ci_rate
+
+            msg_ros.append(new_msg)
+
+        return msg_ros
+
+    else:
+
+        deflated_cov = deflate_covariance(msg_python.est_cov)
+
+        msg_ros = AgentState()
+                
+        msg_ros.header.stamp = rospy.Time.now()
+        msg_ros.src = msg_python.src
+        msg_ros.dest = msg_python.dest
+        msg_ros.src_meas_connections = msg_python.src_meas_connections
+        msg_ros.src_connections = msg_python.src_connections
+        msg_ros.mean = msg_python.state_est.flatten().tolist()
+        msg_ros.covariance = deflated_cov
+        msg_ros.src_ci_rate = msg_python.src_ci_rate
+
+        return msg_ros
+
+def inflate_covariance(covariance_flat):
     """
     Construct full NxN covariance matrix from flattened upper triangular elements.
     Useful for reconstructing covariance data from over the wire, esp. from a ROS msg.
@@ -238,19 +274,20 @@ def inflate_covariance(covariance,cov_size):
 
         inflated_covariance -- NxN numpy array representing full matrix
     """
-
-    # create placeholder covariance
-    inflated_covariance = np.zeros( (cov_size,cov_size) )
-
-    el_cnt = 0
-    loop_cnt = 0
-    while cnt < cov_size:
-        for i in range(el_cnt,cov_size):
-            # inflated_covariance[loop_cnt,el_cnt] = covariance[]
-            # inflate_covariance[el_cnt,loop_cnt] = 
-            continue
-
-
+    # compute size of matrix using quadratic formula
+    cov_size = int(-1 + np.sqrt(1 + 8*len(covariance_flat))) // 2
+    
+    # get indicies for upper triangular of correct size
+    upper_idx = np.triu_indices(cov_size)
+    
+    # create empty matrix for storing values
+    inflated_covariance = np.empty((cov_size, cov_size))
+    
+    # fill value in upper triangular, then transpose and fill again
+    inflated_covariance[upper_idx] = covariance_flat
+    inflated_covariance.T[upper_idx] = covariance_flat
+    
+    return inflated_covariance
 
 def deflate_covariance(covariance):
     """
@@ -291,6 +328,20 @@ def test_deflate_covariance():
 
     assert(flat_cov == d_cov)
 
+def test_inflate_covariance():
+
+    cov = np.array( ( (3,1,2), (1,3,4), (2,4,3)) ,dtype=float)
+
+    flat_cov = [3,1,2,3,4,3]
+
+    i_cov = inflate_covariance(flat_cov)
+
+    print(cov)
+    print(i_cov)
+
+    assert(np.array_equal(cov,i_cov))
+
 
 if __name__ == "__main__":
-    test_deflate_covariance()
+    # test_deflate_covariance()
+    test_inflate_covariance()

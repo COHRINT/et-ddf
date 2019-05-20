@@ -21,6 +21,9 @@ from offset_ros.helpers.msg_conversion import *
 
 from geometry_msgs.msg import TwistStamped
 from offset_etddf.msg import AgentMeasurement, AgentState, gpsMeasurement, linrelMeasurement
+from offset_etddf.srv import CIUpdate
+
+ROS_LOG_LEVEL = rospy.INFO
 
 class AgentWrapper(object):
     """
@@ -67,7 +70,7 @@ class AgentWrapper(object):
         dynamics_fxn = rospy.get_param('dynamics')
         
         # initialize ros node
-        rospy.init_node('agent_{}'.format(self.agent_id))
+        rospy.init_node('agent_{}'.format(self.agent_id),log_level=ROS_LOG_LEVEL)
 
         # create ros rate object for timing update loop
         rate = rospy.Rate(self.update_rate)
@@ -84,8 +87,10 @@ class AgentWrapper(object):
         self.received_measurement_cnt = 0
 
         # create local and recevied covariance intersection queue
-        self.local_ci_queue = queue.LifoQueue()
-        self.recevied_ci_queue = queue.LifoQueue()
+        # self.local_ci_queue = queue.LifoQueue()
+        # self.recevied_ci_queue = queue.LifoQueue()
+        self.ci_queue = queue.LifoQueue()
+        self.ci_cnt = 0
 
         # create subscriber to control input
         # rospy.Subscriber('~actuator_control',ActuatorControl,self.control_input_cb)
@@ -105,6 +110,9 @@ class AgentWrapper(object):
 
         # create publisher of local esimate
         self.local_est_pub = rospy.Publisher('local_estimate', AgentState, queue_size=10)
+
+        # create CI update service
+        self.ci_srv = rospy.Service('ci_update',CIUpdate,self.ci_service_handler)
 
         # begin update loop
         while not rospy.is_shutdown():
@@ -171,7 +179,88 @@ class AgentWrapper(object):
         """
         Check if covariance intersection needs to happen. If so, generate service requests.
         """
-        pass
+        if np.trace(self.agent.local_filter.P) > self.tau*self.agent.local_filter.x.shape[0]:
+
+            # generate CI requests
+            for conn in self.connections[self.agent_id]:
+                # request state of connection and queue
+                rospy.logdebug('[Agent {}]: waiting for CI update service from agent_{} to become available'.format(self.agent_id,conn))
+                rospy.wait_for_service('/agent_{}/ci_update'.format(conn))
+
+                # create service proxy to send request
+                ci_request = rospy.ServiceProxy('/agent_{}/ci_update'.format(conn),CIUpdate)
+                # generate ros state message
+                request_msg = python2ros_state(self.agent.gen_ci_message(conn,self.neighbor_connections[conn]))
+                
+                # send request and wait for response
+                try:
+                    res = ci_request(request_msg)
+                    rospy.logdebug('[Agent {}]: CI update response received'.format(self.agent_id))
+                    # add response to ci queue
+                    self.ci_queue.put(deepcopy(res.response_state))
+                except rospy.ServiceException as e:
+                    rospy.logerr('[Agent {}]: CI update service request failed: {}'.format(self.agent_id,e))
+
+    def process_ci_queue(self):
+        """
+        Process queued CI update messages, and perform CI and conditional updates for each.
+        """
+        rospy.logdebug('[Agent {}]: Emptying CI message queue...'.format(self.agent_id))
+
+        # get current number of messages in queue
+        num_messages = self.ci_queue.qsize()
+
+        # grab above number of messages from queue
+        ci_messages = [self.ci_queue.get() for x in range(num_messages)]
+
+        rospy.logdebug('[Agent {}]: Grabbed {} message(s) from CI message queue.'.format(self.agent_id,num_messages))
+
+        return ci_messages
+
+    def ci_service_handler(self,req):
+        """
+        Handler for CI service requests.
+        """
+        rospy.logdebug('[Agent {}]: CI update request received'.format(self.agent_id))
+        # queue recevied request message
+        self.ci_queue.put(deepcopy(req.request_state))
+
+        # generate ci message for response
+        res_msg = self.agent.gen_ci_message(req.request_state.src,
+                    self.neighbor_connections[req.request_state.src])
+
+        # convert to a ros message
+        res_msg_ros = python2ros_state(res_msg)
+        
+        # get state as response
+        return res_msg_ros
+
+    def get_state_ros(self,dest=None):
+        """
+        Generates AgentState message for use in ROS network.
+
+        Inputs:
+
+            none
+
+        Returns:
+
+            msg -- generated AgentState message
+        """
+        # create state message
+        msg = AgentState()
+        msg.header.stamp = rospy.Time.now()
+        msg.src = self.agent_id
+        msg.src_meas_connections = self.meas_connections
+        msg.src_connections = self.agent_connections
+        msg.mean = self.agent.local_filter.x.transpose().tolist()[0]
+        msg.covariance = deflate_covariance(self.agent.local_filter.P)
+        msg.src_ci_rate = self.agent.ci_trigger_rate
+
+        if dest is not None:
+            msg.dest = dest
+
+        return msg
 
     def publish_estimate(self):
         """
@@ -185,13 +274,8 @@ class AgentWrapper(object):
 
             none
         """
-
-        # create state message
-        msg = AgentState()
-        msg.header.stamp = rospy.Time.now()
-        msg.src = self.agent_id
-        msg.mean = self.agent.local_filter.x.transpose().tolist()[0]
-        msg.covariance = deflate_covariance(self.agent.local_filter.P)
+        # get ros state message
+        msg = self.get_state_ros()        
 
         # publish message
         self.local_est_pub.publish(msg)
@@ -224,6 +308,28 @@ class AgentWrapper(object):
         self.agent.process_received_measurements(received_measurements_python)
 
         # check for CI updates
+        self.local_ci()
+        ci_messages_ros = self.process_ci_queue()
+
+        # NOTE: THIS IS A HUGE HACK!!!!!!!
+        # For reasons unknown, the src_connections field of a message pulled
+        # from the CI queue is sometimes a str type hex representation of the
+        # connection value:
+        #   i.e. for actual value [1], src_connections will be '\x01'
+        # This HACK just catches that and manually changes it using ord,
+        # but NO IDEA WHY THIS IS HAPPENING IN THE FIRST PLACE!
+        # It's probably a race condition in the CI queue...
+        for m in ci_messages_ros:
+            if type(m.src_connections) is str:
+                m.src_connections = [ord(m.src_connections)]
+        
+            assert((type(m.src_connections) is list) or ((type(m.src_connections) is int) or (type(m.src_connections) is tuple)) )
+
+        # convert ROS CI messages to Python objects
+        ci_messages_python = ros2python_state(ci_messages_ros)
+
+        # perform CI and conditional updates
+        self.agent.process_ci_messages(ci_messages_python)
 
     def init_agent(self,start_state,dynamics_fxn='lin_ncv',sensors={}):
         """
@@ -242,7 +348,7 @@ class AgentWrapper(object):
         R_abs = sensors['gps']['noise']
         R_rel = sensors['range_az_el']['noise']
 
-        agent_id = self.agent_id
+        agent_id = deepcopy(self.agent_id)
         ids = sorted(deepcopy(self.connections[agent_id]))
         ids.append(agent_id)
 
@@ -267,15 +373,47 @@ class AgentWrapper(object):
         connections_new = list(set(sorted(neighbor_conn_ids + self.connections[agent_id])))
         meas_connections = self.connections[agent_id]
         self.meas_connections = meas_connections
+        self.agent_connections = connections_new
 
         est_state_length = len(ids)
-        print(ids)
+
+        # find the connections, and therefore intersecting states of all connections, used for similarity transforms in CI updates
+        self.neighbor_connections = {}
+        self.neighbor_meas_connections = {}
+        # loop through all connections of each of self's connections
+        for i in self.connections[self.agent_id]:
+            if i is not self.agent_id:
+                neighbor_agent_id = deepcopy(i)
+                ids_new = sorted(deepcopy(self.connections[neighbor_agent_id]))
+                ids_new.append(neighbor_agent_id)
+
+                # build list of distance one and distance two neighbors for each agent
+                # each agent gets full list of connections
+                neighbor_conn_ids = []
+                for j in range(0,len(self.connections[neighbor_agent_id])):
+                    for k in range(0,len(self.connections[self.connections[neighbor_agent_id][j]])):
+                        # if not any(self.connections[self.connections[neighbor_agent_id][j]][k] == x for x in neighbor_conn_ids):
+                            # neighbor_conn_ids += deepcopy(self.connections[self.connections[neighbor_agent_id][j]])
+                        if not self.connections[self.connections[neighbor_agent_id][j]][k] in neighbor_conn_ids:
+                            neighbor_conn_ids += deepcopy(self.connections[self.connections[neighbor_agent_id][j]])
+
+                        # remove agent's own id from list of neighbors
+                        if neighbor_agent_id in neighbor_conn_ids:
+                            neighbor_conn_ids.remove(neighbor_agent_id)
+
+                # combine with direct connection ids and sort
+                ids_new = list(set(sorted(ids_new + neighbor_conn_ids)))
+
+                # divide out direct measurement connections and all connections
+                neighbor_connections_new = list(set(sorted(neighbor_conn_ids + deepcopy(self.connections[neighbor_agent_id]))))
+                meas_connections_new = deepcopy(self.connections[neighbor_agent_id])
+                self.neighbor_meas_connections[i] = deepcopy(meas_connections_new)
+                self.neighbor_connections[i] = deepcopy(neighbor_connections_new)
 
         # construct local estimate
-        # TODO: remove hardcoded 6
+        # TODO: remove hardcoded 4
         n = (est_state_length)*4
         F,G,Q = globals()[dynamics_fxn](self.update_rate,est_state_length)
-        print('agent {} F shape: {} \t G shape: {} \t Q shape: {}'.format(self.agent_id,F.shape,G.shape,Q.shape))
 
         # sort all connections
         # ids = sorted([agent_id] + connections_new)
