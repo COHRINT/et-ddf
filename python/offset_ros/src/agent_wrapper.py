@@ -8,6 +8,7 @@ and messages to and from other agents.
 import os
 import yaml
 import rospy
+import array
 import Queue as queue
 # import queue
 import numpy as np
@@ -160,6 +161,14 @@ class AgentWrapper(object):
         
         # grab the above number of messages in queue
         local_measurements = [self.local_measurement_queue.get() for x in range(num_measurements)]
+
+        for msg in local_measurements:
+            if rospy.Time.now() - msg.header.stamp > rospy.Duration(secs=self.update_rate):
+                how_old = rospy.Time.now() - msg.header.stamp
+                # src_agent = msg.src
+                msg_type = msg.type
+                del msg
+                rospy.logwarn('[Agent {}]: throwing away local {} message -- {} old'.format(self.agent_id,msg_type,how_old))
         
         return local_measurements
 
@@ -172,6 +181,14 @@ class AgentWrapper(object):
         
         # grab the above number of messages in queue
         received_measurements = [self.received_measurement_queue.get() for x in range(num_measurements)]
+
+        for msg in received_measurements:
+            if rospy.Time.now() - msg.header.stamp > rospy.Duration(secs=self.update_rate):
+                how_old = rospy.Time.now() - msg.header.stamp
+                src_agent = msg.src
+                msg_type = msg.type
+                del msg
+                rospy.logwarn('[Agent {}]: throwing away {} message from Agent {} -- {} old'.format(self.agent_id,msg_type,src_agent,how_old))
         
         return received_measurements
 
@@ -212,6 +229,13 @@ class AgentWrapper(object):
 
         # grab above number of messages from queue
         ci_messages = [self.ci_queue.get() for x in range(num_messages)]
+
+        for msg in ci_messages:
+            if rospy.Time.now() - msg.header.stamp > rospy.Duration(secs=self.update_rate):
+                how_old = rospy.Time.now() - msg.header.stamp
+                src_agent = msg.src
+                del msg
+                rospy.logwarn('[Agent {}]: throwing away CI message from Agent {} -- {} old'.format(self.agent_id,src_agent,how_old))
 
         rospy.logdebug('[Agent {}]: Grabbed {} message(s) from CI message queue.'.format(self.agent_id,num_messages))
 
@@ -321,7 +345,10 @@ class AgentWrapper(object):
         # It's probably a race condition in the CI queue...
         for m in ci_messages_ros:
             if type(m.src_connections) is str:
-                m.src_connections = [ord(m.src_connections)]
+                # m.src_connections = [ord(m.src_connections)]
+                m.src_connections = array.array('b',m.src_connections).tolist()
+                # rospy.logwarn('[Agent {}]: Src connections in CI message from Agent {} retrieved as bytes. Converting...'.format(self.agent_id,m.src))
+            # elif (type(m.src_connections) is list) and (type(m.src_connections)) 
         
             assert((type(m.src_connections) is list) or ((type(m.src_connections) is int) or (type(m.src_connections) is tuple)) )
 
