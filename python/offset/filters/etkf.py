@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+from __future__ import division
+
 __author__ = "Ian Loefgren"
 __date__ = "4.1.2019"
 

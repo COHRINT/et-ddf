@@ -6,7 +6,7 @@ sim:
   random_yaw: false
   
 planners:
-  update_freq: 50
+  update_freq: 5
   random_linear_vel_range: [-1,1]
   random_angular_vel_range: [-0.0,0.0]
 
@@ -21,14 +21,16 @@ sensors:
   distance_noise: 1     # m
   angular_noise: 1      # degrees
   depth_noise: 0.03     # m
-  gps_noise: 1          # m^2 variance
-  lin_rel_noise: 1.77       # m^2 variance
-  gps_pub_rate: 1.0
-  lin_rel_pub_rate: 1.0
+  gps_noise: 1          # m std dev
+  lin_rel_noise: 1.77       # m std dev
+  gps_pub_rate: 5
+  lin_rel_pub_rate: 10
   
 active_auvs:
   - agent_0
   - agent_1
+  - agent_2
+  - agent_3
   # - case
   # - deckard
   # - hal
@@ -48,8 +50,8 @@ agent_0:
     psi: 0
   agent_id: 0
   comm_drop_prob: 0.0
-  meas_connections: ['agent_1']
-  agent_update_rate: 10 # [Hz]
+  meas_connections: ['agent_1','agent_2','agent_3']
+  agent_update_rate: 5 # [Hz]
 
 agent_1:
   planner: linear
@@ -60,13 +62,47 @@ agent_1:
     psi: 0
   start_twist:
     x: 0.0
-    y: 0.0
+    y: 0.1
     z: 0
     psi: 0
   agent_id: 1
   comm_drop_prob: 0.0
   meas_connections: ['agent_0']
-  agent_update_rate: 10 # [Hz]
+  agent_update_rate: 5 # [Hz]
+
+agent_2:
+  planner: linear
+  start_pos:           # either x,y,z,psi or 'random'
+    x: 2
+    y: 2
+    z: 3
+    psi: 0
+  start_twist:
+    x: -0.1
+    y: 0.0
+    z: 0
+    psi: 0
+  agent_id: 2
+  comm_drop_prob: 0.0
+  meas_connections: ['agent_0']
+  agent_update_rate: 5 # [Hz]
+
+agent_3:
+  planner: linear
+  start_pos:           # either x,y,z,psi or 'random'
+    x: -2
+    y: -2
+    z: 3
+    psi: 0
+  start_twist:
+    x: 0.0
+    y: -0.1
+    z: 0
+    psi: 0
+  agent_id: 3
+  comm_drop_prob: 0.0
+  meas_connections: ['agent_0']
+  agent_update_rate: 5 # [Hz]
 
 case:
   planner: linear

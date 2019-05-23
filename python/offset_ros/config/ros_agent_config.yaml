@@ -1,14 +1,14 @@
 
 
-# connections: [[1,2,3],[0],[0],[0]]
-connections: [[1],[0]]
+connections: [[1,2,3],[0],[0],[0]]
+# connections: [[1],[0]]
 # meas_connections: [1,2,3]
-agent_id: 0
-agent_update_rate: 10 # [Hz]
+# agent_id: 0
+agent_update_rate: 5 # [Hz]
 
 # event-triggering parameters
 delta: 1.0    # measurement-sharing Kalman innovation threshold param
-tau: 5          # covariance intersection uncertainty per state threshold
+tau: 5         # covariance intersection uncertainty per state threshold
 
 # adaptive CI thresholding params
 use_adaptive_tau: True
@@ -25,6 +25,8 @@ start_pos:
 dynamics: 'lin_ncv'
 sensors:
     gps:
+        agents: [0]
         noise: [[1,0],[0,1]]
-    range_az_el:
+    lin_rel:
+        agents: [0,1,2,3]
         noise: [[3,0],[0,3]]

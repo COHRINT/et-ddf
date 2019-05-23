@@ -2,11 +2,13 @@
 
     <arg name="id" />
     <arg name="agent_name" default="agent_$(arg id)" />
+    <arg name="log_level" default="INFO" />
 
     <group ns="$(arg agent_name)">
     
         <rosparam command="load" file="$(find offset_etddf)/config/ros_agent_config.yaml" />
         <param name="agent_id" type="int" value="$(arg id)" />
+        <param name="log_level" type="string" value="$(arg log_level)" />
 
         <node name="planner" pkg="offset_etddf" type="point_planner.py" output="screen" />
 	    <node name="sensor_pub" pkg="offset_etddf" type="publish_sensors.py" output="screen" />

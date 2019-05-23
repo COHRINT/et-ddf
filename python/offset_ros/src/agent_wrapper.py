@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+from __future__ import division
+
 """
 ROS wrapper for the Agent class. Manages data messages from sensor topics, 
 and messages to and from other agents.
@@ -20,11 +22,10 @@ from offset.dynamics import *
 
 from offset_ros.helpers.msg_conversion import *
 
+from std_msgs.msg import Float64
 from geometry_msgs.msg import TwistStamped
 from offset_etddf.msg import AgentMeasurement, AgentState, gpsMeasurement, linrelMeasurement
 from offset_etddf.srv import CIUpdate
-
-ROS_LOG_LEVEL = rospy.INFO
 
 class AgentWrapper(object):
     """
@@ -71,6 +72,7 @@ class AgentWrapper(object):
         dynamics_fxn = rospy.get_param('dynamics')
         
         # initialize ros node
+        ROS_LOG_LEVEL = eval('rospy.'+rospy.get_param('log_level'))
         rospy.init_node('agent_{}'.format(self.agent_id),log_level=ROS_LOG_LEVEL)
 
         # create ros rate object for timing update loop
@@ -98,8 +100,11 @@ class AgentWrapper(object):
         rospy.Subscriber('new_twist',TwistStamped,self.control_input_cb)
 
         # create subscribers to sensors
-        rospy.Subscriber('gps', gpsMeasurement, self.queue_local_measurement)
-        rospy.Subscriber('lin_rel', linrelMeasurement, self.queue_local_measurement)
+        sensors_agents = rospy.get_param('sensors')
+        if self.agent_id in sensors_agents['gps']['agents']:
+            rospy.Subscriber('gps', gpsMeasurement, self.queue_local_measurement)
+        if self.agent_id in sensors_agents['lin_rel']['agents']:
+            rospy.Subscriber('lin_rel', linrelMeasurement, self.queue_local_measurement)
 
         # create subscribers to comms module
         rospy.Subscriber('agent_meas_incoming', AgentMeasurement, self.queue_received_measurement)
@@ -111,6 +116,8 @@ class AgentWrapper(object):
 
         # create publisher of local esimate
         self.local_est_pub = rospy.Publisher('local_estimate', AgentState, queue_size=10)
+        # create CI threshold publisher
+        # self.tau_pub = rospy.Publisher('ci_threshold', Float64, queue_size=10)
 
         # create CI update service
         self.ci_srv = rospy.Service('ci_update',CIUpdate,self.ci_service_handler)
@@ -123,6 +130,10 @@ class AgentWrapper(object):
 
             # publish state estimate
             self.publish_estimate()
+            # publish CI threshold tau
+            # tau_msg = Float64()
+            # tau_msg.data = self.agent.tau
+            # self.tau_pub.publish(tau_msg)
 
             # sleep until next update
             rate.sleep()
@@ -135,7 +146,7 @@ class AgentWrapper(object):
         twist_array = [[msg.twist.linear.x],[msg.twist.linear.y]]
         twist_array = np.array(twist_array)
         self.recent_control_input = (twist_array - self.recent_twist)/self.update_rate
-        self.recent_twist = np.array(twist_array)
+        self.recent_twist = twist_array
 
     def queue_local_measurement(self,msg):
         """
@@ -162,13 +173,15 @@ class AgentWrapper(object):
         # grab the above number of messages in queue
         local_measurements = [self.local_measurement_queue.get() for x in range(num_measurements)]
 
+        # throw away measurements older than one update cycle
         for msg in local_measurements:
             if rospy.Time.now() - msg.header.stamp > rospy.Duration(secs=self.update_rate):
-                how_old = rospy.Time.now() - msg.header.stamp
+                how_old = (rospy.Time.now() - msg.header.stamp).to_sec()
                 # src_agent = msg.src
-                msg_type = msg.type
+                # msg_type = msg.type
+                msg_type = msg._type.split('/')[1]
                 del msg
-                rospy.logwarn('[Agent {}]: throwing away local {} message -- {} old'.format(self.agent_id,msg_type,how_old))
+                rospy.logwarn('[Agent {}]: throwing away local {} message -- {} sec old'.format(self.agent_id,msg_type,how_old))
         
         return local_measurements
 
@@ -182,13 +195,14 @@ class AgentWrapper(object):
         # grab the above number of messages in queue
         received_measurements = [self.received_measurement_queue.get() for x in range(num_measurements)]
 
+        # throw away measurements older than one update cycle
         for msg in received_measurements:
             if rospy.Time.now() - msg.header.stamp > rospy.Duration(secs=self.update_rate):
-                how_old = rospy.Time.now() - msg.header.stamp
+                how_old = (rospy.Time.now() - msg.header.stamp).to_sec()
                 src_agent = msg.src
                 msg_type = msg.type
                 del msg
-                rospy.logwarn('[Agent {}]: throwing away {} message from Agent {} -- {} old'.format(self.agent_id,msg_type,src_agent,how_old))
+                rospy.logwarn('[Agent {}]: throwing away {} message from Agent {} -- {} sec old'.format(self.agent_id,msg_type,src_agent,how_old))
         
         return received_measurements
 
@@ -196,7 +210,7 @@ class AgentWrapper(object):
         """
         Check if covariance intersection needs to happen. If so, generate service requests.
         """
-        if np.trace(self.agent.local_filter.P) > self.tau*self.agent.local_filter.x.shape[0]:
+        if np.trace(self.agent.local_filter.P) > self.agent.tau:
 
             # generate CI requests
             for conn in self.connections[self.agent_id]:
@@ -230,12 +244,13 @@ class AgentWrapper(object):
         # grab above number of messages from queue
         ci_messages = [self.ci_queue.get() for x in range(num_messages)]
 
+        # throw away messages older than one update cycle
         for msg in ci_messages:
             if rospy.Time.now() - msg.header.stamp > rospy.Duration(secs=self.update_rate):
-                how_old = rospy.Time.now() - msg.header.stamp
+                how_old = (rospy.Time.now() - msg.header.stamp).to_sec()
                 src_agent = msg.src
                 del msg
-                rospy.logwarn('[Agent {}]: throwing away CI message from Agent {} -- {} old'.format(self.agent_id,src_agent,how_old))
+                rospy.logwarn('[Agent {}]: throwing away CI message from Agent {} -- {} sec old'.format(self.agent_id,src_agent,how_old))
 
         rospy.logdebug('[Agent {}]: Grabbed {} message(s) from CI message queue.'.format(self.agent_id,num_messages))
 
@@ -310,13 +325,13 @@ class AgentWrapper(object):
         """
         # process measurement queues
         local_measurements = self.process_local_measurement_queue()
-        received_measurements = self.process_received_measurement_queue()
+        
 
         # convert messages from AgentMeasurement and AgentState ROS msg types to
         # MeasurementMsg and StateMsg python msg types (they're pretty much the same)
         local_measurements_generic = gen_measurement_msg(self.agent_id,local_measurements)
         local_measurements_python = ros2python_measurement(local_measurements_generic)
-        received_measurements_python = ros2python_measurement(received_measurements)
+        
 
         # pass measurements to wrapped agent
         threshold_measurements = self.agent.process_local_measurements(self.recent_control_input,local_measurements_python)
@@ -329,6 +344,8 @@ class AgentWrapper(object):
             self.comms_meas_pub.publish(msg)
 
         # process received measurements
+        received_measurements = self.process_received_measurement_queue()
+        received_measurements_python = ros2python_measurement(received_measurements)
         self.agent.process_received_measurements(received_measurements_python)
 
         # check for CI updates
@@ -373,7 +390,7 @@ class AgentWrapper(object):
             agent -- Agent instance
         """
         R_abs = sensors['gps']['noise']
-        R_rel = sensors['range_az_el']['noise']
+        R_rel = sensors['lin_rel']['noise']
 
         agent_id = deepcopy(self.agent_id)
         ids = sorted(deepcopy(self.connections[agent_id]))
@@ -497,6 +514,9 @@ class AgentWrapper(object):
                             local_filter,common_estimates,start_state,
                             0,len(x0)*self.tau_goal,len(x0)*self.tau,
                             self.use_adaptive_tau)
+
+        rospy.loginfo('[Agent {}]: Agent initialized w/ delta -- {} \t tau_goal -- {} \t tau -- {}'.format(
+                        agent_id,self.delta,len(x0)*self.tau_goal,len(x0)*self.tau))
 
         return agent
 

@@ -146,7 +146,7 @@ class SensorPub:
             # meas.header.frame_id = TODO proper reference frame
             meas.robot_measured = auv
             x,y,z = self.get_distance(self.pose.position, self.auvs[auv].pose.pose.position, linear=True)
-            x = self.insert_noise(z, self.lin_rel_noise)
+            x = self.insert_noise(x, self.lin_rel_noise)
             y = self.insert_noise(y, self.lin_rel_noise)
             z = self.insert_noise(z, self.lin_rel_noise)
             # az, elev = self.get_bearing(self.pose,self.auvs[auv].pose.pose.position)
@@ -172,7 +172,7 @@ class SensorPub:
             return meas
             
     def get_distance(self, point1, point2, linear=False):
-	"""
+        """
         Returns the distance between 2 points
         
         Parameters
@@ -189,7 +189,7 @@ class SensorPub:
         x2, y2, z2 = point2.x, point2.y, point2.z
         p1_arr = np.array([x1, y1, z1])
         p2_arr = np.array([x2, y2, z2])
-        diff = p2_arr - p1_arr
+        diff = -p2_arr + p1_arr
         if linear:
             return diff
         else:
