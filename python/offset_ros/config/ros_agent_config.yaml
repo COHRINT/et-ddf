@@ -1,11 +1,13 @@
+# ET-DDF instance configuration
 
+# all connections in network -> read as connections[0] = agent 0's connections
+# connections: [[1,2,3],[0],[0],[0]]
+connections: [[1,2],[0],[0,3],[2]]
 
-connections: [[1,2,3],[0],[0],[0]]
-# connections: [[1,2],[0],[0,3],[2]]
-# connections: [[1],[0]]
-# meas_connections: [1,2,3]
-# agent_id: 0
+# update rate for et-ddf code
 agent_update_rate: 5 # [Hz]
+
+# message statistics update rate
 msg_stats_rate: 1 # [hz]
 
 # event-triggering parameters
@@ -17,6 +19,7 @@ use_adaptive_tau: True
 epsilon_1: 0.1          # adaptive threshold heuristic param -- weight for change from old value
 epsilon_2: 0.01         # adaptive threshold heuristic param -- weight for balancing w/ neighbors
 
+# starting position
 start_pos:
     x: 0.0
     y: 0.0
@@ -24,10 +27,14 @@ start_pos:
     phi: 0.0
     theta: 0.0
     psi: 0.0
+
+# dynamics model used in filters
 dynamics: 'lin_ncv'
+
+# sensor models used in filters
 sensors:
     gps:
-        agents: [0]
+        agents: [0] # read as only agent 0 gets GPS
         noise: [[1,0],[0,1]]
     lin_rel:
         agents: [0,1,2,3]
