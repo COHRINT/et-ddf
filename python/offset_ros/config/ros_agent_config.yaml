@@ -11,7 +11,7 @@ agent_update_rate: 5 # [Hz]
 msg_stats_rate: 1 # [hz]
 
 # event-triggering parameters
-delta: 2.0    # measurement-sharing Kalman innovation threshold param
+delta: 1.5    # measurement-sharing Kalman innovation threshold param
 tau: 7         # covariance intersection uncertainty per state threshold
 
 # adaptive CI thresholding params

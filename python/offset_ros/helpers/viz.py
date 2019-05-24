@@ -147,7 +147,7 @@ class PerformanceViz(object):
         cov_msg.y = 2*np.sqrt(cov[10,10])
 
         mse_msg = Float64()
-        mse_msg.data = float(np.linalg.norm(np.array( [msg.mean[12],msg.mean[14]] )- np.array(self.recent_ground_truth_3)))
+        mse_msg.data = float(np.linalg.norm(np.array( [msg.mean[8],msg.mean[10]] )- np.array(self.recent_ground_truth_3)))
         
         self.est_err_pub_3.publish(new_msg)
         self.est_cov_pub_3.publish(cov_msg)

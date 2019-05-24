@@ -60,7 +60,10 @@ class Planner:
     def get_new_twist(self):
         """ This function provides an easy place to add more complex planners  that actively change the velocity """
         if self.planner == "linear":
-            return None
+            new_twist = TwistStamped()
+            new_twist.twist.linear.x = self.twist.twist.linear.x + 0.1*np.cos(0.5*self.seq)
+            new_twist.twist.linear.y = self.twist.twist.linear.y + 0.1*np.sin(0.5*self.seq)
+            return new_twist
 
 def main():
     rospy.init_node('point_planner', anonymous=True)
