@@ -7,26 +7,35 @@
 	
 	<rosparam command="load" file="$(find offset_etddf)/config/$(arg config_file)" />
 	
+    <!-- simulator node -->
 	<node name="point_sim_controller" pkg="offset_etddf" type="point_sim.py" />
 
+    <!-- Launch ET-DDF instances -->
     <include file="$(find offset_etddf)/launch/agent.launch"> 
         <arg name="id" value="0" />
+        <arg name="planner" value="true" />
+        <arg name="sensors" value="true" />
         <!-- <arg name="log_level" value="DEBUG" /> -->
     </include>
 
     <include file="$(find offset_etddf)/launch/agent.launch"> 
         <arg name="id" value="1" />
+        <arg name="planner" value="true" />
+        <arg name="sensors" value="true" />
     </include>
 
     <include file="$(find offset_etddf)/launch/agent.launch"> 
         <arg name="id" value="2" />
+        <arg name="planner" value="true" />
+        <arg name="sensors" value="true" />
     </include>
 
     <include file="$(find offset_etddf)/launch/agent.launch"> 
         <arg name="id" value="3" />
+        <arg name="planner" value="true" />
+        <arg name="sensors" value="true" />
     </include>
 
-    <!-- <include file="$(find offset_etddf)/launch/agent_2.launch" /> -->
-    <!-- <include file="$(find offset_etddf)/launch/agent_3.launch" /> -->
+    <!-- add more agents to be launched here -->
 
 </launch>

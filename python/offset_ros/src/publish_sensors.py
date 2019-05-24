@@ -272,12 +272,13 @@ def test1():
 
 def main():
     rospy.init_node('sensor_pub', anonymous=True)
+    
     ns = rospy.get_namespace()
-    active_auvs = rospy.get_param('/active_auvs')
-    for auv in active_auvs:
-        if auv in ns:
-            name = auv
-            break
+    name = rospy.get_param('agent_name')
+    
+    active_auvs = rospy.get_param('meas_connections')
+    active_auvs.append(name)
+    
     sp = SensorPub(name, active_auvs)
     rospy.spin()
 

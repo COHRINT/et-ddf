@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-Communications module for Minau AUVs. Handles message passing, and simulates
+Communications module for vehicles using ET-DDF. Handles message passing, and simulates
 a communications stack, including potential dropping of messages.
 """
 

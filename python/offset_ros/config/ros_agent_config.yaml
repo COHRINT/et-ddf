@@ -1,6 +1,7 @@
 
 
 connections: [[1,2,3],[0],[0],[0]]
+# connections: [[1,2],[0],[0,3],[2]]
 # connections: [[1],[0]]
 # meas_connections: [1,2,3]
 # agent_id: 0

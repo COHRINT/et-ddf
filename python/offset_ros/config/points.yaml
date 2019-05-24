@@ -50,7 +50,7 @@ agent_0:
     psi: 0
   agent_id: 0
   comm_drop_prob: 0.0
-  meas_connections: ['agent_1','agent_2','agent_3']
+  meas_connections: ['agent_1','agent_2']
   agent_update_rate: 5 # [Hz]
 
 agent_1:
@@ -84,7 +84,7 @@ agent_2:
     psi: 0
   agent_id: 2
   comm_drop_prob: 0.0
-  meas_connections: ['agent_0']
+  meas_connections: ['agent_0','agent_3']
   agent_update_rate: 5 # [Hz]
 
 agent_3:
@@ -101,7 +101,7 @@ agent_3:
     psi: 0
   agent_id: 3
   comm_drop_prob: 0.0
-  meas_connections: ['agent_0']
+  meas_connections: ['agent_2']
   agent_update_rate: 5 # [Hz]
 
 case:

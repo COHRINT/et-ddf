@@ -116,8 +116,8 @@ class PerformanceViz(object):
         """
 
         new_msg = Point()
-        new_msg.x = msg.mean[0] - self.recent_ground_truth_2[0]
-        new_msg.y = msg.mean[2] - self.recent_ground_truth_2[1]
+        new_msg.x = msg.mean[8] - self.recent_ground_truth_2[0]
+        new_msg.y = msg.mean[10] - self.recent_ground_truth_2[1]
 
         cov_msg = Point()
         cov = inflate_covariance(msg.covariance)
@@ -138,13 +138,13 @@ class PerformanceViz(object):
         """
 
         new_msg = Point()
-        new_msg.x = msg.mean[0] - self.recent_ground_truth_3[0]
-        new_msg.y = msg.mean[2] - self.recent_ground_truth_3[1]
+        new_msg.x = msg.mean[8] - self.recent_ground_truth_3[0]
+        new_msg.y = msg.mean[10] - self.recent_ground_truth_3[1]
 
         cov_msg = Point()
         cov = inflate_covariance(msg.covariance)
-        cov_msg.x = 2*np.sqrt(cov[12,12])
-        cov_msg.y = 2*np.sqrt(cov[14,14])
+        cov_msg.x = 2*np.sqrt(cov[8,8])
+        cov_msg.y = 2*np.sqrt(cov[10,10])
 
         mse_msg = Float64()
         mse_msg.data = float(np.linalg.norm(np.array( [msg.mean[12],msg.mean[14]] )- np.array(self.recent_ground_truth_3)))
