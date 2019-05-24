@@ -1,0 +1,10 @@
+# Required packages
+
+pyyaml
+numpy
+scipy
+matplotlib
+pudb
+catkin_pkg
+empy
+rospkg

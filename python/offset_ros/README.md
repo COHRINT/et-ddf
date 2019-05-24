@@ -18,10 +18,20 @@ Once you've cloned the `offset` repository, install the core ET-DDF library by n
 
 ```
 $ cd <offset repo location>/python/
-$ pip2 install -e .
+$ pip2 install -e . -r requirements.txt
 ```
 
 This installs the core ET-DDF modules into your path so python will be able to find them. _Note: make sure you use pip2 to install everything, as ROS 1 requires python2, and running everything in python2 will reduce headaches._
+
+The following packages are installed:
+- pyyaml
+- numpy
+- scipy
+- matplotlib
+- pudb
+- catkin_pkg
+- empy
+- rospkg
 
 Next, create a symbolic link from the ROS package, located in the `offset_ros` folder, to a catkin workspace, then build your catkin workspace, and source it:
 
