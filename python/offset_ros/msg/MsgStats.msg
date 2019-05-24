@@ -1,0 +1,4 @@
+Header header
+uint32 msgs_sent
+float64 msg_fraction_sent
+float64 ci_trigger_rate 

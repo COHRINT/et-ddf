@@ -24,7 +24,7 @@ from offset_ros.helpers.msg_conversion import *
 
 from std_msgs.msg import Float64
 from geometry_msgs.msg import TwistStamped
-from offset_etddf.msg import AgentMeasurement, AgentState, gpsMeasurement, linrelMeasurement
+from offset_etddf.msg import AgentMeasurement, AgentState, gpsMeasurement, linrelMeasurement, MsgStats
 from offset_etddf.srv import CIUpdate
 
 class AgentWrapper(object):
@@ -95,6 +95,9 @@ class AgentWrapper(object):
         self.ci_queue = queue.LifoQueue()
         self.ci_cnt = 0
 
+        # counter for number of updates performed
+        self.update_cnt = 0
+
         # create subscriber to control input
         # rospy.Subscriber('~actuator_control',ActuatorControl,self.control_input_cb)
         rospy.Subscriber('new_twist',TwistStamped,self.control_input_cb)
@@ -118,6 +121,10 @@ class AgentWrapper(object):
         self.local_est_pub = rospy.Publisher('local_estimate', AgentState, queue_size=10)
         # create CI threshold publisher
         # self.tau_pub = rospy.Publisher('ci_threshold', Float64, queue_size=10)
+        # create message statistics publisher and timer
+        self.msg_stats_pub = rospy.Publisher('msg_stats',MsgStats,queue_size=10)
+        self.msg_stats_timer = rospy.Timer(rospy.Duration(rospy.get_param('msg_stats_rate')),
+                                 self.publish_msg_stats)
 
         # create CI update service
         self.ci_srv = rospy.Service('ci_update',CIUpdate,self.ci_service_handler)
@@ -211,6 +218,10 @@ class AgentWrapper(object):
         Check if covariance intersection needs to happen. If so, generate service requests.
         """
         if np.trace(self.agent.local_filter.P) > self.agent.tau:
+
+            # increment CI cnt
+            self.agent.ci_trigger_cnt += 1
+            self.agent.ci_trigger_rate = self.agent.ci_trigger_cnt / self.update_cnt
 
             # generate CI requests
             for conn in self.connections[self.agent_id]:
@@ -319,19 +330,33 @@ class AgentWrapper(object):
         # publish message
         self.local_est_pub.publish(msg)
 
+    def publish_msg_stats(self,msg_):
+        """
+        Publishes statistics on what portion of messages have been sent, as well
+        as CI trigger rate.
+        """
+        msg = MsgStats()
+        msg.header.stamp = rospy.Time.now()
+        msg.msgs_sent = self.agent.msgs_sent
+        msg.msg_fraction_sent = self.agent.msgs_sent / self.agent.total_msgs
+        msg.ci_trigger_rate = self.agent.ci_trigger_rate
+        self.msg_stats_pub.publish(msg)
+
     def update(self):
         """
         Main update function to process measurements, and ci messages.
         """
+
+        # increment update count
+        self.update_cnt += 1
+
         # process measurement queues
         local_measurements = self.process_local_measurement_queue()
-        
 
         # convert messages from AgentMeasurement and AgentState ROS msg types to
         # MeasurementMsg and StateMsg python msg types (they're pretty much the same)
         local_measurements_generic = gen_measurement_msg(self.agent_id,local_measurements)
         local_measurements_python = ros2python_measurement(local_measurements_generic)
-        
 
         # pass measurements to wrapped agent
         threshold_measurements = self.agent.process_local_measurements(self.recent_control_input,local_measurements_python)

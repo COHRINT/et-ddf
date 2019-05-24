@@ -6,10 +6,11 @@ connections: [[1,2,3],[0],[0],[0]]
 # meas_connections: [1,2,3]
 # agent_id: 0
 agent_update_rate: 5 # [Hz]
+msg_stats_rate: 1 # [hz]
 
 # event-triggering parameters
-delta: 1.0    # measurement-sharing Kalman innovation threshold param
-tau: 5         # covariance intersection uncertainty per state threshold
+delta: 2.0    # measurement-sharing Kalman innovation threshold param
+tau: 7         # covariance intersection uncertainty per state threshold
 
 # adaptive CI thresholding params
 use_adaptive_tau: True

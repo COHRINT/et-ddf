@@ -53,6 +53,7 @@ add_message_files(
     AgentMeasurement.msg
     gpsMeasurement.msg
     linrelMeasurement.msg
+    MsgStats.msg
 )
 
 ## Generate services in the 'srv' folder
