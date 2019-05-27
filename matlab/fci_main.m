@@ -9,9 +9,9 @@
 % network's states.
 
 clear; %close all; clc;
-load('sensor_data_6agents.mat');
+% load('sensor_data_6agents.mat');
 
-rng(999)
+% rng(999)
 
 %% Specify connections
 
@@ -43,19 +43,29 @@ num_connections = 2;
 % tau_state_goal_vec = 5:0.5:15;
 % tau_state_vec = 0:0.5:25;
 
-delta_vec = [1];
-tau_state_goal_vec = [5];
+delta_vec = [1.5,2];
+tau_state_goal_vec = [2,3.5,5,7,10];
 msg_drop_prob_vec = 0;
+num_mc_sims = 100;
 
 % cost = zeros(length(delta_vec),length(tau_state_goal_vec),5);
 w1 = 0.5;
 w2 = 0.5;
 
 loop_cnt = 1;
+total_loop_time = 0;
+avg_loop_time = 0;
 
 max_time = 20;
 dt = 0.1;
 input_tvec = 0:dt:max_time;
+
+total_sims = length(delta_vec)*length(tau_state_goal_vec)*length(msg_drop_prob_vec)*num_mc_sims;
+
+mse_data = zeros(total_sims,4+length(input_tvec),N);
+baseline_mse_data = zeros(total_sims,4+length(input_tvec),N);
+msg_data = zeros(total_sims,4+N^2);
+ci_data = zeros(total_sims,4+N);
 
 cost = zeros(length(delta_vec)*length(tau_state_goal_vec)*length(msg_drop_prob_vec),9);
 network_mse = zeros(N,length(input_tvec),length(msg_drop_prob_vec));
@@ -66,6 +76,10 @@ worst_ci_process_times = zeros(1,N);
 for idx1=1:length(delta_vec)
 for idx2=1:length(tau_state_goal_vec) 
 for idx3=1:length(msg_drop_prob_vec)
+for idx4=1:num_mc_sims
+    
+% start timer for loop time
+tic;
 
 % event-triggering  and covariance intersection params
 % delta = 3;
@@ -82,6 +96,8 @@ use_adaptive = true;
 
 % comms modeling params
 msg_drop_prob = msg_drop_prob_vec(idx3);
+
+mc_sim = idx4;
 
 % simulation params
 % max_time = 20;
@@ -235,6 +251,16 @@ all_msgs = {};
 abs_meas_mat = zeros(N,length(input_tvec),2);
 rel_meas_mat = zeros(N,length(input_tvec),2);
 
+mse_data(loop_cnt,1,:) = delta;
+mse_data(loop_cnt,2,:) = tau_state_goal;
+mse_data(loop_cnt,3,:) = msg_drop_prob;
+mse_data(loop_cnt,4,:) = mc_sim;
+
+baseline_mse_data(loop_cnt,1,:) = delta;
+baseline_mse_data(loop_cnt,2,:) = tau_state_goal;
+baseline_mse_data(loop_cnt,3,:) = msg_drop_prob;
+baseline_mse_data(loop_cnt,4,:) = mc_sim;
+
 for i = 2:length(input_tvec)
 %     tic
 
@@ -244,9 +270,19 @@ for i = 2:length(input_tvec)
 %     end
 
     clc;
-    fprintf('Iteration %i of %i\n',loop_cnt,length(delta_vec)*length(tau_state_goal_vec));
+    fprintf('Iteration %i of %i\n',loop_cnt,length(delta_vec)*length(tau_state_goal_vec)*length(msg_drop_prob_vec)*num_mc_sims);
     fprintf('Delta: %f \t State tau goal: %f\n',delta,tau_state_goal);
+    fprintf('Monte Carlo Sim %i of %i\n',idx4,num_mc_sims);
     fprintf('Time step %i of %i, %f seconds of %f total\n',i,length(input_tvec),i*dt,length(input_tvec)*dt);
+    
+    % compute approx time to go
+    iterations_left = length(delta_vec)*length(tau_state_goal_vec)*length(msg_drop_prob_vec)*num_mc_sims - loop_cnt + 1;
+    est_time_remaining_hour = floor((iterations_left * avg_loop_time)/3600);
+    est_time_remaining_min = floor(mod((iterations_left * avg_loop_time)/60,60));
+    est_time_remaining_sec = floor(mod((iterations_left* avg_loop_time),60));
+    
+    fprintf('Average iteration time: %0.2f seconds\n',avg_loop_time);
+    fprintf('Estimated time remaining: %i hr, %i min, %i sec\n',est_time_remaining_hour,est_time_remaining_min,est_time_remaining_sec);
     
     % create measurement inbox
     inbox = cell(N,1);
@@ -412,7 +448,7 @@ for i = 2:length(input_tvec)
         for k=1:length(ci_inbox{j})
             if ~isempty(ci_inbox{j}{k})
                 
-                tic;
+%                 tic;
                 
                 xa = agents{j}.local_filter.x;
                 Pa = agents{j}.local_filter.P;
@@ -472,10 +508,10 @@ for i = 2:length(input_tvec)
                     end
                 end
                 
-                time_elapsed = toc;
-                if time_elapsed > worst_ci_process_times(j)
-                    worst_ci_process_times(j) = time_elapsed;
-                end
+%                 time_elapsed = toc;
+%                 if time_elapsed > worst_ci_process_times(j)
+%                     worst_ci_process_times(j) = time_elapsed;
+%                 end
                 
             end
         end
@@ -503,7 +539,11 @@ for i = 2:length(input_tvec)
 %         network_mse(j,i,idx1) = sum((agents{j}.local_filter.state_history(iidx,i) - agents{j}.true_state(:,i)).^2,1)./4;
         network_mse(j,i,idx2) = norm(agents{j}.local_filter.state_history([iidx(1),iidx(3)],i) - agents{j}.true_state([1 3],i))^2;
         
+        mse_data(loop_cnt,4+i,j) = norm(agents{j}.local_filter.state_history([iidx(1),iidx(3)],i) - agents{j}.true_state([1 3],i))^2;
+        
         baseline_mse(j,i,idx2) = norm(baseline_filter.state_history([4*(j-1)+1,4*(j-1)+3],i) - agents{j}.true_state([1 3],i))^2;
+        
+        baseline_mse_data(loop_cnt,4+i,j) = norm(baseline_filter.state_history([4*(j-1)+1,4*(j-1)+3],i) - agents{j}.true_state([1 3],i))^2;
         
         for k=1:length(agents{j}.common_estimates)
             [rel_loc,rel_iidx] = agents{j}.get_location(agents{j}.meas_connections(k));
@@ -528,9 +568,9 @@ for i = 2:length(input_tvec)
 
 end
 
-for iii=1:N
-    fprintf('Agent %i worst time: %f\n',iii,worst_ci_process_times(iii))
-end
+% for iii=1:N
+%     fprintf('Agent %i worst time: %f\n',iii,worst_ci_process_times(iii))
+% end
 
 avg_mse = mean(network_mse,1);
 
@@ -604,11 +644,34 @@ est_rmse = mean(err_vec);
 
 cost(loop_cnt,:) = [loop_cnt delta tau_state_goal covar_avg msg_drop_prob data_trans_avg cost_val est_err est_rmse];
 
-loop_cnt = loop_cnt + 1;
 % cost(idx,3) = covar_avg;
 % cost(idx,4) = data_trans_avg;
 % cost(idx,5) = cost_val;
 
+msg_data(loop_cnt,1,:) = delta;
+msg_data(loop_cnt,2,:) = tau_state_goal;
+msg_data(loop_cnt,3,:) = msg_drop_prob;
+msg_data(loop_cnt,4,:) = mc_sim;
+    
+ci_data(loop_cnt,1,:) = delta;
+ci_data(loop_cnt,2,:) = tau_state_goal;
+ci_data(loop_cnt,3,:) = msg_drop_prob;
+ci_data(loop_cnt,4,:) = mc_sim;
+
+comms_rate_mat = reshape(sum(sum(comms_mat_sent,3),4)./sum(sum(comms_mat_total,3),4),[size(comms_mat_sent,1)*size(comms_mat_sent,2),1]);
+comms_rate_mat(isnan(comms_rate_mat)) = 0;
+msg_data(loop_cnt,5:end) = comms_rate_mat;
+ci_data(loop_cnt,5:end) = ci_trigger_vec ./ length(input_tvec);
+
+loop_cnt = loop_cnt + 1;
+last_loop_time = toc;
+total_loop_time = total_loop_time + last_loop_time;
+avg_loop_time = total_loop_time / loop_cnt;
+
+% save data
+save('fusion_mc_sims_delta15_2.mat','mse_data','baseline_mse_data','msg_data','ci_data')
+
+end
 end
 end
 end
