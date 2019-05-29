@@ -40,11 +40,11 @@ def gen_measurement_msg(agent_id,msg):
 
                 if m._type == 'offset_etddf/linrelMeasurement':
                     new_msg.type = 'rel'
-                    new_msg.data = [m.x, m.y]
+                    new_msg.data = [m.x, m.y, m.z]
                     new_msg.target = int(m.robot_measured.split("_")[1])
                 elif m._type == 'offset_etddf/gpsMeasurement':
                     new_msg.type = 'abs'
-                    new_msg.data = [m.x, m.y]
+                    new_msg.data = [m.x, m.y, m.z]
 
                 new_msg.status = [1 for x in new_msg.data]
 
@@ -62,11 +62,11 @@ def gen_measurement_msg(agent_id,msg):
 
             if msg._type == 'offset_etddf/linrelMeasurement':
                 meas_msg.type = 'rel'
-                meas_msg.data = [msg.x, msg.y]
+                meas_msg.data = [msg.x, msg.y, msg.z]
                 new_msg.target = int(m.robot_measured.split("_")[1])
             elif msg._type == 'offset_etddf/gpsMeasurement':
                 meas_msg.type = 'abs'
-                meas_msg.data = [msg.x, msg.y]
+                meas_msg.data = [msg.x, msg.y, msg.z]
 
             meas_msg.status = [1 for x in meas_msg.data]
 

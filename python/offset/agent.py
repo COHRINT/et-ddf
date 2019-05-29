@@ -33,7 +33,7 @@ class Agent(object):
         self.neighbor_connections = tuple(neighbor_connections)
         
         # number of states per platform
-        self.num_states = 4
+        self.num_states = 6
         
         # filter selfect for local estimation
         self.local_filter = local_filter
@@ -116,7 +116,7 @@ class Agent(object):
 
         # create correctly-sized input vector to apply from local control input
         input_vec = np.zeros( (self.local_filter.G.shape[1],1) )
-        input_vec[2*agent_loc:2*agent_loc+2] = np.reshape(input_,(input_.shape[0],1))
+        input_vec[3*agent_loc:3*agent_loc+3] = np.reshape(input_,(input_.shape[0],1))
 
         # propagate local and common info filters
         self.local_filter.predict(input_vec)
@@ -276,7 +276,7 @@ class Agent(object):
 
         # construct transform
         Ta, il_a, inter = gen_sim_transform(self.agent_id,list(self.connections),
-                                            dest_id,dest_connections)
+                                            dest_id,dest_connections,num_states=6)
 
         # compute reduced, transformed state estimate
         xaT = np.dot(inv(Ta),xa)
@@ -326,7 +326,7 @@ class Agent(object):
 
             # construct transform
             Ta, il_a, inter = gen_sim_transform(self.agent_id,list(self.connections),
-                                                b_id,list(b_connections))
+                                                b_id,list(b_connections),num_states=6)
 
             # compute reduced, transformed state estimate
             xaT = np.dot(inv(Ta),xa)

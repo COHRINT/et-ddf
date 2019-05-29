@@ -15,6 +15,7 @@ import Queue as queue
 # import queue
 import numpy as np
 from copy import deepcopy
+from scipy.linalg import block_diag
 
 from offset.agent import Agent
 from offset.filters.etkf import ETKF
@@ -59,17 +60,18 @@ class AgentWrapper(object):
         # get agent's initial position, all others assumed 0 w/ large covariance
         start_state = rospy.get_param('start_pos')
         # TODO: add back z and zdot states
-        start_state = np.array((start_state['x'],0,start_state['y'],0))
+        start_state = np.array((start_state['x'],0,start_state['y'],0,start_state['z'],0))
 
         # create initial control input vector
-        self.recent_control_input = np.array([[0],[0]])
-        self.recent_twist = np.array([[0],[0]])
+        self.recent_control_input = np.array([[0],[0],[0]])
+        self.recent_twist = np.array([[0],[0],[0]])
 
         # get availalbe sensors, and noise params
         sensors = rospy.get_param('sensors')
         
         # get dynamics function
-        dynamics_fxn = rospy.get_param('dynamics')
+        dynamics_fxn = rospy.get_param('dynamics').keys()[0]
+        dynamics_fxn_params = rospy.get_param('dynamics')[dynamics_fxn]
         
         # initialize ros node
         ROS_LOG_LEVEL = eval('rospy.'+rospy.get_param('log_level'))
@@ -80,7 +82,7 @@ class AgentWrapper(object):
 
         # instantiate Agent object
         # ground_truth = self.init_ground_truth()
-        self.agent = self.init_agent(start_state,dynamics_fxn,sensors)
+        self.agent = self.init_agent(start_state,dynamics_fxn,dynamics_fxn_params,sensors)
         rospy.loginfo('Agent {} & filters initialized.'.format(self.agent_id))
 
         # create local and received meaurement queues
@@ -150,7 +152,7 @@ class AgentWrapper(object):
         Saves most recent control input.
         """
         # NOTE: currently faking this with differencing twist commands
-        twist_array = [[msg.twist.linear.x],[msg.twist.linear.y]]
+        twist_array = [[msg.twist.linear.x],[msg.twist.linear.y],[msg.twist.linear.z]]
         twist_array = np.array(twist_array)
         self.recent_control_input = (twist_array - self.recent_twist)/self.update_rate
         self.recent_twist = twist_array
@@ -400,15 +402,16 @@ class AgentWrapper(object):
         # perform CI and conditional updates
         self.agent.process_ci_messages(ci_messages_python)
 
-    def init_agent(self,start_state,dynamics_fxn='lin_ncv',sensors={}):
+    def init_agent(self,start_state,dynamics_fxn='lin_ncv',dynamics_fxn_params={},sensors={}):
         """
         Create agent, including associated local filters and common information filters.
 
         Inputs:
 
-            x_true_vec  -- initial true starting positions for every agent
-            dynamics    -- name of dynamics fxn to be used
-            sensors     -- dictionary of sensors and associated parameters
+            x_true_vec          -- initial true starting positions for every agent
+            dynamics_fxn        -- name of dynamics fxn to be used
+            dynamics_fxn_params -- dictionary of additional params for dynamics fxn
+            sensors             -- dictionary of sensors and associated parameters
 
         Returns:
 
@@ -481,8 +484,8 @@ class AgentWrapper(object):
 
         # construct local estimate
         # TODO: remove hardcoded 4
-        n = (est_state_length)*4
-        F,G,Q = globals()[dynamics_fxn](self.update_rate,est_state_length)
+        n = (est_state_length)*6
+        F,G,Q = globals()[dynamics_fxn](self.update_rate,est_state_length,**dynamics_fxn_params)
 
         # sort all connections
         # ids = sorted([agent_id] + connections_new)
@@ -492,10 +495,10 @@ class AgentWrapper(object):
             if j == agent_id:
                 x = start_state
             else:
-                x = np.array((0,0,0,0)).transpose()
+                x = np.array((0,0,0,0,0,0)).transpose()
             x0 = np.hstack( (x0,x) )
 
-        P0 = 5000*np.eye(4*est_state_length)
+        P0 = 5000*np.eye(6*est_state_length)
 
         local_filter = ETKF(F,G,0,0,Q,np.array(R_abs),np.array(R_rel),
                             x0.reshape((F.shape[0],1)),P0,self.delta,
@@ -514,14 +517,14 @@ class AgentWrapper(object):
                 if k == agent_id:
                     x = start_state
                 else:
-                    x = np.array((0,0,0,0)).transpose()
+                    x = np.array((0,0,0,0,0,0)).transpose()
                 x0_comm = np.hstack( (x0_comm,x) )
             
             # create comm info filter initial covariance
-            P0_comm = 5000*np.eye(4*len(comm_ids))
+            P0_comm = 5000*np.eye(6*len(comm_ids))
 
             # generate dynamics
-            F_comm, G_comm, Q_comm = globals()[dynamics_fxn](self.update_rate,len(comm_ids))
+            F_comm, G_comm, Q_comm = globals()[dynamics_fxn](self.update_rate,len(comm_ids),**dynamics_fxn_params)
 
             # remove agent id from comm ids
             if agent_id in comm_ids:

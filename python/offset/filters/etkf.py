@@ -184,11 +184,11 @@ class ETKF(object):
         # as well as of any type
         H = np.zeros( (1,self.F.shape[0]) )
         if type_ == "abs":
-            H[0,4*src_loc+2*i] = 1
+            H[0,6*src_loc+2*i] = 1
             R = self.R_abs[0,0]
         elif type_ == "rel":
-            H[0,4*src_loc+2*i] = 1
-            H[0,4*target_loc+2*i] = -1
+            H[0,6*src_loc+2*i] = 1
+            H[0,6*target_loc+2*i] = -1
             R = self.R_rel[0,0]
 
         # compute predicted measurement and innovation
@@ -243,11 +243,11 @@ class ETKF(object):
         # as well as of any type
         H = np.zeros( (1,self.F.shape[0]) )
         if type_ == "abs":
-            H[0,4*src_loc+2*i] = 1
+            H[0,6*src_loc+2*i] = 1
             R = self.R_abs[0,0]
         elif type_ == "rel":
-            H[0,4*src_loc+2*i] = 1
-            H[0,4*target_loc+2*i] = -1
+            H[0,6*src_loc+2*i] = 1
+            H[0,6*target_loc+2*i] = -1
             R = self.R_rel[0,0]
 
         #
