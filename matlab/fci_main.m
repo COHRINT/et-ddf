@@ -43,7 +43,7 @@ num_connections = 2;
 % tau_state_goal_vec = 5:0.5:15;
 % tau_state_vec = 0:0.5:25;
 
-delta_vec = [1.5,2];
+delta_vec = [2];
 tau_state_goal_vec = [2,3.5,5,7,10];
 msg_drop_prob_vec = 0;
 num_mc_sims = 100;
@@ -63,9 +63,13 @@ input_tvec = 0:dt:max_time;
 total_sims = length(delta_vec)*length(tau_state_goal_vec)*length(msg_drop_prob_vec)*num_mc_sims;
 
 mse_data = zeros(total_sims,4+length(input_tvec),N);
+mse_rel_data = zeros(total_sims,4+length(input_tvec),N,N);
 baseline_mse_data = zeros(total_sims,4+length(input_tvec),N);
+baseline_mse_rel_data = zeros(total_sims,4+length(input_tvec),N,N);
 msg_data = zeros(total_sims,4+N^2);
+msg_rate_data = zeros(total_sims,4+N^2);
 ci_data = zeros(total_sims,4+N);
+ci_rate_data = zeros(total_sims,4+N);
 
 cost = zeros(length(delta_vec)*length(tau_state_goal_vec)*length(msg_drop_prob_vec),9);
 network_mse = zeros(N,length(input_tvec),length(msg_drop_prob_vec));
@@ -256,10 +260,20 @@ mse_data(loop_cnt,2,:) = tau_state_goal;
 mse_data(loop_cnt,3,:) = msg_drop_prob;
 mse_data(loop_cnt,4,:) = mc_sim;
 
+mse_rel_data(loop_cnt,1,:,:) = delta;
+mse_rel_data(loop_cnt,2,:,:) = tau_state_goal;
+mse_rel_data(loop_cnt,3,:,:) = msg_drop_prob;
+mse_rel_data(loop_cnt,4,:,:) = mc_sim;
+
 baseline_mse_data(loop_cnt,1,:) = delta;
 baseline_mse_data(loop_cnt,2,:) = tau_state_goal;
 baseline_mse_data(loop_cnt,3,:) = msg_drop_prob;
 baseline_mse_data(loop_cnt,4,:) = mc_sim;
+
+baseline_mse_rel_data(loop_cnt,1,:,:) = delta;
+baseline_mse_rel_data(loop_cnt,2,:,:) = tau_state_goal;
+baseline_mse_rel_data(loop_cnt,3,:,:) = msg_drop_prob;
+baseline_mse_rel_data(loop_cnt,4,:,:) = mc_sim;
 
 for i = 2:length(input_tvec)
 %     tic
@@ -551,9 +565,19 @@ for i = 2:length(input_tvec)
                         norm( (agents{j}.local_filter.state_history([iidx(1),iidx(3)],i) -...
                         agents{j}.local_filter.state_history([rel_iidx(1),rel_iidx(3)],i)) - ...
                         (agents{j}.true_state([1 3],i) - agents{agents{j}.meas_connections(k)}.true_state([1 3],i)) )^2;
+                    
+            mse_rel_data(loop_cnt,4+i,j,agents{j}.meas_connections(k)) = ...
+                        norm( (agents{j}.local_filter.state_history([iidx(1),iidx(3)],i) -...
+                        agents{j}.local_filter.state_history([rel_iidx(1),rel_iidx(3)],i)) - ...
+                        (agents{j}.true_state([1 3],i) - agents{agents{j}.meas_connections(k)}.true_state([1 3],i)) )^2;
             
             m = agents{j}.meas_connections(k);
             rel_baseline_mse(j,agents{j}.meas_connections(k),i,idx2) = ...
+                        norm( (baseline_filter.state_history([4*(j-1)+1,4*(j-1)+3],i) -...
+                        baseline_filter.state_history([4*(m-1)+1,4*(m-1)+3],i)) - ...
+                        (agents{j}.true_state([1 3],i) - agents{m}.true_state([1 3],i)) )^2;
+                    
+            baseline_mse_rel_data(loop_cnt,4+i,j,agents{j}.meas_connections(k)) = ...
                         norm( (baseline_filter.state_history([4*(j-1)+1,4*(j-1)+3],i) -...
                         baseline_filter.state_history([4*(m-1)+1,4*(m-1)+3],i)) - ...
                         (agents{j}.true_state([1 3],i) - agents{m}.true_state([1 3],i)) )^2;
@@ -652,16 +676,31 @@ msg_data(loop_cnt,1,:) = delta;
 msg_data(loop_cnt,2,:) = tau_state_goal;
 msg_data(loop_cnt,3,:) = msg_drop_prob;
 msg_data(loop_cnt,4,:) = mc_sim;
+
+msg_rate_data(loop_cnt,1,:) = delta;
+msg_rate_data(loop_cnt,2,:) = tau_state_goal;
+msg_rate_data(loop_cnt,3,:) = msg_drop_prob;
+msg_rate_data(loop_cnt,4,:) = mc_sim;
     
 ci_data(loop_cnt,1,:) = delta;
 ci_data(loop_cnt,2,:) = tau_state_goal;
 ci_data(loop_cnt,3,:) = msg_drop_prob;
 ci_data(loop_cnt,4,:) = mc_sim;
 
+ci_rate_data(loop_cnt,1,:) = delta;
+ci_rate_data(loop_cnt,2,:) = tau_state_goal;
+ci_rate_data(loop_cnt,3,:) = msg_drop_prob;
+ci_rate_data(loop_cnt,4,:) = mc_sim;
+
+comms_mat = reshape(sum(sum(comms_mat_sent,3),4),[size(comms_mat_sent,1)*size(comms_mat_sent,2),1]);
+comms_mat(isnan(comms_mat)) = 0;
+msg_data(loop_cnt,5:end) = comms_mat;
 comms_rate_mat = reshape(sum(sum(comms_mat_sent,3),4)./sum(sum(comms_mat_total,3),4),[size(comms_mat_sent,1)*size(comms_mat_sent,2),1]);
 comms_rate_mat(isnan(comms_rate_mat)) = 0;
-msg_data(loop_cnt,5:end) = comms_rate_mat;
-ci_data(loop_cnt,5:end) = ci_trigger_vec ./ length(input_tvec);
+msg_rate_data(loop_cnt,5:end) = comms_rate_mat;
+
+ci_data(loop_cnt,5:end) = ci_trigger_vec;
+ci_rate_data(loop_cnt,5:end) = ci_trigger_vec ./ length(input_tvec);
 
 loop_cnt = loop_cnt + 1;
 last_loop_time = toc;
@@ -669,7 +708,7 @@ total_loop_time = total_loop_time + last_loop_time;
 avg_loop_time = total_loop_time / loop_cnt;
 
 % save data
-save('fusion_mc_sims_delta15_2.mat','mse_data','baseline_mse_data','msg_data','ci_data')
+save('../../sim_data/fusion_mc_sims_delta2.mat','mse_data','mse_rel_data','baseline_mse_data','baseline_mse_rel_data','msg_data','ci_data','msg_rate_data','ci_rate_data')
 
 end
 end
