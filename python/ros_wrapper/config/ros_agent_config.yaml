@@ -29,7 +29,9 @@ start_pos:
     psi: 0.0
 
 # dynamics model used in filters
-dynamics: 'lin_ncv'
+dynamics: 
+    lin_ncv_3d:
+        coplanar: False
 
 # sensor models used in filters
 sensors:

@@ -57,10 +57,10 @@ class PerformanceViz(object):
         self.mse_pub_2 = rospy.Publisher('/agent_2/position_mse',Float64,queue_size=10)
         self.mse_pub_3 = rospy.Publisher('/agent_3/position_mse',Float64,queue_size=10)
 
-        self.recent_ground_truth_0 = [0,0]
-        self.recent_ground_truth_1 = [0,0]
-        self.recent_ground_truth_2 = [0,0]
-        self.recent_ground_truth_3 = [0,0]
+        self.recent_ground_truth_0 = [0,0,0]
+        self.recent_ground_truth_1 = [0,0,0]
+        self.recent_ground_truth_2 = [0,0,0]
+        self.recent_ground_truth_3 = [0,0,0]
 
         # wait for messages
         rospy.spin()
@@ -74,14 +74,16 @@ class PerformanceViz(object):
         new_msg = Point()
         new_msg.x = msg.mean[0] - self.recent_ground_truth_0[0]
         new_msg.y = msg.mean[2] - self.recent_ground_truth_0[1]
+        new_msg.z = msg.mean[4] - self.recent_ground_truth_0[2]
 
         cov_msg = Point()
         cov = inflate_covariance(msg.covariance)
         cov_msg.x = 2*np.sqrt(cov[0,0])
         cov_msg.y = 2*np.sqrt(cov[2,2])
+        cov_msg.z = 2*np.sqrt(cov[4,4])
 
         mse_msg = Float64()
-        mse_msg.data = float(np.linalg.norm(np.array( [msg.mean[0],msg.mean[2]] )- np.array(self.recent_ground_truth_0)))
+        mse_msg.data = float(np.linalg.norm(np.array( [msg.mean[0],msg.mean[2],msg.mean[4]] )- np.array(self.recent_ground_truth_0)))
         
         self.est_err_pub_0.publish(new_msg)
         self.est_cov_pub_0.publish(cov_msg)
@@ -94,16 +96,18 @@ class PerformanceViz(object):
         """
 
         new_msg = Point()
-        new_msg.x = msg.mean[4] - self.recent_ground_truth_1[0]
-        new_msg.y = msg.mean[6] - self.recent_ground_truth_1[1]
+        new_msg.x = msg.mean[6] - self.recent_ground_truth_1[0]
+        new_msg.y = msg.mean[8] - self.recent_ground_truth_1[1]
+        new_msg.z = msg.mean[10] - self.recent_ground_truth_1[2]
 
         cov_msg = Point()
         cov = inflate_covariance(msg.covariance)
-        cov_msg.x = 2*np.sqrt(cov[4,4])
-        cov_msg.y = 2*np.sqrt(cov[6,6])
+        cov_msg.x = 2*np.sqrt(cov[6,6])
+        cov_msg.y = 2*np.sqrt(cov[8,8])
+        cov_msg.z = 2*np.sqrt(cov[10,10])
 
         mse_msg = Float64()
-        mse_msg.data = float(np.linalg.norm(np.array( [msg.mean[4],msg.mean[6]] )- np.array(self.recent_ground_truth_1)))
+        mse_msg.data = float(np.linalg.norm(np.array( [msg.mean[6],msg.mean[8],msg.mean[10]] )- np.array(self.recent_ground_truth_1)))
         
         self.est_err_pub_1.publish(new_msg)
         self.est_cov_pub_1.publish(cov_msg)
@@ -116,16 +120,18 @@ class PerformanceViz(object):
         """
 
         new_msg = Point()
-        new_msg.x = msg.mean[8] - self.recent_ground_truth_2[0]
-        new_msg.y = msg.mean[10] - self.recent_ground_truth_2[1]
+        new_msg.x = msg.mean[12] - self.recent_ground_truth_2[0]
+        new_msg.y = msg.mean[14] - self.recent_ground_truth_2[1]
+        new_msg.z = msg.mean[16] - self.recent_ground_truth_2[2]
 
         cov_msg = Point()
         cov = inflate_covariance(msg.covariance)
-        cov_msg.x = 2*np.sqrt(cov[8,8])
-        cov_msg.y = 2*np.sqrt(cov[10,10])
+        cov_msg.x = 2*np.sqrt(cov[12,12])
+        cov_msg.y = 2*np.sqrt(cov[14,14])
+        cov_msg.z = 2*np.sqrt(cov[16,16])
 
         mse_msg = Float64()
-        mse_msg.data = float(np.linalg.norm(np.array( [msg.mean[8],msg.mean[10]] )- np.array(self.recent_ground_truth_2)))
+        mse_msg.data = float(np.linalg.norm(np.array( [msg.mean[12],msg.mean[14],msg.mean[16]] )- np.array(self.recent_ground_truth_2)))
         
         self.est_err_pub_2.publish(new_msg)
         self.est_cov_pub_2.publish(cov_msg)
@@ -138,16 +144,18 @@ class PerformanceViz(object):
         """
 
         new_msg = Point()
-        new_msg.x = msg.mean[8] - self.recent_ground_truth_3[0]
-        new_msg.y = msg.mean[10] - self.recent_ground_truth_3[1]
+        new_msg.x = msg.mean[12] - self.recent_ground_truth_3[0]
+        new_msg.y = msg.mean[14] - self.recent_ground_truth_3[1]
+        new_msg.y = msg.mean[16] - self.recent_ground_truth_3[2]
 
         cov_msg = Point()
         cov = inflate_covariance(msg.covariance)
-        cov_msg.x = 2*np.sqrt(cov[8,8])
-        cov_msg.y = 2*np.sqrt(cov[10,10])
+        cov_msg.x = 2*np.sqrt(cov[12,12])
+        cov_msg.y = 2*np.sqrt(cov[14,14])
+        cov_msg.z = 2*np.sqrt(cov[16,16])
 
         mse_msg = Float64()
-        mse_msg.data = float(np.linalg.norm(np.array( [msg.mean[8],msg.mean[10]] )- np.array(self.recent_ground_truth_3)))
+        mse_msg.data = float(np.linalg.norm(np.array( [msg.mean[12],msg.mean[14],msg.mean[16]] )- np.array(self.recent_ground_truth_3)))
         
         self.est_err_pub_3.publish(new_msg)
         self.est_cov_pub_3.publish(cov_msg)
@@ -159,6 +167,7 @@ class PerformanceViz(object):
         """
         self.recent_ground_truth_0[0] = msg.pose.pose.position.x
         self.recent_ground_truth_0[1] = msg.pose.pose.position.y
+        self.recent_ground_truth_0[2] = msg.pose.pose.position.z
 
     def gt_cb_1(self,msg):
         """
@@ -166,6 +175,7 @@ class PerformanceViz(object):
         """
         self.recent_ground_truth_1[0] = msg.pose.pose.position.x
         self.recent_ground_truth_1[1] = msg.pose.pose.position.y
+        self.recent_ground_truth_1[2] = msg.pose.pose.position.z
 
     def gt_cb_2(self,msg):
         """
@@ -173,6 +183,7 @@ class PerformanceViz(object):
         """
         self.recent_ground_truth_2[0] = msg.pose.pose.position.x
         self.recent_ground_truth_2[1] = msg.pose.pose.position.y
+        self.recent_ground_truth_2[2] = msg.pose.pose.position.z
 
     def gt_cb_3(self,msg):
         """
@@ -180,6 +191,7 @@ class PerformanceViz(object):
         """
         self.recent_ground_truth_3[0] = msg.pose.pose.position.x
         self.recent_ground_truth_3[1] = msg.pose.pose.position.y
+        self.recent_ground_truth_3[2] = msg.pose.pose.position.z
 
 
 
