@@ -9,8 +9,8 @@ seperate as possible from ROS.
 import rospy
 import numpy as np
 
-from offset.helpers.msg_handling import MeasurementMsg, StateMsg
-from offset_etddf.msg import AgentMeasurement, AgentState
+from etddf.helpers.msg_handling import MeasurementMsg, StateMsg
+from etddf_ros.msg import AgentMeasurement, AgentState
 
 def gen_measurement_msg(agent_id,msg):
         """
@@ -38,11 +38,11 @@ def gen_measurement_msg(agent_id,msg):
                 new_msg.header.stamp = rospy.Time.now()
                 new_msg.src = agent_id
 
-                if m._type == 'offset_etddf/linrelMeasurement':
+                if m._type == 'etddf_ros/linrelMeasurement':
                     new_msg.type = 'rel'
                     new_msg.data = [m.x, m.y]
                     new_msg.target = int(m.robot_measured.split("_")[1])
-                elif m._type == 'offset_etddf/gpsMeasurement':
+                elif m._type == 'etddf_ros/gpsMeasurement':
                     new_msg.type = 'abs'
                     new_msg.data = [m.x, m.y]
 
@@ -60,11 +60,11 @@ def gen_measurement_msg(agent_id,msg):
             meas_msg.header.stamp = rospy.Time.now()
             meas_msg.src = agent_id
 
-            if msg._type == 'offset_etddf/linrelMeasurement':
+            if msg._type == 'etddf_ros/linrelMeasurement':
                 meas_msg.type = 'rel'
                 meas_msg.data = [msg.x, msg.y]
                 new_msg.target = int(m.robot_measured.split("_")[1])
-            elif msg._type == 'offset_etddf/gpsMeasurement':
+            elif msg._type == 'etddf_ros/gpsMeasurement':
                 meas_msg.type = 'abs'
                 meas_msg.data = [msg.x, msg.y]
 

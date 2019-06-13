@@ -2,7 +2,7 @@
 import rospy
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Float64
-from offset_etddf.msg import gpsMeasurement, linrelMeasurement
+from etddf_ros.msg import gpsMeasurement, linrelMeasurement
 from geometry_msgs.msg import Pose
 from decimal import Decimal
 import numpy as np

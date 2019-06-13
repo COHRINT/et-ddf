@@ -8,7 +8,7 @@ a communications stack, including potential dropping of messages.
 import rospy
 import numpy as np
 
-from offset_etddf.msg import AgentMeasurement, AgentState
+from etddf_ros.msg import AgentMeasurement, AgentState
 
 class CommsModule(object):
 
@@ -62,9 +62,9 @@ class CommsModule(object):
         if np.random.binomial(1,self.drop_incoming_prob):
             return None
         else:
-            if msg._type == 'offset_etddf/AgentMeasurement':
+            if msg._type == 'etddf_ros/AgentMeasurement':
                 self.agent_meas_pub.publish(msg)
-            elif msg._type == 'offset_etddf/AgentState':
+            elif msg._type == 'etddf_ros/AgentState':
                 self.agent_state_pub.publish(msg)
         
 
@@ -80,9 +80,9 @@ class CommsModule(object):
 
             none
         """
-        if msg._type == 'offset_etddf/AgentMeasurement':
+        if msg._type == 'etddf_ros/AgentMeasurement':
             self.comms_meas_pub.publish(msg)
-        elif msg._type == 'offset_etddf/AgentState':
+        elif msg._type == 'etddf_ros/AgentState':
             self.comms_state_pub.publish(msg)
 
 

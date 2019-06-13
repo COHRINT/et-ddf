@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>offset_etddf</name>
+  <name>etddf_ros</name>
   <version>0.0.0</version>
-  <description>The offset event-triggered distributed data fusion package</description>
+  <description>The event-triggered distributed data fusion ROS package</description>
 
   <!-- One maintainer tag required, multiple allowed, one person per tag -->
   <!-- Example:  -->

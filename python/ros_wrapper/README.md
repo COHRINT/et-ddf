@@ -1,6 +1,6 @@
 # OFFSET ROS ET-DDF
 
-This ROS package, `offset_etddf`, integrates the OFFSET event-triggered decentralized data fusion (ET-DDF) library into a ROS framework for use in simulations and on hardware. Below are run instructions, as well as an overview of the architecture of the system.
+This ROS package, `etddf_ros`, integrates the OFFSET event-triggered decentralized data fusion (ET-DDF) library into a ROS framework for use in simulations and on hardware. Below are run instructions, as well as an overview of the architecture of the system.
 
 This package was developed as part of the DARPA OFFSET project.
 
@@ -10,14 +10,14 @@ _Note: This software is currently configured to use linear dynamics and linear a
 
 ## Installation Instructions
 
-In order to use the `offset_etddf` package, first clone the `offset` repository to some location on your machine, `<offset repo location>`. This will download both the ROS package as well as the core ET-DDF library.  
+In order to use the `etddf_ros` package, first clone the `etddf` repository to some location on your machine, `<etddf repo location>`. This will download both the ROS package as well as the core ET-DDF library.  
 
 It is highly recommended to install the ET-DDF code in a virtual environment to preclude potential issues with paths and package dependencies. This was the method with which the library, and this ROS package was tested. Make sure the venv is using python2!
 
-Once you've cloned the `offset` repository, install the core ET-DDF library by navigating to the python code and running the setup script using pip:
+Once you've cloned the `etddf` repository, install the core ET-DDF library by navigating to the python code and running the setup script using pip:
 
 ```
-$ cd <offset repo location>/python/
+$ cd <etddf repo location>/python/
 $ pip2 install -e . -r requirements.txt
 ```
 
@@ -33,10 +33,10 @@ The following packages are installed:
 - empy
 - rospkg
 
-Next, create a symbolic link from the ROS package, located in the `offset_ros` folder, to a catkin workspace, then build your catkin workspace, and source it:
+Next, create a symbolic link from the ROS package, located in the `etddf_ros` folder, to a catkin workspace, then build your catkin workspace, and source it:
 
 ```
-$ ln -s <offset repo location>/python/offset_ros/ <path to a catkin workspace>/src/
+$ ln -s <etddf repo location>/python/offset_ros/ <path to a catkin workspace>/src/
 $ cd <path to catkin_workspace> && catkin_make && source devel/setup.bash
 ```
 
@@ -75,7 +75,7 @@ The arguments are as follows:
 
 ### Viewing Performance
 
-To view the quality of estimates, you can use the `offset_ros/helpers/viz.py` node. This node is currently only configured for a 4 agent case, but can be used to confirm things are functioning properly. 
+To view the quality of estimates, you can use the `etddf_ros/helpers/viz.py` node. This node is currently only configured for a 4 agent case, but can be used to confirm things are functioning properly. 
 
 This node uses simuation ground truth pose data to compute estimate error and error magnitude. These can be viewed in a terminal, or using the `rqt_plot` utility.
 
@@ -85,7 +85,7 @@ This node uses simuation ground truth pose data to compute estimate error and er
 
 ### Config Files
 
-There are two main config files used for running ET-DDF in ROS. Both are located in the `config/` folder of the `offset_etddf` package.
+There are two main config files used for running ET-DDF in ROS. Both are located in the `config/` folder of the `etddf_etddf` package.
 
 The `ros_agent_config.yaml` config file is used to configure ET-DDF instances, including setting connections, ET thresholding, CI thresholding, and update rate for the ET-DDF instance.
 
@@ -101,7 +101,7 @@ The current configuration is stable and performs well, but if the CI threshold i
 
 To configure ET-DDF for use in a system, there are a few topics that need to be configured. 
 
-First are the topics for the sensors each ET-DDF instance uses, found in `offset_ros/src/agent_wrapper.py`. The default topic names are those that are used when simulating sensor measurements.
+First are the topics for the sensors each ET-DDF instance uses, found in `etddf_ros/src/agent_wrapper.py`. The default topic names are those that are used when simulating sensor measurements.
 
 <!-- Second is making sure that all ET-DDF instances are namespaced correctly.  -->
 
@@ -109,7 +109,7 @@ First are the topics for the sensors each ET-DDF instance uses, found in `offset
 
 ## Architecture Overview
 
-The `offset_etddf` package provides a wrapper around the `offest` ET-DDF library, as well as the tools to manage, convert, and move sensor, and between-agent messages through the system.
+The `etddf_ros` package provides a wrapper around the `etddf` ET-DDF library, as well as the tools to manage, convert, and move sensor, and between-agent messages through the system.
 
 Below is a block diagram of a high-level view of the system:
 
@@ -136,7 +136,7 @@ The update loop performs the following steps:
 6. Check if covariance intersection (CI) needs to be performed, and if so, generate and send CI requests to other agents, queuing responses
 7. Empty the CI state message queue, convert to Python messages, and perform CI with each state message.
 
-See the README for the `offset` library to read more about the architecture and underlying algorithms for ET-DDF.
+See the README for the `etddf` library to read more about the architecture and underlying algorithms for ET-DDF.
 
 The __comms_module__ node simply abstracts communication with the outside world by allowing the __agent_wrapper__ to send all messages to one topic, from which the module sends each message to the appropriate destination agent's __comms_module__.
 
@@ -151,7 +151,7 @@ The __publish_sensors__ node uses ground truth pose data for a agent to create s
 
 ## ROS 2 Compatibility
 
-In its current state, the `offset_etddf` package is implemented using __ROS 1__. However for use in a larger system running __ROS 2__, there are only a few locations where a message bridge is needed. These are the following:
+In its current state, the `etddf_ros` package is implemented using __ROS 1__. However for use in a larger system running __ROS 2__, there are only a few locations where a message bridge is needed. These are the following:
 
 - Sensor measurements
 - _[if desired]_ publishing local estimates for use outside of the et-ddf namespace

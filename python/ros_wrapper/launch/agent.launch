@@ -9,22 +9,22 @@
     <group ns="$(arg agent_name)">
     
         <!-- Load parameters from config -->
-        <rosparam command="load" file="$(find offset_etddf)/config/ros_agent_config.yaml" />
+        <rosparam command="load" file="$(find etddf_ros)/config/ros_agent_config.yaml" />
         <param name="agent_id" type="int" value="$(arg id)" />
         <param name="agent_name" type="string" value="$(arg agent_name)" />
         <param name="log_level" type="string" value="$(arg log_level)" />
 
         <!-- ET-DDF nodes -->
-        <node name="comms_module" pkg="offset_etddf" type="comms.py" />
-	    <node name="agent" pkg="offset_etddf" type="agent_wrapper.py" output="screen" />
+        <node name="comms_module" pkg="etddf_ros" type="comms.py" />
+	    <node name="agent" pkg="etddf_ros" type="agent_wrapper.py" output="screen" />
     
         <!-- Simulation-related nodes -->
         <group if="$(arg planner)">
-            <node name="planner" pkg="offset_etddf" type="point_planner.py" output="screen" />
+            <node name="planner" pkg="etddf_ros" type="point_planner.py" output="screen" />
 	    </group>
         
         <group if="$(arg sensors)">
-            <node name="sensor_pub" pkg="offset_etddf" type="publish_sensors.py" output="screen" />
+            <node name="sensor_pub" pkg="etddf_ros" type="publish_sensors.py" output="screen" />
 	    </group>
 
     </group>

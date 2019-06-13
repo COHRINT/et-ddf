@@ -16,16 +16,16 @@ import Queue as queue
 import numpy as np
 from copy import deepcopy
 
-from offset.agent import Agent
-from offset.filters.etkf import ETKF
-from offset.dynamics import *
+from etddf.agent import Agent
+from etddf.filters.etkf import ETKF
+from etddf.dynamics import *
 
-from offset_ros.helpers.msg_conversion import *
+from ros_wrapper.helpers.msg_conversion import *
 
 from std_msgs.msg import Float64
 from geometry_msgs.msg import TwistStamped
-from offset_etddf.msg import AgentMeasurement, AgentState, gpsMeasurement, linrelMeasurement, MsgStats
-from offset_etddf.srv import CIUpdate
+from etddf_ros.msg import AgentMeasurement, AgentState, gpsMeasurement, linrelMeasurement, MsgStats
+from etddf_ros.srv import CIUpdate
 
 class AgentWrapper(object):
     """

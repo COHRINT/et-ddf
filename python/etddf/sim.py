@@ -14,14 +14,14 @@ import argparse
 from copy import deepcopy
 import scipy.io
 
-from offset.agent import Agent
-from offset.filters.kf import KF
-from offset.filters.etkf import ETKF
-from offset.dynamics import *
-from offset.helpers.config_handling import load_config
-from offset.helpers.msg_handling import MeasurementMsg, StateMsg
-from offset.helpers.data_handling import package_results, save_sim_data
-from offset.helpers.data_viz import mse_plots, time_trace_plots
+from etddf.agent import Agent
+from etddf.filters.kf import KF
+from etddf.filters.etkf import ETKF
+from etddf.dynamics import *
+from etddf.helpers.config_handling import load_config
+from etddf.helpers.msg_handling import MeasurementMsg, StateMsg
+from etddf.helpers.data_handling import package_results, save_sim_data
+from etddf.helpers.data_viz import mse_plots, time_trace_plots
 
 class SimInstance(object):
     """

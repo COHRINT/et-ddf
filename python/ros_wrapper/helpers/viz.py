@@ -7,9 +7,9 @@ Performance visualization for applications of ET-DDF.
 import rospy
 import numpy as np
 
-from offset_ros.helpers.msg_conversion import inflate_covariance
+from ros_wrapper.helpers.msg_conversion import inflate_covariance
 
-from offset_etddf.msg import AgentState, AgentMeasurement
+from etddf_ros.msg import AgentState, AgentMeasurement
 from std_msgs.msg import Float64
 from geometry_msgs.msg import Point
 from nav_msgs.msg import Odometry
