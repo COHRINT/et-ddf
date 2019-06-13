@@ -1,8 +1,8 @@
-# OFFSET ROS ET-DDF
+# ROS ET-DDF
 
-This ROS package, `etddf_ros`, integrates the OFFSET event-triggered decentralized data fusion (ET-DDF) library into a ROS framework for use in simulations and on hardware. Below are run instructions, as well as an overview of the architecture of the system.
+This ROS package, `etddf_ros`, integrates the event-triggered decentralized data fusion (ET-DDF) library into a ROS framework for use in simulations and on hardware. Below are run instructions, as well as an overview of the architecture of the system.
 
-This package was developed as part of the DARPA OFFSET project.
+This package was developed to support the DARPA OFFSET project, as well as the MinAu project, a collaboration with Orbit Logic, the Univeristy of California San Diego, and the Office of Naval Research.
 
 _Note: This software is currently configured to use linear dynamics and linear absolute and relative position measurements. All agents estimates and measurements are assumed to be in an ENU frame._
 
@@ -51,7 +51,7 @@ This will build your catkin workspace, and generate the necessary message types 
 To launch a full simulation, including simulated measurements, control input and simulated vehicles (represented as point masses):
 
 ```
-$ roslaunch offset_etddf offset_etddf.launch
+$ roslaunch etddf_ros etddf.launch
 ```
 
 ### Launching agent instance
@@ -59,7 +59,7 @@ $ roslaunch offset_etddf offset_etddf.launch
 To launch an instance of ET-DDF, use the `agent.launch` launch file. This will launch an ET-DDF node, a comms module node, and, if set, nodes for simulating sensors measurements ang generating control input.
 
 ```
-$ roslaunch offset_etddf agent.launch id:=[id int value]
+$ roslaunch etddf_ros agent.launch id:=[id int value]
 ```
 
 The arguments are as follows:
@@ -155,3 +155,5 @@ In its current state, the `etddf_ros` package is implemented using __ROS 1__. Ho
 
 - Sensor measurements
 - _[if desired]_ publishing local estimates for use outside of the et-ddf namespace
+
+Plans to implement a ROS 2 compatible version are in the works.
