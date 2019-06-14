@@ -54,6 +54,8 @@ add_message_files(
     gpsMeasurement.msg
     linrelMeasurement.msg
     MsgStats.msg
+    depthMeasurement.msg
+    usblMeasurement.msg
 )
 
 ## Generate services in the 'srv' folder
@@ -107,7 +109,7 @@ generate_messages(
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES offset
-#  CATKIN_DEPENDS rospy
+  CATKIN_DEPENDS rospy message_runtime
 #  DEPENDS system_lib
 )
 
