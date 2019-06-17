@@ -16,7 +16,7 @@ See the Python [ET-DDF README](python/etddf/README.md) for more information on r
 
 There is ROS package, `etddf_ros` that wraps the Python ET-DDF library described above. The package provides an interface for handling sensor measurements and inter-vechicle communications as ROS messages, allowing the algorithms to be run on an acutal system.
 
-To use the ROS ET-DDF package, make sure you have ROS installed on your machine, then see the [ROS ET-DDF README](python/ros_wrapper/README.md). *Note: the ROS package was developed in and tested with ROS Kinetic, however will likely work with other distributions 
+To use the ROS ET-DDF package, make sure you have ROS installed on your machine, then see the [ROS ET-DDF README](python/ros_wrapper/README.md). *Note: the ROS package was developed in and tested with ROS Kinetic, however will likely work with other distributions* 
 
 ## Matlab Simulation
 
