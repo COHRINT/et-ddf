@@ -29,33 +29,33 @@ class PerformanceViz(object):
         rospy.init_node('performance_viz')
 
         # create subscribers to all estimate and ground truth topics
-        rospy.Subscriber('/agent_0/local_estimate',AgentState,self.estimate_cb_0)
-        rospy.Subscriber('/agent_1/local_estimate',AgentState,self.estimate_cb_1)
-        rospy.Subscriber('/agent_2/local_estimate',AgentState,self.estimate_cb_2)
-        rospy.Subscriber('/agent_3/local_estimate',AgentState,self.estimate_cb_3)
+        rospy.Subscriber('/bluerov2_0/local_estimate',AgentState,self.estimate_cb_0)
+        rospy.Subscriber('/bluerov2_1/local_estimate',AgentState,self.estimate_cb_1)
+        rospy.Subscriber('/bluerov2_2/local_estimate',AgentState,self.estimate_cb_2)
+        rospy.Subscriber('/bluerov2_3/local_estimate',AgentState,self.estimate_cb_3)
 
-        rospy.Subscriber('/agent_0/pose_gt',Odometry,self.gt_cb_0)
-        rospy.Subscriber('/agent_1/pose_gt',Odometry,self.gt_cb_1)
-        rospy.Subscriber('/agent_2/pose_gt',Odometry,self.gt_cb_2)
-        rospy.Subscriber('/agent_3/pose_gt',Odometry,self.gt_cb_3)
-
-        # create publishers for estimate error
-        self.est_err_pub_0 = rospy.Publisher('/agent_0/estimate_error',Point,queue_size=10)
-        self.est_err_pub_1 = rospy.Publisher('/agent_1/estimate_error',Point,queue_size=10)
-        self.est_err_pub_2 = rospy.Publisher('/agent_2/estimate_error',Point,queue_size=10)
-        self.est_err_pub_3 = rospy.Publisher('/agent_3/estimate_error',Point,queue_size=10)
+        rospy.Subscriber('/bluerov2_0/pose_gt',Odometry,self.gt_cb_0)
+        rospy.Subscriber('/bluerov2_1/pose_gt',Odometry,self.gt_cb_1)
+        rospy.Subscriber('/bluerov2_2/pose_gt',Odometry,self.gt_cb_2)
+        rospy.Subscriber('/bluerov2_3/pose_gt',Odometry,self.gt_cb_3)
 
         # create publishers for estimate error
-        self.est_cov_pub_0 = rospy.Publisher('/agent_0/estimate_covariance',Point,queue_size=10)
-        self.est_cov_pub_1 = rospy.Publisher('/agent_1/estimate_covariance',Point,queue_size=10)
-        self.est_cov_pub_2 = rospy.Publisher('/agent_2/estimate_covariance',Point,queue_size=10)
-        self.est_cov_pub_3 = rospy.Publisher('/agent_3/estimate_covariance',Point,queue_size=10)
+        self.est_err_pub_0 = rospy.Publisher('/bluerov2_0/estimate_error',Point,queue_size=10)
+        self.est_err_pub_1 = rospy.Publisher('/bluerov2_1/estimate_error',Point,queue_size=10)
+        self.est_err_pub_2 = rospy.Publisher('/bluerov2_2/estimate_error',Point,queue_size=10)
+        self.est_err_pub_3 = rospy.Publisher('/bluerov2_3/estimate_error',Point,queue_size=10)
+
+        # create publishers for estimate error
+        self.est_cov_pub_0 = rospy.Publisher('/bluerov2_0/estimate_covariance',Point,queue_size=10)
+        self.est_cov_pub_1 = rospy.Publisher('/bluerov2_1/estimate_covariance',Point,queue_size=10)
+        self.est_cov_pub_2 = rospy.Publisher('/bluerov2_2/estimate_covariance',Point,queue_size=10)
+        self.est_cov_pub_3 = rospy.Publisher('/bluerov2_3/estimate_covariance',Point,queue_size=10)
 
         # create MSE publishers
-        self.mse_pub_0 = rospy.Publisher('/agent_0/position_mse',Float64,queue_size=10)
-        self.mse_pub_1 = rospy.Publisher('/agent_1/position_mse',Float64,queue_size=10)
-        self.mse_pub_2 = rospy.Publisher('/agent_2/position_mse',Float64,queue_size=10)
-        self.mse_pub_3 = rospy.Publisher('/agent_3/position_mse',Float64,queue_size=10)
+        self.mse_pub_0 = rospy.Publisher('/bluerov2_0/position_mse',Float64,queue_size=10)
+        self.mse_pub_1 = rospy.Publisher('/bluerov2_1/position_mse',Float64,queue_size=10)
+        self.mse_pub_2 = rospy.Publisher('/bluerov2_2/position_mse',Float64,queue_size=10)
+        self.mse_pub_3 = rospy.Publisher('/bluerov2_3/position_mse',Float64,queue_size=10)
 
         self.recent_ground_truth_0 = [0,0,0]
         self.recent_ground_truth_1 = [0,0,0]
