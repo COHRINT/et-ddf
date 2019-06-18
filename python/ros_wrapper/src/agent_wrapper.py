@@ -74,7 +74,7 @@ class AgentWrapper(object):
         dynamics_fxn_params = rospy.get_param('dynamics')[dynamics_fxn]
         
         # initialize ros node
-        ROS_LOG_LEVEL = eval('rospy.'+rospy.get_param('log_level'))
+        ROS_LOG_LEVEL = eval("rospy." + rospy.get_param('log_level')) # self.get_log_level(rospy.get_param('log_level'))
         rospy.init_node('agent_{}'.format(self.agent_id),log_level=ROS_LOG_LEVEL)
 
         # create ros rate object for timing update loop
@@ -132,8 +132,9 @@ class AgentWrapper(object):
         self.ci_srv = rospy.Service('ci_update',CIUpdate,self.ci_service_handler)
 
         # begin update loop
+        rospy.logerr("Entering main loop.")
         while not rospy.is_shutdown():
-
+            
             # process all queue measurements and ci messages
             self.update()
 
@@ -146,6 +147,16 @@ class AgentWrapper(object):
 
             # sleep until next update
             rate.sleep()
+
+    def get_log_level(self, log_level):
+        if log_level.lower() == "debug":
+            return rospy.DEBUG
+        elif log_level.lower() == "info":
+            return rospy.INFO
+        elif log_level.lower() == "warn":
+            return rospy.WARN
+        else:
+            raise Exception("Unrecognized logging level: " + log_level)
 
     def control_input_cb(self,msg):
         """
@@ -229,10 +240,11 @@ class AgentWrapper(object):
             for conn in self.connections[self.agent_id]:
                 # request state of connection and queue
                 rospy.logdebug('[Agent {}]: waiting for CI update service from agent_{} to become available'.format(self.agent_id,conn))
-                rospy.wait_for_service('/agent_{}/ci_update'.format(conn))
+                srv_name = '/'+self.agent_name.split('_')[0] +'_' +str(conn) + '/ci_update'
+                rospy.wait_for_service(srv_name)
 
                 # create service proxy to send request
-                ci_request = rospy.ServiceProxy('/agent_{}/ci_update'.format(conn),CIUpdate)
+                ci_request = rospy.ServiceProxy(srv_name,CIUpdate)
                 # generate ros state message
                 request_msg = python2ros_state(self.agent.gen_ci_message(conn,self.neighbor_connections[conn]))
                 
@@ -340,7 +352,8 @@ class AgentWrapper(object):
         msg = MsgStats()
         msg.header.stamp = rospy.Time.now()
         msg.msgs_sent = self.agent.msgs_sent
-        msg.msg_fraction_sent = self.agent.msgs_sent / self.agent.total_msgs
+        if self.agent.total_msgs:
+            msg.msg_fraction_sent = self.agent.msgs_sent / self.agent.total_msgs
         msg.ci_trigger_rate = self.agent.ci_trigger_rate
         self.msg_stats_pub.publish(msg)
 
@@ -348,12 +361,13 @@ class AgentWrapper(object):
         """
         Main update function to process measurements, and ci messages.
         """
-
+        rospy.loginfo("UPDATING")
         # increment update count
         self.update_cnt += 1
 
         # process measurement queues
         local_measurements = self.process_local_measurement_queue()
+        rospy.loginfo("local_measurements: " + str(local_measurements))
 
         # convert messages from AgentMeasurement and AgentState ROS msg types to
         # MeasurementMsg and StateMsg python msg types (they're pretty much the same)
