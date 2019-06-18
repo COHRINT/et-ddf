@@ -6,8 +6,6 @@
     <arg name="planner" default="false" />
     <arg name="sensors" default="false" />
 
-    <group ns="$(arg agent_name)">
-    
         <!-- Load parameters from config -->
         <rosparam command="load" file="$(find etddf_ros)/config/ros_agent_config.yaml" />
         <param name="agent_id" type="int" value="$(arg id)" />
@@ -26,7 +24,5 @@
         <group if="$(arg sensors)">
             <node name="sensor_pub" pkg="etddf_ros" type="publish_sensors.py" output="screen" />
 	    </group>
-
-    </group>
 
 </launch>
