@@ -6,13 +6,15 @@ package_name = 'etddf_ros2'
 setup(
     name=package_name,
     version='0.7.0',
-    # packages=find_packages(exclude=['test']),
-    packages=[package_name],
+    packages=find_packages(exclude=['test']),
+    # packages=[package_name,package_name+'.helpers'],
     package_dir={package_name: 'src'},
+    # py_modules=['helpers.msg_conversion'],
     data_files=[
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        # ('share/' + package_name + '/', ['helpers/msg_conversion.py']),
         ('share/' + package_name + '/', ['launch/agent.launch.py']),
         ('share/' + package_name + '/', ['config/ros_agent_config.yaml']),
         ('share/' + package_name + '/', ['config/points.yaml'])
@@ -40,7 +42,12 @@ ROS packaging of event-triggered decentralized data fusion python package.""",
     entry_points={
         'console_scripts': [
             'agent_wrapper = src.agent_wrapper:main',
-            'comms = src.comms:main'
-        ]
+            'comms = src.comms:main',
+            'sensors = src.publish_sensors:main',
+            'point_planner = src.point_planner:main'
+        ],
+        # package_name+'.helpers': [
+        #     '.msg_conversion = helpers.msg_conversion'
+        # ]
     }
 )

@@ -7,11 +7,11 @@ from ament_index_python.packages import get_package_share_directory
 
 def generate_launch_description():
 
-    # id_ = launch.substitutions.LaunchConfiguration('id')
-    # agent_name = launch.substitutions.LaunchConfiguration('agent_name')
-    # log_level = launch.substitutions.LaunchConfiguration('log_level')
-    # sensors = launch.substitutions.LaunchConfiguration('sensors')
-    # planner = launch.substitutions.LaunchConfiguration('planner')
+    id_ = launch.substitutions.LaunchConfiguration('id')
+    agent_name = launch.substitutions.LaunchConfiguration('agent_name')
+    log_level = launch.substitutions.LaunchConfiguration('log_level')
+    sensors = launch.substitutions.LaunchConfiguration('sensors')
+    planner = launch.substitutions.LaunchConfiguration('planner')
 
     return launch.LaunchDescription([
 
@@ -44,12 +44,13 @@ def generate_launch_description():
         ### launch ET-DDF nodes
 
         # agent wrapper
-        # launch_ros.actions.Node(
-        #     package='etddf_ros2',
-        #     node_executable='agent_wrapper',
-        #     output='screen',
-        #     parameters=['ros_agent_config.yaml']
-        # ),
+        launch_ros.actions.Node(
+            package='etddf_ros2',
+            node_executable='agent_wrapper',
+            output='screen',
+            # parameters=['ros_agent_config.yaml']
+            arguments=[id_,agent_name,log_level]
+        ),
 
         # comms module
         launch_ros.actions.Node(
@@ -57,23 +58,25 @@ def generate_launch_description():
             node_executable='comms',
             output='screen',
             # parameters=[get_package_share_directory('etddf_ros2') + '/ros_agent_config.yaml']
-            arguments=[launch.substitutions.LaunchConfiguration('agent_name')]
-        )
+            arguments=[agent_name],
+        ),
 
         ### launch simulation nodes
 
         # if launch.substitutions.LaunchConfiguration('planner'):
-        #     launch_ros.actions.Node(
-        #         package='etddf_ros2',
-        #         node_executable='point_planner.py',
-        #         output='screen',
-        #     )
+        launch_ros.actions.Node(
+            package='etddf_ros2',
+            node_executable='point_planner',
+            output='screen',
+            arguments=[agent_name]
+        ),
 
-        # if launch.substitutions.LaunchConfiguration('sensors'):
-        #     launch_ros.actions.Node(
-        #         package='etddf_ros2',
-        #         node_executable='publish_sensors.py',
-        #         output='screen'
-        #     )
+        # if sensors:
+        launch_ros.actions.Node(
+            package='etddf_ros2',
+            node_executable='sensors',
+            output='screen',
+            arguments=[agent_name]
+        )
 
     ])
