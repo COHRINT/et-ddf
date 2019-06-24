@@ -1,0 +1,41 @@
+<launch>
+
+    <arg name="config_file" default="points.yaml" />
+
+	<node pkg="tf" type="static_transform_publisher" name="world_transform"
+        args="0 0 0 0 0 0 world map 100"/>
+	
+	<rosparam command="load" file="$(find etddf_ros)/config/$(arg config_file)" />
+	
+    <!-- simulator node -->
+	<node name="point_sim_controller" pkg="etddf_ros" type="point_sim.py" />
+
+    <!-- Launch ET-DDF instances -->
+    <include file="$(find etddf_ros)/launch/agent.launch"> 
+        <arg name="id" value="0" />
+        <arg name="planner" value="true" />
+        <arg name="sensors" value="true" />
+        <!-- <arg name="log_level" value="DEBUG" /> -->
+    </include>
+
+    <include file="$(find etddf_ros)/launch/agent.launch"> 
+        <arg name="id" value="1" />
+        <arg name="planner" value="true" />
+        <arg name="sensors" value="true" />
+    </include>
+
+    <include file="$(find etddf_ros)/launch/agent.launch"> 
+        <arg name="id" value="2" />
+        <arg name="planner" value="true" />
+        <arg name="sensors" value="true" />
+    </include>
+
+    <include file="$(find etddf_ros)/launch/agent.launch"> 
+        <arg name="id" value="3" />
+        <arg name="planner" value="true" />
+        <arg name="sensors" value="true" />
+    </include>
+
+    <!-- add more agents to be launched here -->
+
+</launch>

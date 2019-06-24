@@ -1,0 +1,39 @@
+<launch>
+	<arg name="config_file" default="points.yaml" />
+
+	<node pkg="tf" type="static_transform_publisher" name="world_transform"
+args="0 0 0 0 0 0 world map 100"/>
+	
+	<rosparam command="load" file="$(find offset_etddf)/config/$(arg config_file)" />
+	
+	<node name="point_sim_controller" pkg="offset_etddf" type="point_sim.py" />
+	
+<group ns="kipp">
+	<node name="point_planner" pkg="offset_etddf" type="point_planner.py" />
+	<node name="sensor_pub" pkg="offset_etddf" type="publish_sensors.py" />
+	<!-- <node name="comms_module" pkg="offset_etddf" type="comms.py" /> -->
+	<!-- <node name="agent" pkg="offset_etddf" type="agent_wrapper.py" output="screen" /> -->
+</group>
+
+<group ns="tars">
+	<node name="point_planner" pkg="offset_etddf" type="point_planner.py" />
+	<node name="sensor_pub" pkg="offset_etddf" type="publish_sensors.py" />
+	<!-- <node name="comms_module" pkg="offset_etddf" type="comms.py" /> -->
+	<!-- <node name="agent" pkg="offset_etddf" type="agent_wrapper.py" /> -->
+</group>
+
+<!-- <group ns="case"> -->
+	<!-- <node name="point_planner" pkg="offset_etddf" type="point_planner.py" /> -->
+	<!-- <node name="sensor_pub" pkg="offset_etddf" type="publish_sensors.py" /> -->
+	<!-- <node name="comms_module" pkg="offset_etddf" type="comms.py" /> -->
+	<!-- <node name="agent" pkg="offset_etddf" type="agent_wrapper.py" output="screen" /> -->
+<!-- </group> -->
+
+<!-- <group ns="deckard"> -->
+	<!-- <node name="point_planner" pkg="offset_etddf" type="point_planner.py" /> -->
+	<!-- <node name="sensor_pub" pkg="offset_etddf" type="publish_sensors.py" /> -->
+	<!-- <node name="comms_module" pkg="offset_etddf" type="comms.py" /> -->
+	<!-- <node name="agent" pkg="offset_etddf" type="agent_wrapper.py" /> -->
+<!-- </group> -->
+
+</launch>

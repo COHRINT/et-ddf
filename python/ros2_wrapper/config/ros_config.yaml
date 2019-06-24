@@ -1,0 +1,81 @@
+# OFFSET event-triggered decentralized data fusion ROS config
+
+# update timestep, TODO: anchor to agent update rates
+dt: &dt_anchor 0.1
+
+# event-triggering parameters
+delta: &delta_anchor 1.0    # measurement-sharing Kalman innovation threshold param
+tau: &tau_anchor 5          # covariance intersection uncertainty per state threshold
+
+# adaptive CI thresholding params
+use_adaptive_tau: True
+epsilon_1: 0.1          # adaptive threshold heuristic param -- weight for change from old value
+epsilon_2: 0.01         # adaptive threshold heuristic param -- weight for balancing w/ neighbors
+
+agent_0:
+    connections: [1,2,3]
+    meas_connections: [1,2,3]
+    agent_id: 0
+    agent_update_rate: *dt_anchor
+    delta: *delta_anchor
+    tau: *tau_anchor
+    start_pos:
+        x: 0.0
+        y: 0.0
+        z: 0.0
+        phi: 0.0
+        theta: 0.0
+        psi: 0.0
+    dynamics: 'lin_ncv'
+    sensors: ['gps','range_az_el']
+
+agent_1:
+    connections: [0,2,3]
+    meas_connections: [0]
+    agent_id: 1
+    agent_update_rate: *dt_anchor
+    delta: *delta_anchor
+    tau: *tau_anchor
+    start_pos:
+        x: 0.0
+        y: 0.0
+        z: 0.0
+        phi: 0.0
+        theta: 0.0
+        psi: 0.0
+    dynamics: 'lin_ncv'
+    sensors: ['gps','range_az_el']
+
+agent_2:
+    connections: [0,1,3]
+    meas_connections: [0]
+    agent_id: 2
+    agent_update_rate: *dt_anchor
+    delta: *delta_anchor
+    tau: *tau_anchor
+    start_pos:
+        x: 0.0
+        y: 0.0
+        z: 0.0
+        phi: 0.0
+        theta: 0.0
+        psi: 0.0
+    dynamics: 'lin_ncv'
+    sensors: ['gps','range_az_el']
+
+agent_3:
+    connections: [0,1,2]
+    meas_connections: [0]
+    agent_id: 3
+    agent_update_rate: *dt_anchor
+    delta: *delta_anchor
+    tau: *tau_anchor
+    start_pos:
+        x: 0.0
+        y: 0.0
+        z: 0.0
+        phi: 0.0
+        theta: 0.0
+        psi: 0.0
+    dynamics: 'lin_ncv'
+    sensors: ['gps','range_az_el']
