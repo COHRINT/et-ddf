@@ -8,7 +8,7 @@ setup(
     description='event-triggered decentralized data fusion package',
     author='Ian Loefgren',
     author_email='ian.loefgren@colorado.edu',
-    packages=['etddf','etddf.filters']
+    packages=['etddf','etddf.filters','etddf.helpers']
 )
 
 # setup_args = generate_distutils_setup(
