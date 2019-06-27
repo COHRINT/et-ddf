@@ -8,6 +8,7 @@ import random
 from geometry_msgs.msg import TwistStamped
 import numpy as np
 
+from std_msgs.msg import Header
 from ament_index_python.packages import get_package_share_directory
 from etddf.helpers.config_handling import load_config
 
@@ -65,8 +66,9 @@ class Planner:
         else:
             self.twist = new_twist
         # new_twist.header.seq = self.seq
-        print(self.node.get_clock().now())
-        new_twist.header.stamp = self.node.get_clock().now()
+        # print(type(self.node.get_clock().now().seconds_nanoseconds()[1]))
+        new_twist.header.stamp.sec = int(self.node.get_clock().now().seconds_nanoseconds()[0])
+        new_twist.header.stamp.nanosec = int(self.node.get_clock().now().seconds_nanoseconds()[1])
         new_twist.header.frame_id = self.name + "/base_link"
         self.pub.publish(new_twist)
         self.seq += 1

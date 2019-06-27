@@ -49,7 +49,8 @@ def generate_launch_description():
             node_executable='agent_wrapper',
             output='screen',
             # parameters=['ros_agent_config.yaml']
-            arguments=[id_,agent_name,log_level]
+            arguments=[id_,agent_name,log_level],
+            node_namespace=agent_name
         ),
 
         # comms module
@@ -59,6 +60,7 @@ def generate_launch_description():
             output='screen',
             # parameters=[get_package_share_directory('etddf_ros2') + '/ros_agent_config.yaml']
             arguments=[agent_name],
+            node_namespace=agent_name
         ),
 
         ### launch simulation nodes
@@ -68,7 +70,8 @@ def generate_launch_description():
             package='etddf_ros2',
             node_executable='point_planner',
             output='screen',
-            arguments=[agent_name]
+            arguments=[agent_name],
+            node_namespace=agent_name
         ),
 
         # if sensors:
@@ -76,7 +79,8 @@ def generate_launch_description():
             package='etddf_ros2',
             node_executable='sensors',
             output='screen',
-            arguments=[agent_name]
+            arguments=[agent_name],
+            node_namespace=agent_name
         )
 
     ])

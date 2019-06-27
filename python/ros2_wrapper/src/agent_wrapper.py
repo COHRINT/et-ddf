@@ -8,6 +8,7 @@ and messages to and from other agents.
 """
 
 import os
+import sys
 import yaml
 import rclpy
 import array
@@ -17,16 +18,18 @@ import numpy as np
 from copy import deepcopy
 from scipy.linalg import block_diag
 from rclpy.node import Node
+from ament_index_python.packages import get_package_share_directory
 
 from etddf.agent import Agent
 from etddf.filters.etkf import ETKF
 from etddf.dynamics import *
+from etddf.helpers.config_handling import load_config
 
-from ros2_wrapper.helpers.msg_conversion import *
+from helpers.msg_conversion import *
 
 from std_msgs.msg import Float64
 from geometry_msgs.msg import TwistStamped
-from etddf_ros2_msgs.msg import AgentMeasurement, AgentState, gpsMeasurement, linrelMeasurement, MsgStats
+from etddf_ros2_msgs.msg import AgentMeasurement, AgentState, GpsMeasurement, LinrelMeasurement, MsgStats
 from etddf_ros2_msgs.srv import CIUpdate
 
 class AgentWrapper(object):
@@ -39,7 +42,7 @@ class AgentWrapper(object):
         config_path -- path to a config file for wrapper (default=None)
     """
 
-    def __init__(self,config_path=None):
+    def __init__(self, cfg=None, id_=None, agent_name=None, log_level='INFO'):
         
         # load config file
         # cfg = self.load_config(config_path)
@@ -50,21 +53,20 @@ class AgentWrapper(object):
 
         # set update rate
         # self.update_rate = cfg['update_rate']
-        self.agent_name = self.node.get_namespace()
-        self.agent_id = self.node.get_parameter('agent_id')
-        self.update_rate = self.node.get_parameter('agent_update_rate')
-        self.connections = self.node.get_parameter('connections')
+        self.agent_name = agent_name
+        self.agent_id = int(id_)
+        self.update_rate = cfg['agent_update_rate']
+        self.connections = cfg['connections']
         # self.meas_connections = self.node.get_parameter('meas_connections')
-        self.delta = self.node.get_parameter('delta')
-        self.tau_goal = self.node.get_parameter('tau')
+        self.delta = cfg['delta']
+        self.tau_goal = cfg['tau']
         self.tau = self.tau_goal*0.75
-        self.use_adaptive_tau = self.node.get_parameter('use_adaptive_tau')
-        self.epsilon_1 = self.node.get_parameter('epsilon_1')
-        self.epsilon_2 = self.node.get_parameter('epsilon_2')
+        self.use_adaptive_tau = cfg['use_adaptive_tau']
+        self.epsilon_1 = cfg['epsilon_1']
+        self.epsilon_2 = cfg['epsilon_2']
 
         # get agent's initial position, all others assumed 0 w/ large covariance
-        start_state = self.node.get_parameter('start_pos')
-        # TODO: add back z and zdot states
+        start_state = cfg['start_pos']
         start_state = np.array((start_state['x'],0,start_state['y'],0,start_state['z'],0))
 
         # create initial control input vector
@@ -72,26 +74,29 @@ class AgentWrapper(object):
         self.recent_twist = np.array([[0],[0],[0]])
 
         # get availalbe sensors, and noise params
-        sensors = self.node.get_parameter('sensors')
+        sensors = cfg['sensors']
         
         # get dynamics function
-        dynamics_fxn = self.node.get_parameter('dynamics').keys()[0]
-        dynamics_fxn_params = self.node.get_parameter('dynamics')[dynamics_fxn]
+        dynamics_fxn = list(cfg['dynamics'].keys())[0]
+        dynamics_fxn_params = cfg['dynamics'][dynamics_fxn]
         
         # initialize ros node
-        ROS_LOG_LEVEL = eval("rospy." + self.node.get_parameter('log_level')) # self.get_log_level(self.node.get_parameter('log_level'))
-        rospy.init_node('agent_{}'.format(self.agent_id),log_level=ROS_LOG_LEVEL)
+        # ROS_LOG_LEVEL = eval("rospy." + log_level) # self.get_log_level(self.node.get_parameter('log_level'))
+        # rospy.init_node('agent_{}'.format(self.agent_id),log_level=ROS_LOG_LEVEL)
+
+        # set logging level
+        rclpy.logging.set_logger_level('agent',self.get_log_level(log_level))
 
         # initilize ROS ndoe
         # super().__init__(self.agent_name)
 
         # create ros rate object for timing update loop
-        rate = rospy.Rate(self.update_rate)
+        # rate = rospy.Rate(self.update_rate)
 
         # instantiate Agent object
         # ground_truth = self.init_ground_truth()
         self.agent = self.init_agent(start_state,dynamics_fxn,dynamics_fxn_params,sensors)
-        self.get_logger().info('Agent {} & filters initialized.'.format(self.agent_id))
+        self.node.get_logger().info('Agent {} & filters initialized.'.format(self.agent_id))
 
         # create local and received meaurement queues
         self.local_measurement_queue = queue.LifoQueue()
@@ -110,59 +115,74 @@ class AgentWrapper(object):
 
         # create subscriber to control input
         # rospy.Subscriber('~actuator_control',ActuatorControl,self.control_input_cb)
-        self.create_subscription(TwistStamped, 'new_twist', self.control_input_cb)
+        self.node.create_subscription(TwistStamped, 'new_twist', self.control_input_cb)
 
         # create subscribers to sensors
-        sensors_agents = self.node.get_parameter('sensors')
+        sensors_agents = cfg['sensors']
         if self.agent_id in sensors_agents['gps']['agents']:
-            self.create_subscription(gpsMeasurement, 'gps', self.queue_local_measurement)
+            self.node.create_subscription(GpsMeasurement, 'gps', self.queue_local_measurement)
         if self.agent_id in sensors_agents['lin_rel']['agents']:
-            self.create_subscription(linrelMeasurement, 'lin_rel', self.queue_local_measurement)
+            self.node.create_subscription(LinrelMeasurement, 'lin_rel', self.queue_local_measurement)
 
         # create subscribers to comms module
-        self.create_subscription(AgentMeasurement, 'agent_meas_incoming', self.queue_received_measurement)
+        self.node.create_subscription(AgentMeasurement, 'agent_meas_incoming', self.queue_received_measurement)
         # rospy.Subscriber('agent_state', AgentState, self.queue_received_state)
 
         # create publishers to comms module
-        self.comms_meas_pub = self.create_publisher(AgentMeasurement, 'agent_meas_outgoing')
-        self.comms_state_pub = self.create_publisher(AgentState, 'agent_state_outgoing')
+        self.comms_meas_pub = self.node.create_publisher(AgentMeasurement, 'agent_meas_outgoing')
+        self.comms_state_pub = self.node.create_publisher(AgentState, 'agent_state_outgoing')
 
         # create publisher of local esimate
-        self.local_est_pub = self.create_publisher(AgentState, 'local_estimate')
+        self.local_est_pub = self.node.create_publisher(AgentState, 'local_estimate')
         # create CI threshold publisher
         # self.tau_pub = self.create_publisher('ci_threshold', Float64, queue_size=10)
         # create message statistics publisher and timer
-        self.msg_stats_pub = self.create_publisher(MsgStats, 'msg_stats')
-        self.msg_stats_timer = rospy.Timer(rospy.Duration(self.node.get_parameter('msg_stats_rate')),
-                                 self.publish_msg_stats)
+        self.msg_stats_pub = self.node.create_publisher(MsgStats, 'msg_stats')
+        # self.msg_stats_timer = rospy.Timer(rospy.Duration(self.node.get_parameter('msg_stats_rate')),
+        #                          self.publish_msg_stats)
+        self.msg_stats_timer = self.node.create_timer(cfg['msg_stats_rate'],self.publish_msg_stats)
 
-        # create CI update service
-        self.ci_srv = self.create_service(CIUpdate, 'ci_update', self.ci_service_handler)
+        # create CI update service and client
+        self.ci_srv = self.node.create_service(CIUpdate, 'ci_update', self.ci_service_handler)
+        self.ci_clients = []
+        for conn in self.connections[self.agent_id]:
+            srv_name = '/'+self.agent_name.split('_')[0] +'_' +str(conn) + '/ci_update'
+            self.ci_clients.append(self.node.create_client(CIUpdate, srv_name))
 
         # begin update loop
-        self.get_logger().err("Entering main loop.")
-        while not rospy.is_shutdown():
+        # self.node.get_logger().err("Entering main loop.")
+        # while not rospy.is_shutdown():
             
-            # process all queue measurements and ci messages
-            self.update()
+        #     # process all queue measurements and ci messages
+        #     self.update()
 
-            # publish state estimate
-            self.publish_estimate()
-            # publish CI threshold tau
-            # tau_msg = Float64()
-            # tau_msg.data = self.agent.tau
-            # self.tau_pub.publish(tau_msg)
+        #     # publish state estimate
+        #     self.publish_estimate()
+        #     # publish CI threshold tau
+        #     # tau_msg = Float64()
+        #     # tau_msg.data = self.agent.tau
+        #     # self.tau_pub.publish(tau_msg)
 
-            # sleep until next update
-            rate.sleep()
+        #     # sleep until next update
+        #     rate.sleep()
+
+        # create update loop timers (while not shutdown pattern not implemented in ROS2)
+        self.update_timer = self.node.create_timer(1/self.update_rate, self.update)
+        self.publish_est_timer = self.node.create_timer(1/self.update_rate, self.publish_estimate)
 
     def get_log_level(self, log_level):
         if log_level.lower() == "debug":
-            return rospy.DEBUG
+            return rclpy.logging.LoggingSeverity.DEBUG
         elif log_level.lower() == "info":
-            return rospy.INFO
+            return rclpy.logging.LoggingSeverity.INFO
         elif log_level.lower() == "warn":
-            return rospy.WARN
+            return rclpy.logging.LoggingSeverity.WARN
+        elif log_level.lower() == "error":
+            return rclpy.logging.LoggingSeverity.ERROR
+        elif log_level.lower() == "fatal":
+            return rclpy.logging.LoggingSeverity.FATAL
+        elif log_level.lower() == "unset":
+            return rclpy.logging.LoggingSeverity.UNSET
         else:
             raise Exception("Unrecognized logging level: " + log_level)
 
@@ -203,13 +223,13 @@ class AgentWrapper(object):
 
         # throw away measurements older than one update cycle
         for msg in local_measurements:
-            if rospy.Time.now() - msg.header.stamp > rospy.Duration(secs=self.update_rate):
-                how_old = (rospy.Time.now() - msg.header.stamp).to_sec()
+            if self.node.get_clock().now() - msg.header.stamp > 1/self.update_rate:
+                how_old = (self.node.get_clock().now() - msg.header.stamp).to_sec()
                 # src_agent = msg.src
                 # msg_type = msg.type
                 msg_type = msg._type.split('/')[1]
                 del msg
-                self.get_logger().warn('[Agent {}]: throwing away local {} message -- {} sec old'.format(self.agent_id,msg_type,how_old))
+                self.node.get_logger().warn('[Agent {}]: throwing away local {} message -- {} sec old'.format(self.agent_id,msg_type,how_old))
         
         return local_measurements
 
@@ -225,12 +245,12 @@ class AgentWrapper(object):
 
         # throw away measurements older than one update cycle
         for msg in received_measurements:
-            if rospy.Time.now() - msg.header.stamp > rospy.Duration(secs=self.update_rate):
-                how_old = (rospy.Time.now() - msg.header.stamp).to_sec()
+            if self.node.get_clock().now() - msg.header.stamp > 1/self.update_rate:
+                how_old = (self.node.get_clock().now() - msg.header.stamp).to_sec()
                 src_agent = msg.src
                 msg_type = msg.type
                 del msg
-                self.get_logger().warn('[Agent {}]: throwing away {} message from Agent {} -- {} sec old'.format(self.agent_id,msg_type,src_agent,how_old))
+                self.node.get_logger().warn('[Agent {}]: throwing away {} message from Agent {} -- {} sec old'.format(self.agent_id,msg_type,src_agent,how_old))
         
         return received_measurements
 
@@ -245,31 +265,44 @@ class AgentWrapper(object):
             self.agent.ci_trigger_rate = self.agent.ci_trigger_cnt / self.update_cnt
 
             # generate CI requests
-            for conn in self.connections[self.agent_id]:
+            # for conn in self.connections[self.agent_id]:
+            for client in self.ci_clients:
+                # print(client.srv_name)
                 # request state of connection and queue
-                self.get_logger().debug('[Agent {}]: waiting for CI update service from agent_{} to become available'.format(self.agent_id,conn))
-                srv_name = '/'+self.agent_name.split('_')[0] +'_' +str(conn) + '/ci_update'
-                rospy.wait_for_service(srv_name)
+                # self.node.get_logger().debug('[Agent {}]: waiting for CI update service from agent_{} to become available'.format(self.agent_id,id_))
+                # srv_name = '/'+self.agent_name.split('_')[0] +'_' +str(conn) + '/ci_update'
+                client.wait_for_service()
 
                 # create service proxy to send request
-                ci_request = rospy.ServiceProxy(srv_name,CIUpdate)
+                # ci_request = rospy.ServiceProxy(srv_name,CIUpdate)
                 # generate ros state message
-                request_msg = python2ros_state(self.agent.gen_ci_message(conn,self.neighbor_connections[conn]))
+                id_ = int(client.srv_name.split('/')[1][-1])
+                self.node.get_logger().error('id: {}'.format(id_))
+                self.node.get_logger().error('neighbor conns: {}'.format(self.neighbor_connections))
+                request_msg = python2ros_state(self.agent.gen_ci_message(id_,self.neighbor_connections[id_]))
+                # have to stamp message now, so we don't have to pass node into conversion fxn
+                if type(request_msg) is list:
+                    for msg in request_msg:
+                        msg.header.stamp.sec = int(self.node.get_clock().now().seconds_nanoseconds()[0])
+                        msg.header.stamp.nanosec = int(self.node.get_clock().now().seconds_nanoseconds()[1])
+                else:
+                    request_msg.header.stamp.sec = int(self.node.get_clock().now().seconds_nanoseconds()[0])
+                    request_msg.header.stamp.nanosec = int(self.node.get_clock().now().seconds_nanoseconds()[1])
                 
                 # send request and wait for response
-                try:
-                    res = ci_request(request_msg)
-                    self.get_logger().debug('[Agent {}]: CI update response received'.format(self.agent_id))
-                    # add response to ci queue
-                    self.ci_queue.put(deepcopy(res.response_state))
-                except rospy.ServiceException as e:
-                    self.get_logger().err('[Agent {}]: CI update service request failed: {}'.format(self.agent_id,e))
+                # try:
+                res = client.call(request_msg)
+                self.node.get_logger().debug('[Agent {}]: CI update response received'.format(self.agent_id))
+                # add response to ci queue
+                self.ci_queue.put(deepcopy(res.response_state))
+                # except rospy.ServiceException as e: #TODO: rclpy version of service exception
+                    # self.node.get_logger().err('[Agent {}]: CI update service request failed: {}'.format(self.agent_id,e))
 
     def process_ci_queue(self):
         """
         Process queued CI update messages, and perform CI and conditional updates for each.
         """
-        self.get_logger().debug('[Agent {}]: Emptying CI message queue...'.format(self.agent_id))
+        self.node.get_logger().debug('[Agent {}]: Emptying CI message queue...'.format(self.agent_id))
 
         # get current number of messages in queue
         num_messages = self.ci_queue.qsize()
@@ -279,27 +312,30 @@ class AgentWrapper(object):
 
         # throw away messages older than one update cycle
         for msg in ci_messages:
-            if rospy.Time.now() - msg.header.stamp > rospy.Duration(secs=self.update_rate):
-                how_old = (rospy.Time.now() - msg.header.stamp).to_sec()
+            if self.node.get_clock().now() - msg.header.stamp > 1/self.update_rate:
+                how_old = (self.node.get_clock().now() - msg.header.stamp).to_sec()
                 src_agent = msg.src
                 del msg
-                self.get_logger().warn('[Agent {}]: throwing away CI message from Agent {} -- {} sec old'.format(self.agent_id,src_agent,how_old))
+                self.node.get_logger().warn('[Agent {}]: throwing away CI message from Agent {} -- {} sec old'.format(self.agent_id,src_agent,how_old))
 
-        self.get_logger().debug('[Agent {}]: Grabbed {} message(s) from CI message queue.'.format(self.agent_id,num_messages))
+        self.node.get_logger().debug('[Agent {}]: Grabbed {} message(s) from CI message queue.'.format(self.agent_id,num_messages))
 
         return ci_messages
 
-    def ci_service_handler(self,req):
+    def ci_service_handler(self,req,res):
         """
         Handler for CI service requests.
         """
-        self.get_logger().debug('[Agent {}]: CI update request received'.format(self.agent_id))
+        self.node.get_logger().debug('[Agent {}]: CI update request received'.format(self.agent_id))
         # queue recevied request message
         self.ci_queue.put(deepcopy(req.request_state))
 
         # generate ci message for response
         res_msg = self.agent.gen_ci_message(req.request_state.src,
                     self.neighbor_connections[req.request_state.src])
+
+        # force src_ci_rate to be float
+        res_msg.src_ci_rate = float(res_msg.src_ci_rate)
 
         # convert to a ros message
         res_msg_ros = python2ros_state(res_msg)
@@ -321,7 +357,7 @@ class AgentWrapper(object):
         """
         # create state message
         msg = AgentState()
-        msg.header.stamp = rospy.Time.now()
+        msg.header.stamp = self.node.get_clock().now()
         msg.src = self.agent_id
         msg.src_meas_connections = self.meas_connections
         msg.src_connections = self.agent_connections
@@ -358,7 +394,7 @@ class AgentWrapper(object):
         as CI trigger rate.
         """
         msg = MsgStats()
-        msg.header.stamp = rospy.Time.now()
+        msg.header.stamp = self.node.get_clock().now()
         msg.msgs_sent = self.agent.msgs_sent
         if self.agent.total_msgs:
             msg.msg_fraction_sent = self.agent.msgs_sent / self.agent.total_msgs
@@ -369,13 +405,13 @@ class AgentWrapper(object):
         """
         Main update function to process measurements, and ci messages.
         """
-        self.get_logger().info("UPDATING")
+        self.node.get_logger().debug("UPDATING")
         # increment update count
         self.update_cnt += 1
 
         # process measurement queues
         local_measurements = self.process_local_measurement_queue()
-        self.get_logger().info("local_measurements: " + str(local_measurements))
+        self.node.get_logger().debug("local_measurements: " + str(local_measurements))
 
         # convert messages from AgentMeasurement and AgentState ROS msg types to
         # MeasurementMsg and StateMsg python msg types (they're pretty much the same)
@@ -565,12 +601,23 @@ class AgentWrapper(object):
                             0,len(x0)*self.tau_goal,len(x0)*self.tau,
                             self.use_adaptive_tau)
 
-        self.get_logger().info('[Agent {}]: Agent initialized w/ delta -- {} \t tau_goal -- {} \t tau -- {}'.format(
+        self.node.get_logger().info('[Agent {}]: Agent initialized w/ delta -- {} \t tau_goal -- {} \t tau -- {}'.format(
                         agent_id,self.delta,len(x0)*self.tau_goal,len(x0)*self.tau))
 
         return agent
 
+def main():
 
+    # get command line args (or coming from launch file)
+    cl_args = sys.argv[1:]
+
+    # load config files (instead of using parameter server)
+    agent_cfg = load_config(get_package_share_directory('etddf_ros2') + '/ros_agent_config.yaml')
+    gen_cfg = load_config(get_package_share_directory('etddf_ros2') + '/points.yaml')
+
+    aw = AgentWrapper(cfg=agent_cfg, id_=cl_args[0], agent_name=cl_args[1])
+
+    rclpy.spin(aw.node)
 
 if __name__ == "__main__":
-    AgentWrapper()
+    main()

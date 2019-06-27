@@ -11,7 +11,6 @@ import rclpy
 import numpy as np
 
 from ament_index_python.packages import get_package_share_directory
-print(sys.path)
 from etddf.helpers.config_handling import load_config
 
 from etddf_ros2_msgs.msg import AgentMeasurement, AgentState
@@ -28,18 +27,17 @@ class CommsModule(object):
         # load parameters from the parameter server
         # self.agent_name = self.node.get_namespace()
         self.agent_name = agent_name
-        self.drop_incoming_prob = self.node.get_parameter('comm_drop_prob').value
-        self.connections = self.node.get_parameter('meas_connections').value
-        print(self.connections)
+        self.drop_incoming_prob = cfg[self.agent_name]['comm_drop_prob']
+        self.connections = cfg[self.agent_name]['meas_connections']
 
         # create topic subscriptions for incoming messages (i.e | connections -> comms |-> agent)
         for sub_name in self.connections:
-            self.node.create_subscriber(AgentMeasurement, '/' + sub_name + '/comms_meas', self.incoming_message)
-            self.node.create_subscriber(AgentState, '/' + sub_name + '/comms_state', self.incoming_message)
+            self.node.create_subscription(AgentMeasurement, '/' + sub_name + '/comms_meas', self.incoming_message)
+            self.node.create_subscription(AgentState, '/' + sub_name + '/comms_state', self.incoming_message)
 
         # create topic subscriptions for outgoing messages (i.e. | agent -> comms | -> connections)
-        self.node.create_subscriber(AgentMeasurement, 'agent_meas_outgoing', self.outgoing_message)
-        self.node.create_subscriber(AgentState, 'agent_state_outgoing', self.outgoing_message)
+        self.node.create_subscription(AgentMeasurement, 'agent_meas_outgoing', self.outgoing_message)
+        self.node.create_subscription(AgentState, 'agent_state_outgoing', self.outgoing_message)
 
         # create publishers for outgoing topics (i.e agent -> | comms -> connections |)
         self.comms_meas_pub = self.node.create_publisher(AgentMeasurement, 'comms_meas')
@@ -53,7 +51,7 @@ class CommsModule(object):
         self.node.get_logger().info('Initialized {} comms module'.format(self.agent_name))
 
         # wait for messages
-        self.node.spin()
+        # self.node.spin()
 
     def incoming_message(self,msg):
         """
@@ -99,13 +97,14 @@ def main():
 
     # get command line args (or coming from launch file)
     cl_args = sys.argv[1:]
-    print(cl_args)
 
     # load config files (instead of using parameter server)
     # agent_cfg = load_config(get_package_share_directory('etddf_ros2') + '/ros_agent_config.yaml')
     gen_config = load_config(get_package_share_directory('etddf_ros2') + '/points.yaml')
 
-    CommsModule(cfg=gen_config,agent_name=cl_args[0])
+    cm = CommsModule(cfg=gen_config,agent_name=cl_args[0])
+
+    rclpy.spin(cm.node)
 
 if __name__ == "__main__":
     main()

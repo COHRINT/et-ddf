@@ -16,6 +16,7 @@ setup(
         ('share/' + package_name, ['package.xml']),
         # ('share/' + package_name + '/', ['helpers/msg_conversion.py']),
         ('share/' + package_name + '/', ['launch/agent.launch.py']),
+        ('share/' + package_name + '/', ['launch/etddf.launch.py']),
         ('share/' + package_name + '/', ['config/ros_agent_config.yaml']),
         ('share/' + package_name + '/', ['config/points.yaml'])
     ],
@@ -44,7 +45,8 @@ ROS packaging of event-triggered decentralized data fusion python package.""",
             'agent_wrapper = src.agent_wrapper:main',
             'comms = src.comms:main',
             'sensors = src.publish_sensors:main',
-            'point_planner = src.point_planner:main'
+            'point_planner = src.point_planner:main',
+            'point_sim = src.point_sim:main'
         ],
         # package_name+'.helpers': [
         #     '.msg_conversion = helpers.msg_conversion'

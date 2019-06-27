@@ -9,6 +9,7 @@ from geometry_msgs.msg import Pose
 from decimal import Decimal
 import numpy as np
 # import tf2
+from functools import partial
 
 from etddf.helpers.config_handling import load_config
 from ament_index_python.packages import get_package_share_directory
@@ -35,7 +36,7 @@ class SensorPub:
 
         self.name = name
         for rob in active_robots:
-            self.node.create_subscription(Odometry, '/' + rob + '/pose_gt', self.pose_callback)
+            self.node.create_subscription(Odometry, '/' + rob + '/pose_gt', partial(self.pose_callback, rob))
             self.auvs[rob] = None
         self.pose = None
 
@@ -73,8 +74,9 @@ class SensorPub:
         self.gpsSeq = 0
         self.linrelSeq = 0
 
-    def pose_callback(self, msg):
-        topic = msg._connection_header['topic']
+    def pose_callback(self, name, msg):
+        # topic = msg._connection_header['topic']
+        topic = name
         auv = None
         for auv_name in self.auvs.keys():
             if auv_name in topic:
@@ -138,8 +140,9 @@ class SensorPub:
         meas.y = y
         meas.z = z
 
-        meas.header.seq = self.gpsSeq
-        meas.header.stamp = self.node.get_clock().now()
+        # meas.header.seq = self.gpsSeq
+        meas.header.stamp.sec = int(self.node.get_clock().now().seconds_nanoseconds()[0])
+        meas.header.stamp.nanosec = int(self.node.get_clock().now().seconds_nanoseconds()[1])
         # meas.header.frame_id = TODO proper reference frame
         self.gps_pub.publish(meas)
         self.gpsSeq += 1
@@ -151,8 +154,9 @@ class SensorPub:
                 continue
 
             # Measurement
-            meas.header.seq = self.linrelSeq
-            meas.header.stamp = self.node.get_clock().now()
+            # meas.header.seq = self.linrelSeq
+            meas.header.stamp.sec = int(self.node.get_clock().now().seconds_nanoseconds()[0])
+            meas.header.stamp.nanosec = int(self.node.get_clock().now().seconds_nanoseconds()[1])
             # meas.header.frame_id = TODO proper reference frame
             meas.robot_measured = auv
             x,y,z = self.get_distance(self.pose.position, self.auvs[auv].pose.pose.position, linear=True)

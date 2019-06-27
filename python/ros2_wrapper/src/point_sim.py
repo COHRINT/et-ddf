@@ -3,41 +3,53 @@ from __future__ import division
 """
 Simulates the movements of points in space
 """
-import rospy
+
+import sys
+import rclpy
 import numpy as np
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Point, Pose, TwistStamped
 import random
-import tf
+# import tf
+from functools import partial
+
+from etddf.helpers.config_handling import load_config
+from ament_index_python.packages import get_package_share_directory
 
 ODOM_INDEX = 0
 PUB_INDEX = 1
 
 class PointSim:
 
-    def __init__(self):
-        rospy.loginfo("Point Sim and Controller Initialized")
-        self.load_auvs()
-        self.update_period = 1 / int(rospy.get_param('sim/update_freq'))
-        self.timer = rospy.Timer(rospy.Duration(self.update_period), self.update_poses)
+    def __init__(self,cfg):
 
-    def load_auvs(self):
+        # initialize node
+        rclpy.init()
+        self.node = rclpy.create_node('point_sim_controller')
+
+        self.node.get_logger().info("Point Sim and Controller Initialized")
+        self.load_auvs(cfg)
+        self.update_period = 1 / int(cfg['sim']['update_freq'])
+        self.timer = self.node.create_timer(self.update_period, self.update_poses)
+
+    def load_auvs(self,cfg):
         self.auvs = {} # each auv has an odom
-        auv_list = rospy.get_param('/active_auvs')
+        auv_list = cfg['active_auvs']
         for auv in auv_list:
             start_odom = Odometry()
-            start_pos = rospy.get_param(auv+'/start_pos', 'random')
+            start_pos = cfg[auv]['start_pos']
             if start_pos == "random":
-                start_odom.pose.pose = self.get_random_pose()
+                start_odom.pose.pose = self.get_random_pose(cfg)
             else:
                 start_odom.pose.pose = self.load_start_pose(start_pos)
-            start_odom.header.seq = 0
-            start_odom.header.stamp = rospy.get_rostime()
+            # start_odom.header.seq = 0
+            start_odom.header.stamp.sec = int(self.node.get_clock().now().seconds_nanoseconds()[0])
+            start_odom.header.stamp.nanosec = int(self.node.get_clock().now().seconds_nanoseconds()[1])
             start_odom.header.frame_id = 'world'
             start_odom.child_frame_id = auv + '/base_link'
-            pub = rospy.Publisher(auv + '/pose_gt', Odometry, queue_size=10)
-            self.auvs[auv] = [start_odom, pub]
-            rospy.Subscriber(auv + '/new_twist', TwistStamped, self.control_callback)
+            self.pub = self.node.create_publisher(Odometry, auv + '/pose_gt')
+            self.auvs[auv] = [start_odom, self.pub]
+            self.node.create_subscription(TwistStamped, auv + '/new_twist', partial(self.control_callback, auv))
 
     def load_start_pose(self, pose_list):
         pose = Pose()
@@ -46,36 +58,36 @@ class PointSim:
         pose.position.z = pose_list['z']
         roll, pitch = 0,0
         yaw = pose_list['psi']
-        quat_list = tf.transformations.quaternion_from_euler(roll, pitch, yaw)
+        quat_list = self.quaternion_from_euler(roll, pitch, yaw)
         pose.orientation.x = quat_list[0]
         pose.orientation.y = quat_list[1]
         pose.orientation.z = quat_list[2]
         pose.orientation.w = quat_list[3]
         return pose
 
-    def get_random_pose(self):
-        [min_point, max_point] = rospy.get_param('sim/random_pose_min_max')
+    def get_random_pose(self,cfg):
+        [min_point, max_point] = cfg['sim']['random_pose_min_max']
         size = max_point - min_point
         pose = Pose()
         pose.position.x = random.random() * size + min_point
         pose.position.y = random.random() * size + min_point
         pose.position.z = random.random() * size + min_point
-        if rospy.get_param('sim/random_yaw'):
+        if cfg['sim']['random_yaw']:
             yaw = random.random() * np.pi * 2
         else:
             yaw = 0
         roll, pitch = 0,0
-        quat_list = tf.transformations.quaternion_from_euler(roll, pitch, yaw)
+        quat_list = self.quaternion_from_euler(roll, pitch, yaw)
         pose.orientation.x = quat_list[0]
         pose.orientation.y = quat_list[1]
         pose.orientation.z = quat_list[2]
         pose.orientation.w = quat_list[3]
         return pose
 
-    def update_poses(self, msg):
+    def update_poses(self):
         for auv in self.auvs:
             odom = self.auvs[auv][ODOM_INDEX]
-            roll, pitch, yaw = tf.transformations.euler_from_quaternion(( odom.pose.pose.orientation.x, \
+            roll, pitch, yaw = self.euler_from_quaternion(( odom.pose.pose.orientation.x, \
                                                                           odom.pose.pose.orientation.y, \
                                                                           odom.pose.pose.orientation.z, \
                                                                           odom.pose.pose.orientation.w))
@@ -87,7 +99,7 @@ class PointSim:
             pitch = self.correct_angles(pitch)
             yaw = self.correct_angles(yaw)
 
-            quat_list = tf.transformations.quaternion_from_euler(roll, pitch, yaw)
+            quat_list = self.quaternion_from_euler(roll, pitch, yaw)
             odom.pose.pose.orientation.x = quat_list[0]
             odom.pose.pose.orientation.y = quat_list[1]
             odom.pose.pose.orientation.z = quat_list[2]
@@ -97,7 +109,8 @@ class PointSim:
             odom.pose.pose.position.y += odom.twist.twist.linear.y * self.update_period
             odom.pose.pose.position.z += odom.twist.twist.linear.z * self.update_period
 
-            odom.header.stamp = rospy.get_rostime()
+            odom.header.stamp.sec = int(self.node.get_clock().now().seconds_nanoseconds()[0])
+            odom.header.stamp.nanosec = int(self.node.get_clock().now().seconds_nanoseconds()[1])
 
             self.auvs[auv][ODOM_INDEX] = odom
             self.auvs[auv][PUB_INDEX].publish(odom)
@@ -111,8 +124,9 @@ class PointSim:
                 angle -= 2 * np.pi
         return angle
         
-    def control_callback(self, msg):
-        topic = msg._connection_header['topic']
+    def control_callback(self, name, msg):
+        # topic = msg._connection_header['topic']
+        topic = name
         auv = None
         for auv_name in self.auvs:
             if auv_name in topic:
@@ -126,14 +140,61 @@ class PointSim:
         self.auvs[auv][ODOM_INDEX].header.frame_id = 'world'
         self.auvs[auv][ODOM_INDEX].twist.twist.linear = msg.twist.linear
         self.auvs[auv][ODOM_INDEX].twist.twist.angular = msg.twist.angular
-        rospy.loginfo(self.auvs[auv][ODOM_INDEX])
+        # self.node.get_logger().info(self.auvs[auv][ODOM_INDEX])
 
         # Republish the new transform msg.header.frame_id -> world
 
+    def euler_from_quaternion(self,quat):
+        """
+        Converts quaternion (w in last place) to euler roll, pitch, yaw
+        quat = [x, y, z, w]
+        """
+        x = quat[0]
+        y = quat[1]
+        z = quat[2]
+        w = quat[3]
+
+        sinr_cosp = 2 * (w*x + y*z)
+        cosr_cosp = 1 - 2*(x*x + y*y)
+        roll = np.arctan2(sinr_cosp,cosr_cosp)
+
+        sinp = 2 * (w*y - z*x)
+        pitch = np.arcsin(sinp)
+
+        siny_cosp = 2 * (w*z + x*y)
+        cosy_cosp = 1 - 2 * (y*y + z*z)
+        yaw = np.arctan2(siny_cosp,cosy_cosp)
+
+        return [roll, pitch, yaw]
+
+    def quaternion_from_euler(self,roll,pitch,yaw):
+        """
+        Converts euler roll, pitch, yaw to quaternion (w in last place)
+        """
+        cy = np.cos(yaw*0.5)
+        sy = np.sin(yaw*0.5)
+        cp = np.cos(pitch*0.5)
+        sp = np.sin(pitch*0.5)
+        cr = np.cos(roll*0.5)
+        sr = np.sin(roll*0.5)
+
+        x = cy * cp * sr - sy * sp * cr
+        y = sy * cp * sr + cy * sp * cr
+        z = sy * cp * cr - cy * sp * sr
+        w = cy * cp * cr + sy * sp * sr
+
+        return [x,y,z,w]
+
 def main():
-    rospy.init_node('point_sim_contoller')
-    ps = PointSim()
-    rospy.spin()
+
+    # get cl args
+    # cl_args = sys.argv[1:]
+
+    # load config
+    gen_cfg = load_config(get_package_share_directory('etddf_ros2')+'/points.yaml')
+
+    ps = PointSim(gen_cfg)
+    rclpy.spin(ps.node)
 
 if __name__ == "__main__":
     main()
