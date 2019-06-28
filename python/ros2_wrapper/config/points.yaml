@@ -39,15 +39,15 @@ active_auvs:
 agent_0:
   planner: linear
   start_pos:           # either x,y,z,psi or 'random'
-    x: 5
-    y: 0
-    z: 3
+    x: 5.0
+    y: 0.0
+    z: 3.0
     psi: 1.57
   start_twist:
     x: 0.1
     y: 0.0
-    z: 0
-    psi: 0
+    z: 0.0
+    psi: 0.0
   agent_id: 0
   comm_drop_prob: 0.0
   meas_connections: ['agent_1','agent_2']
@@ -56,15 +56,15 @@ agent_0:
 agent_1:
   planner: linear
   start_pos:           # either x,y,z,psi or 'random'
-    x: 0
-    y: 5
-    z: 3
-    psi: 0
+    x: 0.0
+    y: 5.0
+    z: 3.0
+    psi: 0.0
   start_twist:
     x: 0.0
     y: 0.1
-    z: 0
-    psi: 0
+    z: 0.0
+    psi: 0.0
   agent_id: 1
   comm_drop_prob: 0.0
   meas_connections: ['agent_0']
@@ -73,15 +73,15 @@ agent_1:
 agent_2:
   planner: linear
   start_pos:           # either x,y,z,psi or 'random'
-    x: 2
-    y: 2
-    z: 3
-    psi: 0
+    x: 2.0
+    y: 2.0
+    z: 3.0
+    psi: 0.0
   start_twist:
     x: -0.1
     y: 0.0
-    z: 0
-    psi: 0
+    z: 0.0
+    psi: 0.0
   agent_id: 2
   comm_drop_prob: 0.0
   meas_connections: ['agent_0','agent_3']
@@ -90,15 +90,15 @@ agent_2:
 agent_3:
   planner: linear
   start_pos:           # either x,y,z,psi or 'random'
-    x: -2
-    y: -2
-    z: 3
-    psi: 0
+    x: -2.0
+    y: -2.0
+    z: 3.0
+    psi: 0.0
   start_twist:
     x: 0.0
     y: -0.1
-    z: 0
-    psi: 0
+    z: 0.0
+    psi: 0.0
   agent_id: 3
   comm_drop_prob: 0.0
   meas_connections: ['agent_2']
