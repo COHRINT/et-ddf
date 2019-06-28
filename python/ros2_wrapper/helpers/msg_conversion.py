@@ -6,11 +6,11 @@ This is to facilitate keeping the python etddf library under the hood as
 seperate as possible from ROS.
 """
 
-import rospy
+import rclpy
 import numpy as np
 
 from etddf.helpers.msg_handling import MeasurementMsg, StateMsg
-from etddf_ros2.msg import AgentMeasurement, AgentState
+from etddf_ros2_msgs.msg import AgentMeasurement, AgentState, LinrelMeasurement, GpsMeasurement
 
 def gen_measurement_msg(agent_id,msg):
         """
@@ -35,18 +35,17 @@ def gen_measurement_msg(agent_id,msg):
                 new_msg = AgentMeasurement()
 
                 # new_msg.type = msg._type.split('/')[1]
-                new_msg.header.stamp = rospy.Time.now()
+                # new_msg.header.stamp = rospy.Time.now()
                 new_msg.src = agent_id
-
-                if m._type == 'etddf_ros2/linrelMeasurement':
+                if type(m) == LinrelMeasurement:
                     new_msg.type = 'rel'
                     new_msg.data = [m.x, m.y, m.z]
                     new_msg.target = int(m.robot_measured.split("_")[1])
-                elif m._type == 'etddf_ros2/gpsMeasurement':
+                elif type(m) == GpsMeasurement:
                     new_msg.type = 'abs'
                     new_msg.data = [m.x, m.y, m.z]
 
-                new_msg.status = [1 for x in new_msg.data]
+                new_msg.status = [True for x in new_msg.data]
 
                 meas_msg.append(new_msg)
 
@@ -57,18 +56,18 @@ def gen_measurement_msg(agent_id,msg):
             meas_msg = AgentMeasurement()
 
             # meas_msg.type = msg._type.split('/')[1]
-            meas_msg.header.stamp = rospy.Time.now()
+            # meas_msg.header.stamp = rospy.Time.now()
             meas_msg.src = agent_id
 
-            if msg._type == 'etddf_ros2/linrelMeasurement':
+            if type(msg) == LinrelMeasurement:
                 meas_msg.type = 'rel'
                 meas_msg.data = [msg.x, msg.y, msg.z]
                 new_msg.target = int(m.robot_measured.split("_")[1])
-            elif msg._type == 'etddf_ros2/gpsMeasurement':
+            elif type(msg) == GpsMeasurement:
                 meas_msg.type = 'abs'
                 meas_msg.data = [msg.x, msg.y, msg.z]
 
-            meas_msg.status = [1 for x in meas_msg.data]
+            meas_msg.status = [True for x in meas_msg.data]
 
             return meas_msg
 
@@ -97,7 +96,7 @@ def ros2python_measurement(msg_ros):
                                     msg.status,
                                     msg.type,
                                     msg.data,
-                                    msg.header.stamp.to_sec())
+                                    (msg.header.stamp.sec*1e9 + msg.header.stamp.nanosec)/1e9)
 
             msg_python.append(new_msg)
 
@@ -111,7 +110,7 @@ def ros2python_measurement(msg_ros):
                                 msg.status,
                                 msg.type,
                                 msg.data,
-                                msg.header.stamp.to_sec())
+                                (msg.header.stamp.sec*1e9 + msg.header.stamp.nanosec)/1e9)
 
         return msg_python
 
@@ -142,7 +141,7 @@ def ros2python_state(msg_ros):
                                 np.array(msg.mean,ndmin=2).transpose(),
                                 inflated_cov,
                                 msg.src_ci_rate,
-                                msg.header.stamp.to_sec())
+                                (msg.header.stamp.sec*1e9 + msg.header.stamp.nanosec)/1e9)
 
             msg_python.append(new_msg)
 
@@ -159,7 +158,7 @@ def ros2python_state(msg_ros):
                             np.array(msg_ros.mean,ndmin=2).transpose(),
                             inflated_cov,
                             msg_ros.src_ci_rate,
-                            msg_ros.header.stamp.to_sec())
+                            (msg.header.stamp.sec*1e9 + msg.header.stamp.nanosec)/1e9)
 
         return msg_python
 
@@ -187,10 +186,10 @@ def python2ros_measurement(msg_python):
             new_msg.src = msg.src
             new_msg.dest = msg.dest
             new_msg.target = msg.target
-            new_msg.status = msg.status
+            new_msg.status = [bool(x) for x in msg.status]
             new_msg.type = msg.type_
             new_msg.data = msg.data
-            new_msg.header.stamp = rospy.Time.now()
+            # new_msg.header.stamp = rospy.Time.now()
 
             msg_ros.append(new_msg)
 
@@ -203,10 +202,10 @@ def python2ros_measurement(msg_python):
         new_msg.src = msg.src
         new_msg.dest = msg.dest
         new_msg.target = msg.target
-        new_msg.status = msg.status
+        new_msg.status = [bool(x) for x in msg.status]
         new_msg.type = msg.type_
         new_msg.data = msg.data
-        new_msg.header.stamp = rospy.Time.now()
+        # new_msg.header.stamp = rospy.Time.now()
 
         return msg_ros
 
@@ -232,7 +231,7 @@ def python2ros_state(msg_python):
 
             new_msg = AgentState()
                 
-            new_msg.header.stamp = rospy.Time.now()
+            # new_msg.header.stamp = rospy.Time.now()
             new_msg.src = msg.src
             new_msg.dest = msg.dest
             new_msg.src_meas_connections = msg.src_meas_connections
@@ -251,7 +250,7 @@ def python2ros_state(msg_python):
 
         msg_ros = AgentState()
                 
-        msg_ros.header.stamp = rospy.Time.now()
+        # msg_ros.header.stamp = rospy.Time.now()
         msg_ros.src = msg_python.src
         msg_ros.dest = msg_python.dest
         msg_ros.src_meas_connections = msg_python.src_meas_connections

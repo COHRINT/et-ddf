@@ -53,8 +53,8 @@ class SensorPub:
         # self.usbl_timer = rospy.Timer(rospy.Duration(usbl_rate), self.usbl_callback)
         gps_rate = 1 / float(cfg['sensors']['gps_pub_rate'])
         linrel_rate = 1 / float(cfg['sensors']['lin_rel_pub_rate'])
-        self.gps_timer = self.node.create_timer(1/gps_rate, self.gps_callback)
-        self.linrel_timer = self.node.create_timer(1/linrel_rate, self.linrel_callback)
+        self.gps_timer = self.node.create_timer(gps_rate, self.gps_callback)
+        self.linrel_timer = self.node.create_timer(linrel_rate, self.linrel_callback)
 
         # Noise
         self.noise = cfg['sensors']['noise']
