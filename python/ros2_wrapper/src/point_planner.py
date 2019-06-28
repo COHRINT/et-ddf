@@ -83,17 +83,22 @@ class Planner:
 
 def main():
 
-    # get launch arguments
-    cl_args = sys.argv[1:]
+    try:
+        # get launch arguments
+        cl_args = sys.argv[1:]
 
-    # load config
-    gen_cfg = load_config(get_package_share_directory('etddf_ros2')+'/points.yaml')
+        # load config
+        gen_cfg = load_config(get_package_share_directory('etddf_ros2')+'/points.yaml')
 
-    name = cl_args[0]
-    update_period = 1 / int(gen_cfg['planners']['update_freq'])
+        name = cl_args[0]
+        update_period = 1 / int(gen_cfg['planners']['update_freq'])
 
-    p = Planner(name, update_period, gen_cfg)
-    rclpy.spin(p.node)
+        p = Planner(name, update_period, gen_cfg)
+        rclpy.spin(p.node)
+    except KeyboardInterrupt as e:
+        print(e)
+        p.node.destroy_node()
+        rclpy.shutdown()
     
 if __name__ == "__main__":
     main()

@@ -187,14 +187,19 @@ class PointSim:
 
 def main():
 
-    # get cl args
-    # cl_args = sys.argv[1:]
+    try:
+        # get cl args
+        # cl_args = sys.argv[1:]
 
-    # load config
-    gen_cfg = load_config(get_package_share_directory('etddf_ros2')+'/points.yaml')
+        # load config
+        gen_cfg = load_config(get_package_share_directory('etddf_ros2')+'/points.yaml')
 
-    ps = PointSim(gen_cfg)
-    rclpy.spin(ps.node)
+        ps = PointSim(gen_cfg)
+        rclpy.spin(ps.node)
+    except KeyboardInterrupt as e:
+        print(e)
+        ps.node.destroy_node()
+        rclpy.shutdown()
 
 if __name__ == "__main__":
     main()

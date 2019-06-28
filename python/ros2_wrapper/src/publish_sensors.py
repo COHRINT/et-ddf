@@ -327,17 +327,22 @@ def test1():
 
 def main():
 
-    cl_args = sys.argv[1:]
+    try:
+        cl_args = sys.argv[1:]
 
-    # agent_cfg = load_config(get_package_share_directory('etddf_ros2')+'/ros_agent_config.yaml')
-    gen_cfg = load_config(get_package_share_directory('etddf_ros2')+'/points.yaml')
+        # agent_cfg = load_config(get_package_share_directory('etddf_ros2')+'/ros_agent_config.yaml')
+        gen_cfg = load_config(get_package_share_directory('etddf_ros2')+'/points.yaml')
 
-    name = cl_args[0]
-    active_auvs = gen_cfg[name]['meas_connections']
-    active_auvs.append(name)
-    
-    sp = SensorPub(name, active_auvs, gen_cfg)
-    rclpy.spin(sp.node)
+        name = cl_args[0]
+        active_auvs = gen_cfg[name]['meas_connections']
+        active_auvs.append(name)
+        
+        sp = SensorPub(name, active_auvs, gen_cfg)
+        rclpy.spin(sp.node)
+    except KeyboardInterrupt as e:
+        print(e)
+        sp.node.destroy_node()
+        rclpy.shutdown()
 
 if __name__ == "__main__":
     main()
