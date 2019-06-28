@@ -12,15 +12,10 @@ planners:
 
 sensors:
   noise: true           # bool
-  depth_pub_rate: 0.00000001
-  usbl_pub_rate: 0.5
-  distance_res: 1       # m (number of decimal points)
-  angular_res: 1        # degrees (number of decimal points)
   depth_res: 2          # m (number of decimal points)
   positioning_res: 1    # m (number of decimal points)  
   distance_noise: 1     # m
   angular_noise: 1      # degrees
-  depth_noise: 0.03     # m
   gps_noise: 1          # m std dev
   lin_rel_noise: 1.77       # m std dev
   gps_pub_rate: 5
@@ -31,10 +26,6 @@ active_auvs:
   - agent_1
   - agent_2
   - agent_3
-  # - case
-  # - deckard
-  # - hal
-  # - ava
 
 agent_0:
   planner: linear
@@ -103,33 +94,3 @@ agent_3:
   comm_drop_prob: 0.0
   meas_connections: ['agent_2']
   agent_update_rate: 5 # [Hz]
-
-case:
-  planner: linear
-  start_pos: random
-  start_twist: random
-  agent_id: 2
-  comm_drop_prob: 0.0
-  connections: ['kipp']
-  agent_update_rate: 1.0 # [Hz]
-
-deckard:
-  planner: linear
-  start_pos: random
-  start_twist: random
-  agent_id: 3
-  comm_drop_prob: 0.0
-  connections: ['kipp']
-  agent_update_rate: 1.0 # [Hz]
-
-hal:
-  planner: linear
-  start_pos: random
-  start_twist: random
-  comm_drop_prob: 0.0
-
-ava:
-  planner: linear
-  start_pos: random
-  start_twist: random
-  comm_drop_prob: 0.0
