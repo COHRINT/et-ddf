@@ -4,12 +4,12 @@
 Performance visualization for applications of ET-DDF.
 """
 
-import rospy
+import rclpy
 import numpy as np
 
-from ros_wrapper.helpers.msg_conversion import inflate_covariance
+from helpers.msg_conversion import inflate_covariance
 
-from etddf_ros.msg import AgentState, AgentMeasurement
+from etddf_ros2_msgs.msg import AgentState, AgentMeasurement
 from std_msgs.msg import Float64
 from geometry_msgs.msg import Point
 from nav_msgs.msg import Odometry
@@ -26,44 +26,42 @@ class PerformanceViz(object):
         
 
         # initialize ros node
-        rospy.init_node('performance_viz')
+        rclpy.init()
+        self.node = rclpy.create_node('performance_viz')
 
         # create subscribers to all estimate and ground truth topics
-        rospy.Subscriber('/bluerov2_0/local_estimate',AgentState,self.estimate_cb_0)
-        rospy.Subscriber('/bluerov2_1/local_estimate',AgentState,self.estimate_cb_1)
-        rospy.Subscriber('/bluerov2_2/local_estimate',AgentState,self.estimate_cb_2)
-        rospy.Subscriber('/bluerov2_3/local_estimate',AgentState,self.estimate_cb_3)
+        self.node.create_subscription(AgentState, '/agent_0/local_estimate', self.estimate_cb_0)
+        self.node.create_subscription(AgentState, '/agent_1/local_estimate', self.estimate_cb_1)
+        self.node.create_subscription(AgentState, '/agent_2/local_estimate', self.estimate_cb_2)
+        self.node.create_subscription(AgentState, '/agent_3/local_estimate', self.estimate_cb_3)
 
-        rospy.Subscriber('/bluerov2_0/pose_gt',Odometry,self.gt_cb_0)
-        rospy.Subscriber('/bluerov2_1/pose_gt',Odometry,self.gt_cb_1)
-        rospy.Subscriber('/bluerov2_2/pose_gt',Odometry,self.gt_cb_2)
-        rospy.Subscriber('/bluerov2_3/pose_gt',Odometry,self.gt_cb_3)
-
-        # create publishers for estimate error
-        self.est_err_pub_0 = rospy.Publisher('/bluerov2_0/estimate_error',Point,queue_size=10)
-        self.est_err_pub_1 = rospy.Publisher('/bluerov2_1/estimate_error',Point,queue_size=10)
-        self.est_err_pub_2 = rospy.Publisher('/bluerov2_2/estimate_error',Point,queue_size=10)
-        self.est_err_pub_3 = rospy.Publisher('/bluerov2_3/estimate_error',Point,queue_size=10)
+        self.node.create_subscription(Odometry, '/agent_0/pose_gt', self.gt_cb_0)
+        self.node.create_subscription(Odometry, '/agent_1/pose_gt', self.gt_cb_1)
+        self.node.create_subscription(Odometry, '/agent_2/pose_gt', self.gt_cb_2)
+        self.node.create_subscription(Odometry, '/agent_3/pose_gt', self.gt_cb_3)
 
         # create publishers for estimate error
-        self.est_cov_pub_0 = rospy.Publisher('/bluerov2_0/estimate_covariance',Point,queue_size=10)
-        self.est_cov_pub_1 = rospy.Publisher('/bluerov2_1/estimate_covariance',Point,queue_size=10)
-        self.est_cov_pub_2 = rospy.Publisher('/bluerov2_2/estimate_covariance',Point,queue_size=10)
-        self.est_cov_pub_3 = rospy.Publisher('/bluerov2_3/estimate_covariance',Point,queue_size=10)
+        self.est_err_pub_0 = self.node.create_publisher(Point, '/agent_0/estimate_error')
+        self.est_err_pub_1 = self.node.create_publisher(Point, '/agent_1/estimate_error')
+        self.est_err_pub_2 = self.node.create_publisher(Point, '/agent_2/estimate_error')
+        self.est_err_pub_3 = self.node.create_publisher(Point, '/agent_3/estimate_error')
+
+        # create publishers for estimate error
+        self.est_cov_pub_0 = self.node.create_publisher(Point, '/agent_0/estimate_covariance')
+        self.est_cov_pub_1 = self.node.create_publisher(Point, '/agent_1/estimate_covariance')
+        self.est_cov_pub_2 = self.node.create_publisher(Point, '/agent_2/estimate_covariance')
+        self.est_cov_pub_3 = self.node.create_publisher(Point, '/agent_3/estimate_covariance')
 
         # create MSE publishers
-        self.mse_pub_0 = rospy.Publisher('/bluerov2_0/position_mse',Float64,queue_size=10)
-        self.mse_pub_1 = rospy.Publisher('/bluerov2_1/position_mse',Float64,queue_size=10)
-        self.mse_pub_2 = rospy.Publisher('/bluerov2_2/position_mse',Float64,queue_size=10)
-        self.mse_pub_3 = rospy.Publisher('/bluerov2_3/position_mse',Float64,queue_size=10)
+        self.mse_pub_0 = self.node.create_publisher(Float64, '/agent_0/position_mse')
+        self.mse_pub_1 = self.node.create_publisher(Float64, '/agent_1/position_mse')
+        self.mse_pub_2 = self.node.create_publisher(Float64, '/agent_2/position_mse')
+        self.mse_pub_3 = self.node.create_publisher(Float64, '/agent_3/position_mse')
 
         self.recent_ground_truth_0 = [0,0,0]
         self.recent_ground_truth_1 = [0,0,0]
         self.recent_ground_truth_2 = [0,0,0]
         self.recent_ground_truth_3 = [0,0,0]
-
-        # wait for messages
-        rospy.spin()
 
     def estimate_cb_0(self,msg):
         """
@@ -193,10 +191,16 @@ class PerformanceViz(object):
         self.recent_ground_truth_3[1] = msg.pose.pose.position.y
         self.recent_ground_truth_3[2] = msg.pose.pose.position.z
 
+def main():
 
-
-
+    try:
+        pv = PerformanceViz()
+        rclpy.spin(pv.node)
+    except KeyboardInterrupt as e:
+        print(e)
+        pv.node.destroy_node()
+        rclpy.shutdown()
 
 if __name__ == "__main__":
-    PerformanceViz()
+    main()
 
