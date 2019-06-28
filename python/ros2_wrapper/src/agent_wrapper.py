@@ -85,7 +85,8 @@ class AgentWrapper(object):
         # rospy.init_node('agent_{}'.format(self.agent_id),log_level=ROS_LOG_LEVEL)
 
         # set logging level
-        rclpy.logging.set_logger_level('agent',self.get_log_level(log_level))
+        self.node.get_logger().set_level(self.get_log_level(log_level))
+        self.node.get_logger().info('Set logging level to {}'.format(str(self.get_log_level(log_level))))
 
         # initilize ROS ndoe
         # super().__init__(self.agent_name)
@@ -140,14 +141,28 @@ class AgentWrapper(object):
         self.msg_stats_pub = self.node.create_publisher(MsgStats, 'msg_stats')
         # self.msg_stats_timer = rospy.Timer(rospy.Duration(self.node.get_parameter('msg_stats_rate')),
         #                          self.publish_msg_stats)
-        self.msg_stats_timer = self.node.create_timer(cfg['msg_stats_rate'],self.publish_msg_stats)
+        self.msg_stats_timer = self.node.create_timer(1/cfg['msg_stats_rate'],self.publish_msg_stats)
 
         # create CI update service and client
-        self.ci_srv = self.node.create_service(CIUpdate, 'ci_update', self.ci_service_handler)
-        self.ci_clients = []
+        # self.ci_srv = self.node.create_service(CIUpdate, 'ci_update', self.ci_service_handler)
+        # self.ci_clients = []
+        # for conn in self.connections[self.agent_id]:
+        #     srv_name = '/'+self.agent_name.split('_')[0] +'_' +str(conn) + '/ci_update'
+        #     self.ci_clients.append(self.node.create_client(CIUpdate, srv_name))
+
+        # create topics-based version of service
+        #
+        # NOTE: this version of the CI update service is implemented only
+        # because the author couldn't get the above actual service
+        # implementation to actually work...
+        self.ci_srv_pub = self.node.create_publisher(AgentState,'ci_update_response')
+        self.ci_srv_sub = self.node.create_subscription(AgentState, 'ci_update_request', self.ci_service_handler_topic)
+        self.ci_clients_pubs = []
+        self.ci_clients_subs = []
         for conn in self.connections[self.agent_id]:
             srv_name = '/'+self.agent_name.split('_')[0] +'_' +str(conn) + '/ci_update'
-            self.ci_clients.append(self.node.create_client(CIUpdate, srv_name))
+            self.ci_clients_pubs.append(self.node.create_publisher(AgentState, srv_name+'_request'))
+            self.ci_clients_subs.append(self.node.create_subscription(AgentState, srv_name+'_response', self.ci_service_response_handler))
 
         # begin update loop
         # self.node.get_logger().err("Entering main loop.")
@@ -223,11 +238,11 @@ class AgentWrapper(object):
 
         # throw away measurements older than one update cycle
         for msg in local_measurements:
-            if self.node.get_clock().now() - msg.header.stamp > 1/self.update_rate:
-                how_old = (self.node.get_clock().now() - msg.header.stamp).to_sec()
+            if self.node.get_clock().now().nanoseconds - (msg.header.stamp.sec*1e9+msg.header.stamp.nanosec) > 1e9/self.update_rate:
+                how_old = (self.node.get_clock().now().nanoseconds - ((msg.header.stamp.sec*1e9+msg.header.stamp.nanosec)))/1e9
                 # src_agent = msg.src
                 # msg_type = msg.type
-                msg_type = msg._type.split('/')[1]
+                msg_type = str(type(msg)).split('.')[-1][:-2]
                 del msg
                 self.node.get_logger().warn('[Agent {}]: throwing away local {} message -- {} sec old'.format(self.agent_id,msg_type,how_old))
         
@@ -245,8 +260,8 @@ class AgentWrapper(object):
 
         # throw away measurements older than one update cycle
         for msg in received_measurements:
-            if self.node.get_clock().now() - msg.header.stamp > 1/self.update_rate:
-                how_old = (self.node.get_clock().now() - msg.header.stamp).to_sec()
+            if self.node.get_clock().now().nanoseconds - (msg.header.stamp.sec*1e9+msg.header.stamp.nanosec) > 1e9/self.update_rate:
+                how_old = (self.node.get_clock().now().nanoseconds - ((msg.header.stamp.sec*1e9+msg.header.stamp.nanosec)))/1e9
                 src_agent = msg.src
                 msg_type = msg.type
                 del msg
@@ -267,18 +282,21 @@ class AgentWrapper(object):
             # generate CI requests
             # for conn in self.connections[self.agent_id]:
             for client in self.ci_clients:
-                # print(client.srv_name)
+                
+                # figure out target agent id from client's service name
+                id_ = int(client.srv_name.split('/')[1][-1])
+
                 # request state of connection and queue
                 # self.node.get_logger().debug('[Agent {}]: waiting for CI update service from agent_{} to become available'.format(self.agent_id,id_))
                 # srv_name = '/'+self.agent_name.split('_')[0] +'_' +str(conn) + '/ci_update'
-                client.wait_for_service()
+                while not client.wait_for_service(timeout_sec = 1.0):
+                    self.node.get_logger().debug('[Agent {}]: waiting for CI update service from agent_{} to become available'.format(self.agent_id,id_))
 
                 # create service proxy to send request
                 # ci_request = rospy.ServiceProxy(srv_name,CIUpdate)
                 # generate ros state message
-                id_ = int(client.srv_name.split('/')[1][-1])
-                self.node.get_logger().error('id: {}'.format(id_))
-                self.node.get_logger().error('neighbor conns: {}'.format(self.neighbor_connections))
+                self.node.get_logger().debug('service id: {}'.format(id_))
+                self.node.get_logger().debug('neighbor conns: {}'.format(self.neighbor_connections))
                 request_msg = python2ros_state(self.agent.gen_ci_message(id_,self.neighbor_connections[id_]))
                 # have to stamp message now, so we don't have to pass node into conversion fxn
                 if type(request_msg) is list:
@@ -289,12 +307,85 @@ class AgentWrapper(object):
                     request_msg.header.stamp.sec = int(self.node.get_clock().now().seconds_nanoseconds()[0])
                     request_msg.header.stamp.nanosec = int(self.node.get_clock().now().seconds_nanoseconds()[1])
                 
+
+                req_msg = CIUpdate.Request()
+                req_msg.request_state = request_msg
                 # send request and wait for response
                 # try:
-                res = client.call(request_msg)
+                # res = client.call(request_msg)
+                self.node.get_logger().error('calling service')
+                future = client.call_async(req_msg)
+                rclpy.spin_until_future_complete(self.node, future)
+                if future.result() is not None:
+                    res = future.result()
+                else:
+                    self.node.get_logger().warn('CI service call failed: {}'.format(future.exception()))
+                # res = client.call(req_msg)
+
                 self.node.get_logger().debug('[Agent {}]: CI update response received'.format(self.agent_id))
                 # add response to ci queue
                 self.ci_queue.put(deepcopy(res.response_state))
+                # except rospy.ServiceException as e: #TODO: rclpy version of service exception
+                    # self.node.get_logger().err('[Agent {}]: CI update service request failed: {}'.format(self.agent_id,e))
+
+    def local_ci_topic(self):
+        """
+        Check if covariance intersection needs to happen. If so, generate service 
+        requests, but here using topic pub sub paradigm.
+        """
+        if np.trace(self.agent.local_filter.P) > self.agent.tau:
+
+            # increment CI cnt
+            self.agent.ci_trigger_cnt += 1
+            self.agent.ci_trigger_rate = self.agent.ci_trigger_cnt / self.update_cnt
+
+            # generate CI requests
+            # for conn in self.connections[self.agent_id]:
+            for client in self.ci_clients_pubs:
+                
+                # figure out target agent id from client's service name
+                id_ = int(client.topic.split('/')[1][-1])
+
+                # request state of connection and queue
+                # self.node.get_logger().debug('[Agent {}]: waiting for CI update service from agent_{} to become available'.format(self.agent_id,id_))
+                # srv_name = '/'+self.agent_name.split('_')[0] +'_' +str(conn) + '/ci_update'
+                # while not client.wait_for_service(timeout_sec = 1.0):
+                    # self.node.get_logger().info('[Agent {}]: waiting for CI update service from agent_{} to become available'.format(self.agent_id,id_))
+
+                # create service proxy to send request
+                # ci_request = rospy.ServiceProxy(srv_name,CIUpdate)
+                # generate ros state message
+                self.node.get_logger().debug('service id: {}'.format(id_))
+                self.node.get_logger().debug('neighbor conns: {}'.format(self.neighbor_connections))
+                request_msg = python2ros_state(self.agent.gen_ci_message(id_,self.neighbor_connections[id_]))
+                # have to stamp message now, so we don't have to pass node into conversion fxn
+                if type(request_msg) is list:
+                    for msg in request_msg:
+                        msg.header.stamp.sec = int(self.node.get_clock().now().seconds_nanoseconds()[0])
+                        msg.header.stamp.nanosec = int(self.node.get_clock().now().seconds_nanoseconds()[1])
+                else:
+                    request_msg.header.stamp.sec = int(self.node.get_clock().now().seconds_nanoseconds()[0])
+                    request_msg.header.stamp.nanosec = int(self.node.get_clock().now().seconds_nanoseconds()[1])
+                
+
+                # req_msg = CIUpdate.Request()
+                # req_msg.request_state = request_msg
+                # send request and wait for response
+                # try:
+                # res = client.call(request_msg)
+                self.node.get_logger().debug('publishing request')
+                # future = client.call_async(req_msg)
+                # rclpy.spin_until_future_complete(self.node, future)
+                # if future.result() is not None:
+                #     res = future.result()
+                # else:
+                #     self.node.get_logger().warn('CI service call failed: {}'.format(future.exception()))
+                # res = client.call(req_msg)
+                client.publish(request_msg)
+
+                # self.node.get_logger().info('[Agent {}]: CI update response received'.format(self.agent_id))
+                # add response to ci queue
+                # self.ci_queue.put(deepcopy(res.response_state))
                 # except rospy.ServiceException as e: #TODO: rclpy version of service exception
                     # self.node.get_logger().err('[Agent {}]: CI update service request failed: {}'.format(self.agent_id,e))
 
@@ -312,8 +403,8 @@ class AgentWrapper(object):
 
         # throw away messages older than one update cycle
         for msg in ci_messages:
-            if self.node.get_clock().now() - msg.header.stamp > 1/self.update_rate:
-                how_old = (self.node.get_clock().now() - msg.header.stamp).to_sec()
+            if self.node.get_clock().now().nanoseconds - (msg.header.stamp.sec*1e9+msg.header.stamp.nanosec) > 1e9/self.update_rate:
+                how_old = (self.node.get_clock().now().nanoseconds - ((msg.header.stamp.sec*1e9+msg.header.stamp.nanosec)))/1e9
                 src_agent = msg.src
                 del msg
                 self.node.get_logger().warn('[Agent {}]: throwing away CI message from Agent {} -- {} sec old'.format(self.agent_id,src_agent,how_old))
@@ -327,6 +418,7 @@ class AgentWrapper(object):
         Handler for CI service requests.
         """
         self.node.get_logger().debug('[Agent {}]: CI update request received'.format(self.agent_id))
+        self.node.get_logger().debug('[Agent {}]: CI update response type -- {}'.format(self.agent_id,type(res)))
         # queue recevied request message
         self.ci_queue.put(deepcopy(req.request_state))
 
@@ -339,9 +431,53 @@ class AgentWrapper(object):
 
         # convert to a ros message
         res_msg_ros = python2ros_state(res_msg)
+
+        # have to stamp the message here
+        res_msg_ros.header.stamp = self.node.get_clock().now().to_msg()
         
+        # add response payload to response message
+        res.response_state = res_msg_ros
         # get state as response
-        return res_msg_ros
+        self.node.get_logger().debug('[Agent {}]: Sending CI update response'.format(self.agent_id))
+        return res
+
+    def ci_service_handler_topic(self,request_state):
+        """
+        Handler for CI service requests, but in topic form.
+        """
+        self.node.get_logger().debug('[Agent {}]: CI update request received'.format(self.agent_id))
+        # self.node.get_logger().info('[Agent {}]: CI update response type -- {}'.format(self.agent_id,type(res)))
+        # queue recevied request message
+        self.ci_queue.put(deepcopy(request_state))
+
+        # generate ci message for response
+        res_msg = self.agent.gen_ci_message(request_state.src,
+                    self.neighbor_connections[request_state.src])
+
+        # force src_ci_rate to be float
+        res_msg.src_ci_rate = float(res_msg.src_ci_rate)
+
+        # convert to a ros message
+        res_msg_ros = python2ros_state(res_msg)
+
+        # have to stamp the message here
+        res_msg_ros.header.stamp = self.node.get_clock().now().to_msg()
+        
+        # add response payload to response message
+        response_state = res_msg_ros
+        # get state as response
+        self.node.get_logger().debug('[Agent {}]: Sending CI update response'.format(self.agent_id))
+        self.ci_srv_pub.publish(response_state)
+
+    def ci_service_response_handler(self,response_state):
+        """
+        Handler for CI update responses when using topic pub sub version instead of actual ROS service version.
+        """
+        if response_state.dest == self.agent_id:
+            self.node.get_logger().debug('[Agent {}]: Received CI update response from agent {}'.format(self.agent_id,response_state.src))
+
+            # queue received message
+            self.ci_queue.put(deepcopy(response_state))
 
     def get_state_ros(self,dest=None):
         """
@@ -357,13 +493,13 @@ class AgentWrapper(object):
         """
         # create state message
         msg = AgentState()
-        msg.header.stamp = self.node.get_clock().now()
+        msg.header.stamp = self.node.get_clock().now().to_msg()
         msg.src = self.agent_id
         msg.src_meas_connections = self.meas_connections
         msg.src_connections = self.agent_connections
         msg.mean = self.agent.local_filter.x.transpose().tolist()[0]
         msg.covariance = deflate_covariance(self.agent.local_filter.P)
-        msg.src_ci_rate = self.agent.ci_trigger_rate
+        msg.src_ci_rate = float(self.agent.ci_trigger_rate)
 
         if dest is not None:
             msg.dest = dest
@@ -388,17 +524,17 @@ class AgentWrapper(object):
         # publish message
         self.local_est_pub.publish(msg)
 
-    def publish_msg_stats(self,msg_):
+    def publish_msg_stats(self):
         """
         Publishes statistics on what portion of messages have been sent, as well
         as CI trigger rate.
         """
         msg = MsgStats()
-        msg.header.stamp = self.node.get_clock().now()
+        msg.header.stamp = self.node.get_clock().now().to_msg()
         msg.msgs_sent = self.agent.msgs_sent
         if self.agent.total_msgs:
             msg.msg_fraction_sent = self.agent.msgs_sent / self.agent.total_msgs
-        msg.ci_trigger_rate = self.agent.ci_trigger_rate
+        msg.ci_trigger_rate = float(self.agent.ci_trigger_rate)
         self.msg_stats_pub.publish(msg)
 
     def update(self):
@@ -434,7 +570,7 @@ class AgentWrapper(object):
         self.agent.process_received_measurements(received_measurements_python)
 
         # check for CI updates
-        self.local_ci()
+        self.local_ci_topic()
         ci_messages_ros = self.process_ci_queue()
 
         # NOTE: THIS IS A HUGE HACK!!!!!!!
@@ -608,16 +744,21 @@ class AgentWrapper(object):
 
 def main():
 
-    # get command line args (or coming from launch file)
-    cl_args = sys.argv[1:]
+    try:
+        # get command line args (or coming from launch file)
+        cl_args = sys.argv[1:]
 
-    # load config files (instead of using parameter server)
-    agent_cfg = load_config(get_package_share_directory('etddf_ros2') + '/ros_agent_config.yaml')
-    gen_cfg = load_config(get_package_share_directory('etddf_ros2') + '/points.yaml')
+        # load config files (instead of using parameter server)
+        agent_cfg = load_config(get_package_share_directory('etddf_ros2') + '/ros_agent_config.yaml')
+        gen_cfg = load_config(get_package_share_directory('etddf_ros2') + '/points.yaml')
 
-    aw = AgentWrapper(cfg=agent_cfg, id_=cl_args[0], agent_name=cl_args[1])
+        aw = AgentWrapper(cfg=agent_cfg, id_=cl_args[0], agent_name=cl_args[1], log_level=cl_args[2])
 
-    rclpy.spin(aw.node)
+        rclpy.spin(aw.node)
+    except KeyboardInterrupt as e:
+        print(e)
+        aw.node.destroy_node()
+        rclpy.shutdown()
 
 if __name__ == "__main__":
     main()
