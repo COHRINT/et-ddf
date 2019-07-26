@@ -13,18 +13,14 @@
 function [Dc] = covar_diagonalize(P,method)
     
     if nargin < 2
-        method = 'opt';
+        method = 'eig';
     end
     
     % optimization-based scaling
     if strcmp(method,'opt')
         
-        % vector of scale factors, c
-        c = [];
-        
         % D
         D = diag(diag(P));
-        disp(D)
         
         % compute c* optimal scale factors
         fun = @(x) trace(diag(x)*D);
@@ -37,6 +33,17 @@ function [Dc] = covar_diagonalize(P,method)
         
         % compute Dc
         Dc = diag(c_opt)*D;
+    elseif strcmp(method,'eig')
+        
+        % compute diagonal cov
+        D = diag(diag(P));
+        % compute correlation matrix Q
+        Q = inv(sqrtm(D))*P*inv(sqrtm(D));
+        % find largest eigenvalue of Q
+        lambda = max(eig(Q));
+        % inflate diagonal cov
+        Dc = lambda*D;
+        
     end
 
 
