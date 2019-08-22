@@ -11,9 +11,9 @@ import pickle
 import time
 import numpy as np
 
-from offset.agent import Agent
-from offset.filters.etkf import ETKF
-from offset.filters.kf import KF
+from etddf.agent import Agent
+from etddf.filters.etkf import ETKF
+from etddf.filters.kf import KF
 
 def gen_sim_data_struct(baseline,agents):
     """
