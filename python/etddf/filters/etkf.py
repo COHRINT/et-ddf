@@ -140,10 +140,10 @@ class ETKF(object):
             # as well as of any type
             H = np.zeros( (1,self.F.shape[0]) )
             if type_ == "abs":
-                H[0,4*src_loc+2*i] = 1
+                H[0,6*src_loc+2*i] = 1
             elif type_ == "rel":
-                H[0,4*src_loc+2*i] = 1
-                H[0,4*target_loc+2*i] = -1
+                H[0,6*src_loc+2*i] = 1
+                H[0,6*target_loc+2*i] = -1
 
             # predicted measurement by filter
             meas_pred = np.dot(H,self.x)
