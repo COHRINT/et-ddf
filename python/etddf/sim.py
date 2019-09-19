@@ -161,86 +161,6 @@ class SimInstance(object):
 
         for i in range(0,self.num_agents):
 
-            # agent_id = i
-
-            # ids = deepcopy(self.connections[i])
-            # ids.append(agent_id)
-            # ids.sort()
-
-            # # build list of distance one and distance two neighbors for each agent
-            # neighbor_conn_ids = []
-            # for j in range(0,len(self.connections[i])):
-            #     for k in range(0,len(self.connections[self.connections[i][j]])):
-            #         # if not any(self.connections[self.connections[i][j]][k] == x for x in neighbor_conn_ids):
-            #         #     neighbor_conn_ids += self.connections[self.connections[i][j]]
-            #         if not self.connections[self.connections[i][j]][k] in neighbor_conn_ids:
-            #             neighbor_conn_ids += self.connections[self.connections[i][j]]
-
-            #         # remove agent's own id from list of neighbors
-            #         if agent_id in neighbor_conn_ids:
-            #             neighbor_conn_ids.remove(agent_id)
-
-            # # combine with direct connection ids and sort
-            # ids = list(set(sorted(ids + neighbor_conn_ids)))
-
-            # # divide out direct measurement connections and all connections
-            # connections_new = list(set(sorted(neighbor_conn_ids + self.connections[i])))
-            # meas_connections = self.connections[i]
-
-            # est_state_length = len(ids)
-
-            # # construct local estimate
-            # n = (est_state_length)*4
-            # F,G,Q = globals()[dynamics_fxn](self.dt,est_state_length)
-
-            # # sort all connections
-            # ids = sorted([agent_id] + connections_new)
-            # # create initial state estimate by grabbing relevant ground truth from full ground truth vector
-            # x0 = np.array([])
-            # for j in range(0,len(ids)):
-            #     x0 = np.hstack( (x0,x_true_vec[ids[j]*4:ids[j]*4+4]) )
-
-            # P0 = 100*np.eye(4*est_state_length)
-
-            # local_filter = ETKF(F,G,0,0,Q,np.array(R_abs),np.array(R_rel),
-            #                     x0.reshape((F.shape[0],1)),P0,self.delta,
-            #                     agent_id,connections_new,-1)
-
-            # # construct common information estimates
-            # common_estimates = []
-            # for j in range(0,len(meas_connections)):
-                
-            #     # find unique states between direct connections
-            #     # inter_states = set(meas_connections).intersection(self.connections[self.connections[i][j]])
-            #     unique_states = set(meas_connections+self.connections[self.connections[i][j]])
-            #     comm_ids = list(unique_states)
-            #     x0_comm = np.array([])
-            #     for k in range(0,len(comm_ids)):
-            #         x0_comm = np.hstack( (x0_comm,x_true_vec[comm_ids[k]*4:comm_ids[k]*4+4]) )
-                
-            #     # create comm info filter initial covariance
-            #     P0_comm = 100*np.eye(4*len(comm_ids))
-
-            #     # generate dynamics
-            #     F_comm, G_comm, Q_comm = globals()[dynamics_fxn](self.dt,len(comm_ids))
-
-            #     # remove agent id from comm ids
-            #     if agent_id in comm_ids:
-            #         comm_ids.remove(agent_id)
-
-            #     # create common information filter
-            #     comm_filter = ETKF(F_comm,G_comm,0,0,Q_comm,np.array(R_abs),np.array(R_rel),
-            #                         x0_comm.reshape((F_comm.shape[0],1)),P0_comm,self.delta,
-            #                         agent_id,comm_ids,meas_connections[j])
-
-            #     common_estimates.append(comm_filter)
-
-            # # create agent instance
-            # new_agent = Agent(agent_id,connections_new,meas_connections,neighbor_conn_ids,
-            #                     local_filter,common_estimates,x_true_vec[4*i:4*i+4],
-            #                     self.msg_drop_prob,len(x0)*self.tau_state_goal,len(x0)*self.tau,
-            #                     self.use_adaptive_tau)
-
             agent_id = deepcopy(i)
             ids = sorted(deepcopy(self.connections[agent_id]))
             ids.append(agent_id)
@@ -250,8 +170,6 @@ class SimInstance(object):
             neighbor_conn_ids = []
             for j in range(0,len(self.connections[agent_id])):
                 for k in range(0,len(self.connections[self.connections[agent_id][j]])):
-                    # if not any(self.connections[self.connections[agent_id][j]][k] == x for x in neighbor_conn_ids):
-                    #     neighbor_conn_ids += self.connections[self.connections[agent_id][j]]
                     if not self.connections[self.connections[agent_id][j]][k] in neighbor_conn_ids:
                         neighbor_conn_ids += self.connections[self.connections[agent_id][j]]
 
@@ -285,8 +203,6 @@ class SimInstance(object):
                     neighbor_conn_ids = []
                     for j in range(0,len(self.connections[neighbor_agent_id])):
                         for k in range(0,len(self.connections[self.connections[neighbor_agent_id][j]])):
-                            # if not any(self.connections[self.connections[neighbor_agent_id][j]][k] == x for x in neighbor_conn_ids):
-                                # neighbor_conn_ids += deepcopy(self.connections[self.connections[neighbor_agent_id][j]])
                             if not self.connections[self.connections[neighbor_agent_id][j]][k] in neighbor_conn_ids:
                                 neighbor_conn_ids += deepcopy(self.connections[self.connections[neighbor_agent_id][j]])
 
@@ -304,7 +220,7 @@ class SimInstance(object):
                     self.neighbor_connections[i] = deepcopy(neighbor_connections_new)
 
             # construct local estimate
-            # TODO: remove hardcoded 4
+            # TODO: remove hardcoded 6
             n = (est_state_length)*6
             F,G,Q = globals()[dynamics_fxn](self.dt,est_state_length,**dynamics_fxn_params)
 
@@ -469,7 +385,6 @@ class SimInstance(object):
             self.agents[j].process_received_measurements(inbox[j])
 
         # covariance intersection
-        # TODO: THIS ENTIRE GODDAMN THING
         # this loop is a proxy for a service request and response framework.
         # The agent that triggers CI creates a request in the form of a StateMsg message
         # populated with its info, and sends it to its direct (distance-one) connections.
@@ -491,12 +406,6 @@ class SimInstance(object):
                     # add messages to ci inbox
                     ci_inbox[conn_id].append(deepcopy(msg_a))
                     ci_inbox[agent.agent_id].append(msg_b)
-
-        #         # generate similarity transforms
-
-        #         # collect transforms and generate outbound message
-
-        #         # add message to ci inbox
 
         # # process inbox messages
         for j, msg_list in enumerate(ci_inbox):
