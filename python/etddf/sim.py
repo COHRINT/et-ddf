@@ -20,7 +20,7 @@ from etddf.filters.etkf import ETKF
 from etddf.dynamics import *
 from etddf.helpers.config_handling import load_config
 from etddf.helpers.msg_handling import MeasurementMsg, StateMsg
-from etddf.helpers.data_handling import package_results, save_sim_data
+from etddf.helpers.data_handling import package_results, save_sim_data, make_data_directory, write_metadata_file
 from etddf.helpers.data_viz import mse_plots, time_trace_plots
 
 class SimInstance(object):
@@ -66,7 +66,7 @@ class SimInstance(object):
         self.use_adaptive_tau = use_adaptive_tau
 
         self.fixed_rng = fixed_rng
-        if self.fixed_rng is not None:
+        if self.fixed_rng is not False:
             np.random.seed(self.fixed_rng)
             print('Fixing random number generator with seed: {}'.format(self.fixed_rng))
 
@@ -460,6 +460,23 @@ class SimInstance(object):
             # increament simulation time
             self.sim_time += self.dt
             self.sim_time_step += 1
+
+        # create empty numpy arrays to store results -> rows=time, columns=agents
+        mse_results_array = np.empty((self.sim_time_step,self.num_agents))
+        local_filter_history = np.empty(())
+
+        baseline_state_history = np.array(self.baseline_filter.state_history)
+        baseline_cov_history = np.array(self.baseline_filter.cov_history)
+
+        agent_state_histories = []
+        agent_cov_histories = []
+        agent_true_states = []
+        for i,a in enumerate(self.agents):
+            mse_results_array[:,i] = np.array(a.mse_history)
+
+            agent_state_histories.append(np.array(a.local_filter.state_history))
+            agent_cov_histories.append(np.array(a.local_filter.cov_history))
+            agent_true_states.append(np.array(a.true_state))
             
         # print ci_process_worst_case_time for each agent
         # for i,a in enumerate(self.agents):
@@ -467,7 +484,13 @@ class SimInstance(object):
 
         # package simulation results
         # res = package_results()
-        results_dict = {'baseline': self.baseline_filter, 'agents': self.agents}
+        # results_dict = {'baseline': self.baseline_filter, 'agents': self.agents}
+        results_dict = {'agent_mse': mse_results_array,
+                        'agent_state_histories': agent_state_histories,
+                        'agent_cov_histories': agent_cov_histories,
+                        'baseline_state_history': baseline_state_history,
+                        'baseline_cov_history': baseline_cov_history}
+                        
         # create metadata dictionary
         metadata_dict = {'max_time': self.max_time, 
                         'dt': self.dt,
@@ -538,6 +561,9 @@ def main(plot=False,cfg_path=None,save_path=None):
         save_path = os.path.abspath(os.path.join(os.path.dirname(__file__),
                         '../data/'))
 
+    # make new data directory for sim files
+    save_path = make_data_directory(save_path)
+
     # extract config params
     num_mc_sim = cfg['num_mc_sims']
     delta_values = cfg['delta_values']
@@ -554,6 +580,10 @@ def main(plot=False,cfg_path=None,save_path=None):
     for i in delta_values:
         for j in tau_values:
             for k in msg_drop_prob_values:
+
+                # numpy array for monte carlo averaged results
+                mc_mse_results = np.empty((int(cfg['max_time']/cfg['dt'] + 1),len(cfg['agent_cfg']['conns']),num_mc_sim))
+
                 for m in range(1,num_mc_sim+1):
                     # create simulation status strings to be printed
                     sim_print_str = 'Initializing simulation {} of {}'.format(sim_cnt,total_sims)
@@ -573,19 +603,31 @@ def main(plot=False,cfg_path=None,save_path=None):
                     # run simulation
                     res = sim.run_sim([sim_print_str,param_print_str,mc_print_str])
                     # add results to results container
-                    results.append(res)
+                    # results.append(res)
+                    mc_mse_results[:,:,m-1] = res['results']['agent_mse']
 
                     sim_cnt += 1
 
-    # create metadata dictionary
-    metadata_dict = {'num_mc_sim': num_mc_sim,
-                    'delta_values': delta_values,
-                    'tau_values': tau_values,
-                    'msg_drop_prob_values': msg_drop_prob_values,
-                    'total_sims': total_sims}
+                mc_avg_mse_results = np.mean(mc_mse_results,axis=2)
 
-    # save data to pickle file
-    save_sim_data(metadata_dict,results,save_path)
+                results = {'mse': mc_avg_mse_results}
+
+                # create metadata dictionary
+                metadata_dict = {'num_mc_sim': num_mc_sim,
+                                'delta_value': (i,delta_values),
+                                'tau_value': (j,tau_values),
+                                'msg_drop_prob_value': (k,msg_drop_prob_values)}
+
+                # create filename
+                file_name = 'delta{}_tau{}_drop{}_mc{}'.format(i,j,k,num_mc_sim).replace('.','')
+
+                # save data to pickle file
+                save_sim_data(metadata_dict,results,save_path,file_name)
+
+    # write metadata file for data
+    sim_metadata = {'cfg': cfg}
+    write_metadata_file(save_path,sim_metadata)
+
 
     # if plot flag is set, plot results
     if plot:
