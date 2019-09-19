@@ -43,16 +43,19 @@ class KF(object):
     def update(self,meas,meas_type,src_id,rel_agent_id):
 
         for i in range(0,meas.shape[0]):
-            H = np.zeros([2,self.F.shape[0]])
+            H = np.zeros([3,self.F.shape[0]])
             if meas_type is 'abs':
-                H[0,4*(src_id)] = 1
-                H[1,4*(src_id)+2] = 1
+                H[0,6*(src_id)] = 1
+                H[1,6*(src_id)+2] = 1
+                H[2,6*(src_id)+4] = 1
                 R = self.R_abs
             elif meas_type is 'rel':
-                H[0,4*(src_id)] = 1
-                H[1,4*(src_id)+2] = 1
-                H[0,4*(rel_agent_id)] = -1
-                H[1,4*(rel_agent_id)+2] = -1
+                H[0,6*(src_id)] = 1
+                H[1,6*(src_id)+2] = 1
+                H[2,6*(src_id)+4] = 1
+                H[0,6*(rel_agent_id)] = -1
+                H[1,6*(rel_agent_id)+2] = -1
+                H[2,6*(rel_agent_id)+4] = -1
                 R = self.R_rel
             else:
                 print('Received invalid measurement type {}'.format(meas_type))
