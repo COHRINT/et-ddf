@@ -22,6 +22,7 @@ from etddf.helpers.config_handling import load_config
 from etddf.helpers.msg_handling import MeasurementMsg, StateMsg
 from etddf.helpers.data_handling import package_results, save_sim_data, make_data_directory, write_metadata_file
 from etddf.helpers.data_viz import mse_plots, time_trace_plots
+from etddf.quantization import Quantizer, covar_diagonalize
 
 class SimInstance(object):
     """
@@ -46,7 +47,8 @@ class SimInstance(object):
 
     def __init__(self,delta,tau,msg_drop_prob,baseline_cfg,
                     agent_cfg,max_time=20,dt=0.1,use_adaptive_tau=True,
-                    fixed_rng=None,process_noise=False,sensor_noise=False):
+                    fixed_rng=None,process_noise=False,sensor_noise=False,
+                    quantization_flag=False,diagonalization_flag=False):
 
         self.max_time = max_time
         self.dt = dt
@@ -64,6 +66,12 @@ class SimInstance(object):
         self.tau = tau*0.75
         self.msg_drop_prob = msg_drop_prob
         self.use_adaptive_tau = use_adaptive_tau
+
+        # data compression flags and object
+        self.quantization = quantization_flag
+        self.diagonalization = diagonalization_flag
+        if self.quantization:
+            self.quantizer = Quantizer(quantizer_fxn='x2')
 
         self.fixed_rng = fixed_rng
         if self.fixed_rng is not False:
@@ -403,6 +411,74 @@ class SimInstance(object):
                     # generate message
                     msg_a = agent.gen_ci_message(conn_id,list(self.agents[conn_id].connections))
                     msg_b = self.agents[conn_id].gen_ci_message(agent.agent_id,list(agent.connections))
+
+                    # compress state messages
+                    if self.quantization and self.diagonalization:
+
+                        # create element types list: assumes position, velocity alternating structure
+                        element_types = []
+                        for el_idx in range(0,msg_a.est_cov.shape[0]):
+                            if el_idx % 2 == 0: element_types.append('position')
+                            else: element_types.append('velocity')
+
+                        # first diagonalize
+                        cova_diag = covar_diagonalize(msg_a.est_cov)
+                        covb_diag = covar_diagonalize(msg_b.est_cov)
+
+                        # then quantize
+                        print(cova_diag.shape)
+                        print(msg_a.state_est.shape)
+                        bits_a = self.quantizer.state2quant(msg_a.state_est, cova_diag, element_types, diag_only=True)
+                        bits_b = self.quantizer.state2quant(msg_b.state_est, covb_diag, element_types, diag_only=True)
+
+                        # then decompress
+                        meana_quant, cova_quant = self.quantizer.quant2state(bits_a[0], 2*cova_diag.shape[0], element_types, diag_only=True)
+                        meanb_quant, covb_quant = self.quantizer.quant2state(bits_b[0], 2*covb_diag.shape[0], element_types, diag_only=True)
+
+                        print(cova_quant.shape)
+                        print(msg_a.est_cov.shape)
+                        print(covb_quant.shape)
+                        print(msg_b.est_cov.shape)
+                        assert(cova_quant.shape == msg_a.est_cov.shape)
+
+                        # add back to state messages
+                        msg_a.state_est = meana_quant
+                        msg_a.est_cov = cova_quant
+                        msg_b.state_est = meanb_quant
+                        msg_b.est_cov = covb_quant
+
+                    elif self.quantization:
+
+                        # create element types list: assumes position, velocity alternating structure
+                        element_types = []
+                        for el_idx in range(0,msg_a.est_cov.shape[0]):
+                            if el_idx % 2 == 0: element_types.append('position')
+                            else: element_types.append('velocity')
+
+                        # quantize
+                        bits_a = self.quantizer.state2quant(msg_a.state_est, msg_a.est_cov, element_types)
+                        bits_b = self.quantizer.state2quant(msg_b.state_est, msg_b.est_cov, element_types)
+
+                        # then decompress
+                        meana_quant, cova_quant = self.quantizer.quant2state(bits_a[0], int(msg_a.est_cov.shape[0] + (msg_a.est_cov.shape[0]**2 + msg_a.est_cov.shape[0])/2), element_types)
+                        meanb_quant, covb_quant = self.quantizer.quant2state(bits_b[0], int(msg_b.est_cov.shape[0] + (msg_b.est_cov.shape[0]**2 + msg_b.est_cov.shape[0])/2), element_types)
+
+                        # add back to state messages
+                        meana_quant = np.reshape(meana_quant,msg_a.state_est.shape)
+                        msg_a.state_est = meana_quant
+                        msg_a.est_cov = cova_quant
+                        meanb_quant = np.reshape(meanb_quant,msg_b.state_est.shape)
+                        msg_b.state_est = meanb_quant
+                        msg_b.est_cov = covb_quant
+
+                    elif self.diagonalization:
+                        # diagonalize
+                        cova_diag = covar_diagonalize(msg_a.est_cov)
+                        covb_diag = covar_diagonalize(msg_b.est_cov)
+
+                        msg_a.est_cov = cova_diag
+                        msg_b.est_cov = covb_diag
+
                     # add messages to ci inbox
                     ci_inbox[conn_id].append(deepcopy(msg_a))
                     ci_inbox[agent.agent_id].append(msg_b)
@@ -631,7 +707,9 @@ def main(plot=False,cfg_path=None,save_path=None):
                                         use_adaptive_tau=cfg['use_adaptive_tau'],
                                         fixed_rng=cfg['fixed_rng'],
                                         process_noise=False,
-                                        sensor_noise=False)
+                                        sensor_noise=False,
+                                        quantization_flag=cfg['quantization'],
+                                        diagonalization_flag=cfg['diagonalization'])
                     # run simulation
                     res = sim.run_sim([sim_print_str,param_print_str,mc_print_str])
                     # add results to results container

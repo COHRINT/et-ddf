@@ -11,6 +11,7 @@ import math
 import yaml
 import numpy as np
 from decimal import Decimal, getcontext
+from scipy.linalg import sqrtm
 getcontext().prec = 500
 
 class Quantizer:
@@ -136,7 +137,7 @@ class Quantizer:
         """
         # convert from bits to configuration number
         if config_num is None:
-            config_num = long(bitstring,base=2)
+            config_num = int(bitstring,base=2)
         config_num = Decimal(config_num)
 
         # retrieve measurement parameters
@@ -280,6 +281,7 @@ class Quantizer:
         offdiag_els = np.extract(np.triu(1-np.eye(cov.shape[0])),cov)
 
         # combine both elements and max number of bin lists of mean, diagonal, and off-diagonal
+        mean_vec = np.squeeze(mean_vec)
         elements = np.concatenate((mean_vec,diag_els))
         if not diag_only:
             elements = np.concatenate((elements,offdiag_els))
@@ -289,7 +291,7 @@ class Quantizer:
         config_num = self.bin2config(bin_list,quantization_params['num_bins'])
 
         # convert to bitstring
-        bits = bin(long(config_num))
+        bits = bin(int(config_num))
 
         return_vals = []
         if bits_flag: return_vals.append(bits)
@@ -309,6 +311,7 @@ class Quantizer:
             bitstring of quantized measurements
         num_els
             number of elements to convert to values
+            NOTE: should be equal to the n+((n^2+n)/2), or 2n if diag_only
         element_types
             state element types
         mean_range : [default None]
@@ -429,7 +432,7 @@ class Quantizer:
 
         return mean_vec, cov
 
-    def vals2bins(self, vals, quantization_params):
+    def vals2bins(self, vals, quantization_params, range_warn=False):
         """
         Compute the bin numbers for a quantized version of vals at given range and resolution.
         """
@@ -439,11 +442,12 @@ class Quantizer:
             # make sure element is within range
             if el < quantization_params['range'][i][0]:
                 el = quantization_params['range'][i][0]
-                print('Warning: Element is outside allowable range, setting to min.')
+                if range_warn:
+                    print('Warning: Element {} is outside allowable range, setting to min.'.format(i))
             elif el > quantization_params['range'][i][1]:
                 el = quantization_params['range'][i][1]
-                print('Warning: Element is outside allowable range, setting to max.')
-                print(i,el)
+                if range_warn:
+                    print('Warning: Element {} is outside allowable range, setting to max.'.format(i))
 
             if self.quantizer_fxn == 'uniform':
                 # determine rounding method (depends on if resolution is smaller than 1)
@@ -486,7 +490,7 @@ class Quantizer:
 
                 # find which bins values belong to
                 bin_idx = np.digitize(el,bin_vals)
-                bin_num_list.append(bin_idx)
+                bin_num_list.append(int(bin_idx))
         
         return bin_num_list
 

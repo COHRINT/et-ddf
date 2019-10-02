@@ -4,14 +4,18 @@ max_time: 20
 dt: 0.1
 
 monte_carlo_sims: True
-num_mc_sims: 1
+num_mc_sims: 2
 
-delta_values: [1.0]
-tau_values: [5]
+delta_values: [1.0,2.0]
+tau_values: [3.5,5]
 msg_drop_prob_values: [0.0]
 
 use_adaptive_tau: True
-fixed_rng: 999
+fixed_rng: False
+
+# data compression techniques
+quantization: True
+diagonalization: True
 
 agent_cfg:
     conn_struct_type: "tree"
