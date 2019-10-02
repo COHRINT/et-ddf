@@ -340,7 +340,7 @@ class SimInstance(object):
                 y_abs_msg = MeasurementMsg(self.agents[j].agent_id,
                                             self.agents[j].agent_id,
                                             self.agents[j].agent_id,
-                                            [1,1],'abs',y_abs)
+                                            [1,1,1],'abs',y_abs)
                 # add msg to queue
                 msgs.append(y_abs_msg)
 
@@ -361,7 +361,7 @@ class SimInstance(object):
                 y_rel_msg = MeasurementMsg(self.agents[j].agent_id,
                                             self.agents[j].meas_connections[k],
                                             self.agents[j].meas_connections[k],
-                                            [1,1],'rel',y_rel)
+                                            [1,1,1],'rel',y_rel)
                 # add msg to queue
                 msgs.append(y_rel_msg)
 
