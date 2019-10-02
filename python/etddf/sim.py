@@ -393,7 +393,7 @@ class SimInstance(object):
         # Everyone adds these messages to their inbox to be processed.
         for j, agent in enumerate(self.agents):
             
-        #     # check covaraince trace for triggering CI
+        #     # check covariance trace for triggering CI
             if np.trace(agent.local_filter.P) > agent.tau:
                 agent.ci_trigger_cnt += 1
                 agent.ci_trigger_rate = agent.ci_trigger_cnt / (i-1)
@@ -468,15 +468,33 @@ class SimInstance(object):
         baseline_state_history = np.array(self.baseline_filter.state_history)
         baseline_cov_history = np.array(self.baseline_filter.cov_history)
 
+        agent_msgs_total = []
+        agent_msgs_sent = []
+        agent_ci_total = []
+        agent_ci_rate = []
+
         agent_state_histories = []
         agent_cov_histories = []
         agent_true_states = []
+
+        agent_state_error = []
+        baseline_state_error = []
+
         for i,a in enumerate(self.agents):
             mse_results_array[:,i] = np.array(a.mse_history)
 
             agent_state_histories.append(np.array(a.local_filter.state_history))
             agent_cov_histories.append(np.array(a.local_filter.cov_history))
             agent_true_states.append(np.array(a.true_state))
+
+            agent_msgs_total.append(a.total_msgs)
+            agent_msgs_sent.append(a.msgs_sent)
+            agent_ci_total.append(a.ci_trigger_cnt)
+            agent_ci_rate.append(a.ci_trigger_rate)
+
+            # loc,idx = a.get_location(a.agent_id)
+            # agent_state_error.append(np.array(a.local_filter.state_history[idx])-np.array(a.true_state))
+            # baseline_state_error.append(np.array(baseline_state_history[6*a.agent_id:6*a.agent_id+6])-np.array(a.true_state))
             
         # print ci_process_worst_case_time for each agent
         # for i,a in enumerate(self.agents):
@@ -488,8 +506,15 @@ class SimInstance(object):
         results_dict = {'agent_mse': mse_results_array,
                         'agent_state_histories': agent_state_histories,
                         'agent_cov_histories': agent_cov_histories,
+                        'agent_true_states': agent_true_states,
+                        # 'agent_state_error': agent_state_error,
                         'baseline_state_history': baseline_state_history,
-                        'baseline_cov_history': baseline_cov_history}
+                        'baseline_cov_history': baseline_cov_history,
+                        # 'baseline_state_error': baseline_state_error,
+                        'agent_msgs_total': agent_msgs_total,
+                        'agent_msgs_sent': agent_msgs_sent,
+                        'agent_ci_total': agent_ci_total,
+                        'agent_ci_rate': agent_ci_rate}
                         
         # create metadata dictionary
         metadata_dict = {'max_time': self.max_time, 
@@ -583,6 +608,13 @@ def main(plot=False,cfg_path=None,save_path=None):
 
                 # numpy array for monte carlo averaged results
                 mc_mse_results = np.empty((int(cfg['max_time']/cfg['dt'] + 1),len(cfg['agent_cfg']['conns']),num_mc_sim))
+                # mc_time_trace_results = np.empty((int(cfg['max_time']/cfg['dt'] + 1),len(cfg['agent_cfg']['conns']),num_mc_sim))
+                # mc_baseline_results = np.empty((int(cfg['max_time']/cfg['dt'] + 1),len(cfg['agent_cfg']['conns']),num_mc_sim))
+
+                mc_msgs_total = np.empty((len(cfg['agent_cfg']['conns']),num_mc_sim))
+                mc_msgs_sent = np.empty((len(cfg['agent_cfg']['conns']),num_mc_sim))
+                mc_ci_total = np.empty((len(cfg['agent_cfg']['conns']),num_mc_sim))
+                mc_ci_rate = np.empty((len(cfg['agent_cfg']['conns']),num_mc_sim))
 
                 for m in range(1,num_mc_sim+1):
                     # create simulation status strings to be printed
@@ -606,11 +638,25 @@ def main(plot=False,cfg_path=None,save_path=None):
                     # results.append(res)
                     mc_mse_results[:,:,m-1] = res['results']['agent_mse']
 
+                    mc_msgs_total[:,m-1] = res['results']['agent_msgs_total']
+                    mc_msgs_sent[:,m-1] = res['results']['agent_msgs_sent']
+                    mc_ci_total[:,m-1] = res['results']['agent_ci_total']
+                    mc_ci_rate[:,m-1] = res['results']['agent_ci_rate']
+
                     sim_cnt += 1
 
                 mc_avg_mse_results = np.mean(mc_mse_results,axis=2)
 
-                results = {'mse': mc_avg_mse_results}
+                mc_avg_msgs_total = np.mean(mc_msgs_total,axis=1)
+                mc_avg_msgs_sent = np.mean(mc_msgs_sent,axis=1)
+                mc_avg_ci_total = np.mean(mc_ci_total,axis=1)
+                mc_avg_ci_rate = np.mean(mc_ci_rate,axis=1)
+
+                results = {'mse': mc_avg_mse_results,
+                            'msgs_total': mc_avg_msgs_total,
+                            'msgs_sent': mc_avg_msgs_sent,
+                            'ci_total': mc_avg_ci_total,
+                            'ci_rate': mc_avg_ci_rate}
 
                 # create metadata dictionary
                 metadata_dict = {'num_mc_sim': num_mc_sim,
