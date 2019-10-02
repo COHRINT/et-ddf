@@ -12,9 +12,9 @@ import matplotlib.pyplot as plt
 import argparse
 # import pudb; pudb.set_trace()
 
-from .data_handling import load_sim_data
+from etddf.helpers.data_handling import load_sim_data, load_metadata
 
-def mse_plots(metadata,data,agent_ids):
+def mse_plots(path,agent_ids):
     """
     Creates mean-squared-error plors for provided agent ids.
 
@@ -28,32 +28,62 @@ def mse_plots(metadata,data,agent_ids):
 
         plots -- matplotlib plot objects
     """
-    # create time vector -- common to all plots
-    time_vec = np.arange(start=0,
-                        stop=metadata['max_time']+metadata['dt'],
-                        step=metadata['dt'])
+    # list of params for figures --> params not specified will have all values plotted
+    figs = [['delta10','drop00','tau5'],['delta10','drop00','tau7'],['delta20','drop00','tau5'],['delta20','drop00','tau7']]
+    # figs = [['drop00','delta15','tau5'],['drop02','delta20','tau5']]
 
-    # for each agent generate mse plot
-    for id_ in agent_ids:
+    # load simulation metadata and get ids of agents to plot
+    metadata = load_metadata(path)['cfg']
+    if len(agent_ids) == 1 and agent_ids[0] == -1:
+        agent_ids = list(range(0,len(metadata['agent_cfg']['conns'])))
 
-        # extract agent data to plot
-        a = data['agents'][id_]
-        mse_data = a.mse_history
+    # for each fig to be created, get data
+    for fig in figs:
 
-        # create plot
-        plt.figure(id_)
+        # get all sim data files with desired params
+        all_files = os.listdir(path)
+        files_to_load = []
+        for file in all_files:
+            keep_flag = True
+            for param in fig:
+                if param not in file:
+                    keep_flag = False
+            if keep_flag: files_to_load.append(file)
+        
+        data = []
+        for file in files_to_load:
+            data.append(load_sim_data(os.path.join(path,file)))
+            
+        # create time vector -- common to all plots
+        time_vec = np.arange(start=0,
+                            stop=metadata['max_time']+metadata['dt'],
+                            step=metadata['dt'])
+
+        # create figure for figure parameter set
+        plt.figure()
+        legend_str = []
 
         # configure pyplot for using latex
         plt.rc('text', usetex=True)
         plt.rc('font',family='serif')
-
-        plt.grid()
-
-        plt.plot(time_vec,mse_data)
-
+        plt.grid(True)
         plt.xlabel('Time [s]')
-        plt.ylabel('Est error [m]')
-        plt.title(r'Agent {} ownship pos MSE: $\delta={}$, $\tau_g={}$, msg drop={}'.format(id_+1,metadata['delta'],metadata['tau_goal'],metadata['msg_drop_prob']))
+        plt.ylabel(r'Est error [$m^2$]')
+
+        # for each loaded data file
+        for param_data in data:
+            # for each agent generate mse plot
+            for id_ in agent_ids:
+
+                # extract agent data to plot
+                mse_data = param_data['results']['mse'][:,id_]
+                plt.plot(time_vec,mse_data)
+
+                # plt.title(r'Agent {} ownship pos MSE: $\delta={}$, $\tau_g={}$, msg drop={}'.format(id_+1,param_data['metadata']['delta_value'],param_data['metadata']['tau_value'],param_data['metadata']['msg_drop_prob_value']))
+
+            legend_str.append(r'$\delta={}$'.format(param_data['metadata']['delta_value']))
+
+        plt.legend(legend_str)
 
     plt.show()
 
@@ -149,6 +179,8 @@ if __name__ == "__main__":
                     help='plot mean-squared-errors (MSE)')
     parser.add_argument('-f','--file-path',type=str,dest='file_path',action='store',
                     help='specify file path of sim data')
+    parser.add_argument('-d','--dir-path',type=str,dest='dir_path',action='store',
+                    help='specify path to sim data directory')
     args = parser.parse_args()
 
     # TODO: add arg for local, common, or both
@@ -162,20 +194,18 @@ if __name__ == "__main__":
         save_path = args.file_path
 
     # load data
-    data = load_sim_data(save_path)
+    # data = load_sim_data(save_path)
 
     # get all agent ids if param is all agents (-1)
     agents = args.agents
-    if len(args.agents) == 1 and args.agents[0] == -1:
-        agents = list(range(0,data['results'][0]['metadata']['num_agents']))
+    # if len(args.agents) == 1 and args.agents[0] == -1:
+        # agents = list(range(0,data['results'][0]['metadata']['num_agents']))
 
     # generate plots
-    if args.tt_flag:
-        time_trace_plots(data['results'][0]['metadata'],
-                data['results'][0]['results'],
-                agents)
+    # if args.tt_flag:
+    #     time_trace_plots(data['results'][0]['metadata'],
+    #             data['results'][0]['results'],
+    #             agents)
 
     if args.mse_flag:
-        mse_plots(data['results'][0]['metadata'],
-                data['results'][0]['results'],
-                agents)
+        mse_plots(args.dir_path, agents)
