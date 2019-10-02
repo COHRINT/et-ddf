@@ -582,6 +582,23 @@ class Quantizer:
 
         return elements
 
+def covar_diagonalize(P,method='eig'):
+    """
+    Diagonalization of covariance matrices to reduce DDF data transfer.
+    See Forsling et. al. FUSION 2019 for methods implemented and more info.
+    """
+    if method == 'eig':
+        # compute diagonal covariance
+        D = np.diag(np.diag(P))
+        # compute correlation matrix
+        Q = np.dot(np.linalg.inv(sqrtm(D)),np.dot(P,np.linalg.inv(sqrtm(D))))
+        # find largest eigenvalue of Q
+        lamb = max(np.linalg.eig(Q)[0])
+        # inflate diagonalized covariance
+        Dc = lamb*D
+
+    return Dc
+
 if __name__ == "__main__":
     q = Quantizer(quantizer_fxn='x2')
 
