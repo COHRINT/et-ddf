@@ -489,7 +489,11 @@ class Quantizer:
                 bin_vals = np.concatenate((bin_vals_lower[:int(0.5*num_bins)], bin_vals_upper[int(0.5*num_bins):]))
 
                 # find which bins values belong to
-                bin_idx = np.digitize(el,bin_vals)
+                try:
+                    bin_idx = np.digitize(el,bin_vals)
+                except TypeError as e:
+                    el = el.astype(np.float_)
+                    bin_idx = np.digitize(el,bin_vals)
                 bin_num_list.append(int(bin_idx))
         
         return bin_num_list
@@ -598,9 +602,12 @@ def covar_diagonalize(P,method='eig'):
         Q = np.dot(np.linalg.inv(sqrtm(D)),np.dot(P,np.linalg.inv(sqrtm(D))))
         # find largest eigenvalue of Q
         lamb = max(np.linalg.eig(Q)[0])
+        lamb.astype(np.float_)
         # inflate diagonalized covariance
         Dc = lamb*D
 
+    # assert(Dc.dtype != np.dtype(np.complex_))
+    Dc.astype(np.float_)
     return Dc
 
 if __name__ == "__main__":

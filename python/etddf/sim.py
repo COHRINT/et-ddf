@@ -426,8 +426,6 @@ class SimInstance(object):
                         covb_diag = covar_diagonalize(msg_b.est_cov)
 
                         # then quantize
-                        print(cova_diag.shape)
-                        print(msg_a.state_est.shape)
                         bits_a = self.quantizer.state2quant(msg_a.state_est, cova_diag, element_types, diag_only=True)
                         bits_b = self.quantizer.state2quant(msg_b.state_est, covb_diag, element_types, diag_only=True)
 
@@ -435,15 +433,13 @@ class SimInstance(object):
                         meana_quant, cova_quant = self.quantizer.quant2state(bits_a[0], 2*cova_diag.shape[0], element_types, diag_only=True)
                         meanb_quant, covb_quant = self.quantizer.quant2state(bits_b[0], 2*covb_diag.shape[0], element_types, diag_only=True)
 
-                        print(cova_quant.shape)
-                        print(msg_a.est_cov.shape)
-                        print(covb_quant.shape)
-                        print(msg_b.est_cov.shape)
                         assert(cova_quant.shape == msg_a.est_cov.shape)
 
                         # add back to state messages
+                        meana_quant = np.reshape(meana_quant,msg_a.state_est.shape)
                         msg_a.state_est = meana_quant
                         msg_a.est_cov = cova_quant
+                        meanb_quant = np.reshape(meanb_quant,msg_b.state_est.shape)
                         msg_b.state_est = meanb_quant
                         msg_b.est_cov = covb_quant
 
