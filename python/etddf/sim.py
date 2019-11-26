@@ -70,8 +70,8 @@ class SimInstance(object):
         # data compression flags and object
         self.quantization = quantization_flag
         self.diagonalization = diagonalization_flag
-        if self.quantization:
-            self.quantizer = Quantizer(quantizer_fxn='x2')
+        # if self.quantization:
+        #     self.quantizer = Quantizer(quantizer_fxn='x2')
 
         self.fixed_rng = fixed_rng
         if self.fixed_rng is not False:
@@ -286,7 +286,7 @@ class SimInstance(object):
             new_agent = Agent(agent_id,connections_new,meas_connections,neighbor_conn_ids,
                                 local_filter,common_estimates,x_true_vec[6*i:6*i+6],
                                 0,len(x0)*self.tau_state_goal,len(x0)*self.tau,
-                                self.use_adaptive_tau)
+                                self.use_adaptive_tau,self.quantization,self.diagonalization)
 
             agents.append(new_agent)
 
@@ -402,7 +402,7 @@ class SimInstance(object):
         for j, agent in enumerate(self.agents):
             
         #     # check covariance trace for triggering CI
-            if np.trace(agent.local_filter.P) > agent.tau:
+            if np.trace(agent.local_filter.P) > agent.tau or agent.ci_trigger_cnt < 75:
                 agent.ci_trigger_cnt += 1
                 agent.ci_trigger_rate = agent.ci_trigger_cnt / (i-1)
 
@@ -412,68 +412,68 @@ class SimInstance(object):
                     msg_a = agent.gen_ci_message(conn_id,list(self.agents[conn_id].connections))
                     msg_b = self.agents[conn_id].gen_ci_message(agent.agent_id,list(agent.connections))
 
-                    # compress state messages
-                    if self.quantization and self.diagonalization:
+                    # # compress state messages
+                    # if self.quantization and self.diagonalization:
 
-                        # create element types list: assumes position, velocity alternating structure
-                        element_types = []
-                        for el_idx in range(0,msg_a.est_cov.shape[0]):
-                            if el_idx % 2 == 0: element_types.append('position')
-                            else: element_types.append('velocity')
+                    #     # create element types list: assumes position, velocity alternating structure
+                    #     element_types = []
+                    #     for el_idx in range(0,msg_a.est_cov.shape[0]):
+                    #         if el_idx % 2 == 0: element_types.append('position')
+                    #         else: element_types.append('velocity')
 
-                        # first diagonalize
-                        cova_diag = covar_diagonalize(msg_a.est_cov)
-                        covb_diag = covar_diagonalize(msg_b.est_cov)
+                    #     # first diagonalize
+                    #     cova_diag = covar_diagonalize(msg_a.est_cov)
+                    #     covb_diag = covar_diagonalize(msg_b.est_cov)
 
-                        # then quantize
-                        bits_a = self.quantizer.state2quant(msg_a.state_est, cova_diag, element_types, diag_only=True)
-                        bits_b = self.quantizer.state2quant(msg_b.state_est, covb_diag, element_types, diag_only=True)
+                    #     # then quantize
+                    #     bits_a = self.quantizer.state2quant(msg_a.state_est, cova_diag, element_types, diag_only=True)
+                    #     bits_b = self.quantizer.state2quant(msg_b.state_est, covb_diag, element_types, diag_only=True)
 
-                        # then decompress
-                        meana_quant, cova_quant = self.quantizer.quant2state(bits_a[0], 2*cova_diag.shape[0], element_types, diag_only=True)
-                        meanb_quant, covb_quant = self.quantizer.quant2state(bits_b[0], 2*covb_diag.shape[0], element_types, diag_only=True)
+                    #     # then decompress
+                    #     meana_quant, cova_quant = self.quantizer.quant2state(bits_a[0], 2*cova_diag.shape[0], element_types, diag_only=True)
+                    #     meanb_quant, covb_quant = self.quantizer.quant2state(bits_b[0], 2*covb_diag.shape[0], element_types, diag_only=True)
 
-                        assert(cova_quant.shape == msg_a.est_cov.shape)
+                    #     assert(cova_quant.shape == msg_a.est_cov.shape)
 
-                        # add back to state messages
-                        meana_quant = np.reshape(meana_quant,msg_a.state_est.shape)
-                        msg_a.state_est = meana_quant
-                        msg_a.est_cov = cova_quant
-                        meanb_quant = np.reshape(meanb_quant,msg_b.state_est.shape)
-                        msg_b.state_est = meanb_quant
-                        msg_b.est_cov = covb_quant
+                    #     # add back to state messages
+                    #     meana_quant = np.reshape(meana_quant,msg_a.state_est.shape)
+                    #     msg_a.state_est = meana_quant
+                    #     msg_a.est_cov = cova_quant
+                    #     meanb_quant = np.reshape(meanb_quant,msg_b.state_est.shape)
+                    #     msg_b.state_est = meanb_quant
+                    #     msg_b.est_cov = covb_quant
 
-                    elif self.quantization:
+                    # elif self.quantization:
 
-                        # create element types list: assumes position, velocity alternating structure
-                        element_types = []
-                        for el_idx in range(0,msg_a.est_cov.shape[0]):
-                            if el_idx % 2 == 0: element_types.append('position')
-                            else: element_types.append('velocity')
+                    #     # create element types list: assumes position, velocity alternating structure
+                    #     element_types = []
+                    #     for el_idx in range(0,msg_a.est_cov.shape[0]):
+                    #         if el_idx % 2 == 0: element_types.append('position')
+                    #         else: element_types.append('velocity')
 
-                        # quantize
-                        bits_a = self.quantizer.state2quant(msg_a.state_est, msg_a.est_cov, element_types)
-                        bits_b = self.quantizer.state2quant(msg_b.state_est, msg_b.est_cov, element_types)
+                    #     # quantize
+                    #     bits_a = self.quantizer.state2quant(msg_a.state_est, msg_a.est_cov, element_types)
+                    #     bits_b = self.quantizer.state2quant(msg_b.state_est, msg_b.est_cov, element_types)
 
-                        # then decompress
-                        meana_quant, cova_quant = self.quantizer.quant2state(bits_a[0], int(msg_a.est_cov.shape[0] + (msg_a.est_cov.shape[0]**2 + msg_a.est_cov.shape[0])/2), element_types)
-                        meanb_quant, covb_quant = self.quantizer.quant2state(bits_b[0], int(msg_b.est_cov.shape[0] + (msg_b.est_cov.shape[0]**2 + msg_b.est_cov.shape[0])/2), element_types)
+                    #     # then decompress
+                    #     meana_quant, cova_quant = self.quantizer.quant2state(bits_a[0], int(msg_a.est_cov.shape[0] + (msg_a.est_cov.shape[0]**2 + msg_a.est_cov.shape[0])/2), element_types)
+                    #     meanb_quant, covb_quant = self.quantizer.quant2state(bits_b[0], int(msg_b.est_cov.shape[0] + (msg_b.est_cov.shape[0]**2 + msg_b.est_cov.shape[0])/2), element_types)
 
-                        # add back to state messages
-                        meana_quant = np.reshape(meana_quant,msg_a.state_est.shape)
-                        msg_a.state_est = meana_quant
-                        msg_a.est_cov = cova_quant
-                        meanb_quant = np.reshape(meanb_quant,msg_b.state_est.shape)
-                        msg_b.state_est = meanb_quant
-                        msg_b.est_cov = covb_quant
+                    #     # add back to state messages
+                    #     meana_quant = np.reshape(meana_quant,msg_a.state_est.shape)
+                    #     msg_a.state_est = meana_quant
+                    #     msg_a.est_cov = cova_quant
+                    #     meanb_quant = np.reshape(meanb_quant,msg_b.state_est.shape)
+                    #     msg_b.state_est = meanb_quant
+                    #     msg_b.est_cov = covb_quant
 
-                    elif self.diagonalization:
-                        # diagonalize
-                        cova_diag = covar_diagonalize(msg_a.est_cov)
-                        covb_diag = covar_diagonalize(msg_b.est_cov)
+                    # elif self.diagonalization:
+                    #     # diagonalize
+                    #     cova_diag = covar_diagonalize(msg_a.est_cov)
+                    #     covb_diag = covar_diagonalize(msg_b.est_cov)
 
-                        msg_a.est_cov = cova_diag
-                        msg_b.est_cov = covb_diag
+                    #     msg_a.est_cov = cova_diag
+                    #     msg_b.est_cov = covb_diag
 
                     # add messages to ci inbox
                     ci_inbox[conn_id].append(deepcopy(msg_a))
