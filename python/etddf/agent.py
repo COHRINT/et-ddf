@@ -16,8 +16,8 @@ from copy import deepcopy
 # import pudb; pudb.set_trace()
 import time
 
-from .covar_intersect import covar_intersect, gen_sim_transform
-from .helpers.msg_handling import MeasurementMsg, StateMsg
+from etddf.covar_intersect import covar_intersect, gen_sim_transform
+from etddf.helpers.msg_handling import MeasurementMsg, StateMsg
 
 class Agent(object):
     
@@ -58,7 +58,7 @@ class Agent(object):
         self.tau_goal = tau_goal
         self.tau = tau
         self.connection_tau_rates = np.zeros( (len(self.connections),1) )
-        self.epsilon_1 = 0.05
+        self.epsilon_1 = 0.1
         self.epsilon_2 = 0.1
 
         self.use_adaptive_tau = use_adaptive_tau
