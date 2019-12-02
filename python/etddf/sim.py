@@ -70,8 +70,8 @@ class SimInstance(object):
         # data compression flags and object
         self.quantization = quantization_flag
         self.diagonalization = diagonalization_flag
-        if self.quantization:
-            self.quantizer = Quantizer(quantizer_fxn='x2')
+        # if self.quantization:
+        #     self.quantizer = Quantizer(quantizer_fxn='x2')
 
         self.fixed_rng = fixed_rng
         if self.fixed_rng is not False:
@@ -286,7 +286,7 @@ class SimInstance(object):
             new_agent = Agent(agent_id,connections_new,meas_connections,neighbor_conn_ids,
                                 local_filter,common_estimates,x_true_vec[6*i:6*i+6],
                                 0,len(x0)*self.tau_state_goal,len(x0)*self.tau,
-                                self.use_adaptive_tau)
+                                self.use_adaptive_tau,self.quantization,self.diagonalization)
 
             agents.append(new_agent)
 
@@ -402,7 +402,7 @@ class SimInstance(object):
         for j, agent in enumerate(self.agents):
             
         #     # check covariance trace for triggering CI
-            if np.trace(agent.local_filter.P) > agent.tau:
+            if np.trace(agent.local_filter.P) > agent.tau: # or agent.ci_trigger_cnt < 75:
                 agent.ci_trigger_cnt += 1
                 agent.ci_trigger_rate = agent.ci_trigger_cnt / (i-1)
 
@@ -412,68 +412,68 @@ class SimInstance(object):
                     msg_a = agent.gen_ci_message(conn_id,list(self.agents[conn_id].connections))
                     msg_b = self.agents[conn_id].gen_ci_message(agent.agent_id,list(agent.connections))
 
-                    # compress state messages
-                    if self.quantization and self.diagonalization:
+                    # # compress state messages
+                    # if self.quantization and self.diagonalization:
 
-                        # create element types list: assumes position, velocity alternating structure
-                        element_types = []
-                        for el_idx in range(0,msg_a.est_cov.shape[0]):
-                            if el_idx % 2 == 0: element_types.append('position')
-                            else: element_types.append('velocity')
+                    #     # create element types list: assumes position, velocity alternating structure
+                    #     element_types = []
+                    #     for el_idx in range(0,msg_a.est_cov.shape[0]):
+                    #         if el_idx % 2 == 0: element_types.append('position')
+                    #         else: element_types.append('velocity')
 
-                        # first diagonalize
-                        cova_diag = covar_diagonalize(msg_a.est_cov)
-                        covb_diag = covar_diagonalize(msg_b.est_cov)
+                    #     # first diagonalize
+                    #     cova_diag = covar_diagonalize(msg_a.est_cov)
+                    #     covb_diag = covar_diagonalize(msg_b.est_cov)
 
-                        # then quantize
-                        bits_a = self.quantizer.state2quant(msg_a.state_est, cova_diag, element_types, diag_only=True)
-                        bits_b = self.quantizer.state2quant(msg_b.state_est, covb_diag, element_types, diag_only=True)
+                    #     # then quantize
+                    #     bits_a = self.quantizer.state2quant(msg_a.state_est, cova_diag, element_types, diag_only=True)
+                    #     bits_b = self.quantizer.state2quant(msg_b.state_est, covb_diag, element_types, diag_only=True)
 
-                        # then decompress
-                        meana_quant, cova_quant = self.quantizer.quant2state(bits_a[0], 2*cova_diag.shape[0], element_types, diag_only=True)
-                        meanb_quant, covb_quant = self.quantizer.quant2state(bits_b[0], 2*covb_diag.shape[0], element_types, diag_only=True)
+                    #     # then decompress
+                    #     meana_quant, cova_quant = self.quantizer.quant2state(bits_a[0], 2*cova_diag.shape[0], element_types, diag_only=True)
+                    #     meanb_quant, covb_quant = self.quantizer.quant2state(bits_b[0], 2*covb_diag.shape[0], element_types, diag_only=True)
 
-                        assert(cova_quant.shape == msg_a.est_cov.shape)
+                    #     assert(cova_quant.shape == msg_a.est_cov.shape)
 
-                        # add back to state messages
-                        meana_quant = np.reshape(meana_quant,msg_a.state_est.shape)
-                        msg_a.state_est = meana_quant
-                        msg_a.est_cov = cova_quant
-                        meanb_quant = np.reshape(meanb_quant,msg_b.state_est.shape)
-                        msg_b.state_est = meanb_quant
-                        msg_b.est_cov = covb_quant
+                    #     # add back to state messages
+                    #     meana_quant = np.reshape(meana_quant,msg_a.state_est.shape)
+                    #     msg_a.state_est = meana_quant
+                    #     msg_a.est_cov = cova_quant
+                    #     meanb_quant = np.reshape(meanb_quant,msg_b.state_est.shape)
+                    #     msg_b.state_est = meanb_quant
+                    #     msg_b.est_cov = covb_quant
 
-                    elif self.quantization:
+                    # elif self.quantization:
 
-                        # create element types list: assumes position, velocity alternating structure
-                        element_types = []
-                        for el_idx in range(0,msg_a.est_cov.shape[0]):
-                            if el_idx % 2 == 0: element_types.append('position')
-                            else: element_types.append('velocity')
+                    #     # create element types list: assumes position, velocity alternating structure
+                    #     element_types = []
+                    #     for el_idx in range(0,msg_a.est_cov.shape[0]):
+                    #         if el_idx % 2 == 0: element_types.append('position')
+                    #         else: element_types.append('velocity')
 
-                        # quantize
-                        bits_a = self.quantizer.state2quant(msg_a.state_est, msg_a.est_cov, element_types)
-                        bits_b = self.quantizer.state2quant(msg_b.state_est, msg_b.est_cov, element_types)
+                    #     # quantize
+                    #     bits_a = self.quantizer.state2quant(msg_a.state_est, msg_a.est_cov, element_types)
+                    #     bits_b = self.quantizer.state2quant(msg_b.state_est, msg_b.est_cov, element_types)
 
-                        # then decompress
-                        meana_quant, cova_quant = self.quantizer.quant2state(bits_a[0], int(msg_a.est_cov.shape[0] + (msg_a.est_cov.shape[0]**2 + msg_a.est_cov.shape[0])/2), element_types)
-                        meanb_quant, covb_quant = self.quantizer.quant2state(bits_b[0], int(msg_b.est_cov.shape[0] + (msg_b.est_cov.shape[0]**2 + msg_b.est_cov.shape[0])/2), element_types)
+                    #     # then decompress
+                    #     meana_quant, cova_quant = self.quantizer.quant2state(bits_a[0], int(msg_a.est_cov.shape[0] + (msg_a.est_cov.shape[0]**2 + msg_a.est_cov.shape[0])/2), element_types)
+                    #     meanb_quant, covb_quant = self.quantizer.quant2state(bits_b[0], int(msg_b.est_cov.shape[0] + (msg_b.est_cov.shape[0]**2 + msg_b.est_cov.shape[0])/2), element_types)
 
-                        # add back to state messages
-                        meana_quant = np.reshape(meana_quant,msg_a.state_est.shape)
-                        msg_a.state_est = meana_quant
-                        msg_a.est_cov = cova_quant
-                        meanb_quant = np.reshape(meanb_quant,msg_b.state_est.shape)
-                        msg_b.state_est = meanb_quant
-                        msg_b.est_cov = covb_quant
+                    #     # add back to state messages
+                    #     meana_quant = np.reshape(meana_quant,msg_a.state_est.shape)
+                    #     msg_a.state_est = meana_quant
+                    #     msg_a.est_cov = cova_quant
+                    #     meanb_quant = np.reshape(meanb_quant,msg_b.state_est.shape)
+                    #     msg_b.state_est = meanb_quant
+                    #     msg_b.est_cov = covb_quant
 
-                    elif self.diagonalization:
-                        # diagonalize
-                        cova_diag = covar_diagonalize(msg_a.est_cov)
-                        covb_diag = covar_diagonalize(msg_b.est_cov)
+                    # elif self.diagonalization:
+                    #     # diagonalize
+                    #     cova_diag = covar_diagonalize(msg_a.est_cov)
+                    #     covb_diag = covar_diagonalize(msg_b.est_cov)
 
-                        msg_a.est_cov = cova_diag
-                        msg_b.est_cov = covb_diag
+                    #     msg_a.est_cov = cova_diag
+                    #     msg_b.est_cov = covb_diag
 
                     # add messages to ci inbox
                     ci_inbox[conn_id].append(deepcopy(msg_a))
@@ -548,8 +548,8 @@ class SimInstance(object):
         agent_state_histories = []
         agent_cov_histories = []
         agent_true_states = []
-
         agent_state_error = []
+        agent_cov_error = []
         baseline_state_error = []
 
         for i,a in enumerate(self.agents):
@@ -558,6 +558,15 @@ class SimInstance(object):
             agent_state_histories.append(np.array(a.local_filter.state_history))
             agent_cov_histories.append(np.array(a.local_filter.cov_history))
             agent_true_states.append(np.array(a.true_state))
+
+            state_error = []
+            cov_error = []
+            for j in range(0,len(a.local_filter.state_history)-1):
+                id_loc,id_idx = a.get_location(a.agent_id)
+                state_error.append(np.squeeze(np.take(a.local_filter.state_history[j],[id_idx]))-a.true_state[j])
+                cov_error.append(a.local_filter.cov_history[j][np.ix_(id_idx,id_idx)])
+            agent_state_error.append(np.array(state_error))
+            agent_cov_error.append(np.array(cov_error))
 
             agent_msgs_total.append(a.total_msgs)
             agent_msgs_sent.append(a.msgs_sent)
@@ -579,7 +588,8 @@ class SimInstance(object):
                         'agent_state_histories': agent_state_histories,
                         'agent_cov_histories': agent_cov_histories,
                         'agent_true_states': agent_true_states,
-                        # 'agent_state_error': agent_state_error,
+                        'agent_state_error': agent_state_error,
+                        'agent_cov_error': agent_cov_error,
                         'baseline_state_history': baseline_state_history,
                         'baseline_cov_history': baseline_cov_history,
                         # 'baseline_state_error': baseline_state_error,
@@ -680,8 +690,12 @@ def main(plot=False,cfg_path=None,save_path=None):
 
                 # numpy array for monte carlo averaged results
                 mc_mse_results = np.empty((int(cfg['max_time']/cfg['dt'] + 1),len(cfg['agent_cfg']['conns']),num_mc_sim))
-                # mc_time_trace_results = np.empty((int(cfg['max_time']/cfg['dt'] + 1),len(cfg['agent_cfg']['conns']),num_mc_sim))
-                # mc_baseline_results = np.empty((int(cfg['max_time']/cfg['dt'] + 1),len(cfg['agent_cfg']['conns']),num_mc_sim))
+                state_results = []
+                cov_results = []
+                baseline_results = []
+                true_states = []
+                state_error = []
+                cov_error = []
 
                 mc_msgs_total = np.empty((len(cfg['agent_cfg']['conns']),num_mc_sim))
                 mc_msgs_sent = np.empty((len(cfg['agent_cfg']['conns']),num_mc_sim))
@@ -708,9 +722,12 @@ def main(plot=False,cfg_path=None,save_path=None):
                                         diagonalization_flag=cfg['diagonalization'])
                     # run simulation
                     res = sim.run_sim([sim_print_str,param_print_str,mc_print_str])
-                    # add results to results container
-                    # results.append(res)
+                   
                     mc_mse_results[:,:,m-1] = res['results']['agent_mse']
+
+                    state_error.append(res['results']['agent_state_error'])
+                    cov_error.append(res['results']['agent_cov_error'])
+                    cov_results.append(res['results']['agent_cov_histories'])
 
                     mc_msgs_total[:,m-1] = res['results']['agent_msgs_total']
                     mc_msgs_sent[:,m-1] = res['results']['agent_msgs_sent']
@@ -726,7 +743,25 @@ def main(plot=False,cfg_path=None,save_path=None):
                 mc_avg_ci_total = np.mean(mc_ci_total,axis=1)
                 mc_avg_ci_rate = np.mean(mc_ci_rate,axis=1)
 
+                state_error_mc_avg = [state_error[0][x] for x in range(0,len(state_error[0]))]
+                cov_histories_mc_avg = [cov_results[0][x] for x in range(0,len(cov_results[0]))]
+                cov_error_mc_avg = [cov_error[0][x] for x in range(0,len(cov_error[0]))]
+                for ii in range(1,len(state_error)):
+                    for jj in range(0,len(state_error[ii])):
+                        state_error_mc_avg[jj] += state_error[ii][jj]
+                        cov_histories_mc_avg[jj] += cov_results[ii][jj]
+                        cov_error_mc_avg[jj] += cov_error[ii][jj]
+
+                state_error_mc_avg = [state_error_mc_avg[x]/num_mc_sim for x in range(0,len(state_error_mc_avg))]
+                cov_histories_mc_avg = [cov_histories_mc_avg[x]/num_mc_sim for x in range(0,len(cov_histories_mc_avg))]
+                cov_error_mc_avg = [cov_error_mc_avg[x]/num_mc_sim for x in range(0,len(cov_error_mc_avg))]
+
+
                 results = {'mse': mc_avg_mse_results,
+                            'state_error': state_error_mc_avg,
+                            'cov_error': cov_error_mc_avg,
+                            'state_history': state_results,
+                            'cov_history': cov_histories_mc_avg,
                             'msgs_total': mc_avg_msgs_total,
                             'msgs_sent': mc_avg_msgs_sent,
                             'ci_total': mc_avg_ci_total,

@@ -22,23 +22,23 @@ covar_offdiag_num_bins: 100
 covar_offdiag_center: 0
 
 position:
-  range: [-200,200]   # nominal operating area
+  range: [-500,500]   # nominal operating area
   resolution: 0.001  # resolution for uniform quantization
-  num_bins: 100       # number of allowed bins for adaptive scaling --> determines scale factor for adaptive binning
+  num_bins: 30       # number of allowed bins for adaptive scaling --> determines scale factor for adaptive binning
   center: 0           # center of expected values for adaptive binning
   variance_range: [0,10000]
   variance_resolution: 0.001
-  variance_num_bins: 100
+  variance_num_bins: 30
   variance_center: 50
 
 velocity:
-  range: [-5,5]       # nominal operating area
+  range: [-10,10]       # nominal operating area
   resolution: 0.001 # resolution for uniform quantization
-  num_bins: 100       # number of allowed bins for adaptive scaling --> determines scale factor for adaptive binning
+  num_bins: 30       # number of allowed bins for adaptive scaling --> determines scale factor for adaptive binning
   center: 0           # center of expected values for adaptive binning
   variance_range: [0,50]
   variance_resolution: 0.001
-  variance_num_bins: 100
+  variance_num_bins: 30
   variance_center: 20
 
 angle:

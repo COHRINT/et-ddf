@@ -52,7 +52,8 @@ class Quantizer:
         # number of available bits for message
         self.available_bits = self.cfg['available_bits']
 
-    def meas2quant(self,measurement,type_=None,measurement_range=None,measurement_resolution=None,bits_flag=True,config_flag=False):
+    def meas2quant(self,measurement,type_=None,elements=None,measurement_range=None,measurement_resolution=None,bits_flag=True,config_flag=False,
+                    measurement_num_bins=None,measurement_center=None):
         """
         Convert measurement into quantized representation using parameters
         from config or passed.
@@ -86,6 +87,18 @@ class Quantizer:
                 measurement_range = [self.cfg[element]['range'] for element in element_types]
                 measurement_center = [self.cfg[element]['center'] for element in element_types]
                 measurement_num_bins = [self.cfg[element]['num_bins'] for element in element_types]
+        elif elements is not None:
+            element_types = elements
+            if self.quantizer_fxn == 'uniform':
+                measurement_range = [self.cfg[element]['range'] for element in element_types]
+                measurement_resolution = [self.cfg[element]['resolution'] for element in element_types]
+            else:
+                if measurement_range is None:
+                    measurement_range = [self.cfg[element]['range'] for element in element_types]
+                if measurement_center is None:
+                    measurement_center = [self.cfg[element]['center'] for element in element_types]
+                if measurement_num_bins is None:
+                    measurement_num_bins = [self.cfg[element]['num_bins'] for element in element_types]
 
         # compute bins, with method depending on quantizer fxn
         if self.quantizer_fxn == 'uniform':
@@ -117,7 +130,8 @@ class Quantizer:
         
         return return_vals
 
-    def quant2meas(self,bitstring,num_els,type_=None,measurement_range=None,measurement_resolution=None,config_num=None):
+    def quant2meas(self,bitstring,num_els,type_=None,elements=None,measurement_range=None,measurement_resolution=None,config_num=None,
+                    measurement_num_bins=None,measurement_center=None):
         """
         Convert quantized measurement to measurement using range and resolution.
 
@@ -150,6 +164,18 @@ class Quantizer:
                 measurement_range = [self.cfg[element]['range'] for element in element_types]
                 measurement_center = [self.cfg[element]['center'] for element in element_types]
                 measurement_num_bins = [self.cfg[element]['num_bins'] for element in element_types]
+        elif elements is not None:
+            element_types = elements
+            if self.quantizer_fxn == 'uniform':
+                measurement_range = [self.cfg[element]['range'] for element in element_types]
+                measurement_resolution = [self.cfg[element]['resolution'] for element in element_types]
+            else:
+                if measurement_range is None:
+                    measurement_range = [self.cfg[element]['range'] for element in element_types]
+                if measurement_center is None:
+                    measurement_center = [self.cfg[element]['center'] for element in element_types]
+                if measurement_num_bins is None:
+                    measurement_num_bins = [self.cfg[element]['num_bins'] for element in element_types]
 
         # compute bins, with method depending on quantizer fxn
         if self.quantizer_fxn == 'uniform':

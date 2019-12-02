@@ -19,11 +19,13 @@ import time
 from etddf.covar_intersect import covar_intersect, gen_sim_transform
 from etddf.helpers.msg_handling import MeasurementMsg, StateMsg
 
+from etddf.quantization import Quantizer, covar_diagonalize
+
 class Agent(object):
     
     def __init__(self,agent_id,connections,meas_connections,neighbor_connections,
                     local_filter,common_estimates,x_true,msg_drop_prob,tau_goal,
-                    tau,use_adaptive_tau):    
+                    tau,use_adaptive_tau,quantization_flag,diagonalization_flag):    
         # agent id
         self.agent_id = agent_id
         
@@ -64,6 +66,12 @@ class Agent(object):
         self.use_adaptive_tau = use_adaptive_tau
 
         self.ci_process_worst_case_time = 0
+
+        # data compression flags and object
+        self.quantization = quantization_flag
+        self.diagonalization = diagonalization_flag
+        if self.quantization:
+            self.quantizer = Quantizer(quantizer_fxn='x2')
 
     def get_location(self,id_):
         """
@@ -225,6 +233,14 @@ class Agent(object):
             # make sure message dest is current agent
             assert(msg.dest == self.agent_id)
 
+            # simulate message quantization
+            if self.quantization and len(msg.data)>0:
+                element_types = ['position' for x in msg.data] # assuming gps or lin rel measurements
+                num_bins = [1000 for x in msg.data]
+                bits = self.quantizer.meas2quant(msg.data,elements=element_types,measurement_num_bins=num_bins)
+                meas_quant = self.quantizer.quant2meas(bits[0],len(msg.data),elements=element_types,measurement_num_bins=num_bins)
+                msg.data = meas_quant
+
             # imperfect comms sim: coin flip for dropping message
             # TODO: add binomial draw w/ msgs drop prob here
              
@@ -339,9 +355,77 @@ class Agent(object):
             xbTred = xb
             PbTred = Pb
 
+            # compress state messages
+            if self.quantization and self.diagonalization:
+
+                # create element types list: assumes position, velocity alternating structure
+                element_types = []
+                for el_idx in range(0,PaTred.shape[0]):
+                    if el_idx % 2 == 0: element_types.append('position')
+                    else: element_types.append('velocity')
+
+                # make sure there are no infs or nans
+                assert(not np.isnan(PaTred).any())
+                assert(not np.isnan(PbTred).any())
+
+                # first diagonalize
+                cova_diag = covar_diagonalize(PaTred)
+                covb_diag = covar_diagonalize(PbTred)
+
+                # then quantize
+                bits_a = self.quantizer.state2quant(xaTred, cova_diag, element_types, diag_only=True)
+                bits_b = self.quantizer.state2quant(xbTred, covb_diag, element_types, diag_only=True)
+
+                # then decompress
+                meana_quant, cova_quant = self.quantizer.quant2state(bits_a[0], 2*cova_diag.shape[0], element_types, diag_only=True)
+                meanb_quant, covb_quant = self.quantizer.quant2state(bits_b[0], 2*covb_diag.shape[0], element_types, diag_only=True)
+
+                assert(cova_quant.shape == PaTred.shape)
+
+                # add back to state messages
+                meana_quant = np.reshape(meana_quant,xaTred.shape)
+                xaTred_quant = meana_quant
+                PaTred_quant = cova_quant
+                meanb_quant = np.reshape(meanb_quant,xbTred.shape)
+                xbTred_quant = meanb_quant
+                PbTred_quant = covb_quant
+
+            elif self.quantization:
+
+                # create element types list: assumes position, velocity alternating structure
+                element_types = []
+                for el_idx in range(0,PaTred.shape[0]):
+                    if el_idx % 2 == 0: element_types.append('position')
+                    else: element_types.append('velocity')
+
+                # quantize
+                bits_a = self.quantizer.state2quant(xaTred, m, element_types)
+                bits_b = self.quantizer.state2quant(xbTred, PbTred, element_types)
+
+                # then decompress
+                meana_quant, cova_quant = self.quantizer.quant2state(bits_a[0], int(PaTred.shape[0] + (PaTred.shape[0]**2 + PaTred.shape[0])/2), element_types)
+                meanb_quant, covb_quant = self.quantizer.quant2state(bits_b[0], int(PbTred.shape[0] + (PbTred.shape[0]**2 + PbTred.shape[0])/2), element_types)
+
+                # add back to state messages
+                meana_quant = np.reshape(meana_quant,xaTred.shape)
+                xaTred_quant = meana_quant
+                PaTred_quant = cova_quant
+                meanb_quant = np.reshape(meanb_quant,xbTred.shape)
+                xbTred_quant = meanb_quant
+                PbTred_quant = covb_quant
+
+            elif self.diagonalization:
+                # diagonalize
+                cova_diag = covar_diagonalize(PaTred)
+                covb_diag = covar_diagonalize(PbTred)
+
+                PaTred_quant = cova_diag
+                PbTred_quant = covb_diag
+
             # perform covariance intersection with reduced estimates
             alpha = np.ones((PaTred.shape[0],1))
-            xc, Pc = covar_intersect(xaTred,xbTred,PaTred,PbTred,alpha)
+            xc, Pc = covar_intersect(xaTred,xbTred_quant,PaTred,PbTred_quant,alpha)
+            xc_quant, Pc_quant = covar_intersect(xaTred_quant,xbTred_quant,PaTred_quant,PbTred_quant,alpha)
 
             # compute information delta for conditional update
             invD = inv(Pc) - inv(PaTred)
