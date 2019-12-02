@@ -16,7 +16,7 @@ from copy import deepcopy
 # import pudb; pudb.set_trace()
 import time
 
-from etddf.covar_intersect import covar_intersect, gen_sim_transform
+from etddf.covar_intersect import covar_intersect, gen_sim_transform, covariance_union_simple
 from etddf.helpers.msg_handling import MeasurementMsg, StateMsg
 
 from etddf.quantization import Quantizer, covar_diagonalize
@@ -424,8 +424,9 @@ class Agent(object):
 
             # perform covariance intersection with reduced estimates
             alpha = np.ones((PaTred.shape[0],1))
-            xc, Pc = covar_intersect(xaTred,xbTred_quant,PaTred,PbTred_quant,alpha)
-            xc_quant, Pc_quant = covar_intersect(xaTred_quant,xbTred_quant,PaTred_quant,PbTred_quant,alpha)
+            # xc, Pc = covar_intersect(xaTred,xbTred,PaTred,PbTred,alpha)
+            xc, Pc = covariance_union_simple(xaTred,xbTred,PaTred,PbTred)
+            # xc = np.reshape(xc,(xc.shape[0],1))
 
             # compute information delta for conditional update
             invD = inv(Pc) - inv(PaTred)
