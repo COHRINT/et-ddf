@@ -402,7 +402,7 @@ class SimInstance(object):
         for j, agent in enumerate(self.agents):
             
         #     # check covariance trace for triggering CI
-            if np.trace(agent.local_filter.P) > agent.tau or agent.ci_trigger_cnt < 75:
+            if np.trace(agent.local_filter.P) > agent.tau: # or agent.ci_trigger_cnt < 75:
                 agent.ci_trigger_cnt += 1
                 agent.ci_trigger_rate = agent.ci_trigger_cnt / (i-1)
 
@@ -548,8 +548,8 @@ class SimInstance(object):
         agent_state_histories = []
         agent_cov_histories = []
         agent_true_states = []
-
         agent_state_error = []
+        agent_cov_error = []
         baseline_state_error = []
 
         for i,a in enumerate(self.agents):
@@ -558,6 +558,15 @@ class SimInstance(object):
             agent_state_histories.append(np.array(a.local_filter.state_history))
             agent_cov_histories.append(np.array(a.local_filter.cov_history))
             agent_true_states.append(np.array(a.true_state))
+
+            state_error = []
+            cov_error = []
+            for j in range(0,len(a.local_filter.state_history)-1):
+                id_loc,id_idx = a.get_location(a.agent_id)
+                state_error.append(np.squeeze(np.take(a.local_filter.state_history[j],[id_idx]))-a.true_state[j])
+                cov_error.append(a.local_filter.cov_history[j][np.ix_(id_idx,id_idx)])
+            agent_state_error.append(np.array(state_error))
+            agent_cov_error.append(np.array(cov_error))
 
             agent_msgs_total.append(a.total_msgs)
             agent_msgs_sent.append(a.msgs_sent)
@@ -579,7 +588,8 @@ class SimInstance(object):
                         'agent_state_histories': agent_state_histories,
                         'agent_cov_histories': agent_cov_histories,
                         'agent_true_states': agent_true_states,
-                        # 'agent_state_error': agent_state_error,
+                        'agent_state_error': agent_state_error,
+                        'agent_cov_error': agent_cov_error,
                         'baseline_state_history': baseline_state_history,
                         'baseline_cov_history': baseline_cov_history,
                         # 'baseline_state_error': baseline_state_error,
@@ -680,8 +690,12 @@ def main(plot=False,cfg_path=None,save_path=None):
 
                 # numpy array for monte carlo averaged results
                 mc_mse_results = np.empty((int(cfg['max_time']/cfg['dt'] + 1),len(cfg['agent_cfg']['conns']),num_mc_sim))
-                # mc_time_trace_results = np.empty((int(cfg['max_time']/cfg['dt'] + 1),len(cfg['agent_cfg']['conns']),num_mc_sim))
-                # mc_baseline_results = np.empty((int(cfg['max_time']/cfg['dt'] + 1),len(cfg['agent_cfg']['conns']),num_mc_sim))
+                state_results = []
+                cov_results = []
+                baseline_results = []
+                true_states = []
+                state_error = []
+                cov_error = []
 
                 mc_msgs_total = np.empty((len(cfg['agent_cfg']['conns']),num_mc_sim))
                 mc_msgs_sent = np.empty((len(cfg['agent_cfg']['conns']),num_mc_sim))
@@ -708,9 +722,12 @@ def main(plot=False,cfg_path=None,save_path=None):
                                         diagonalization_flag=cfg['diagonalization'])
                     # run simulation
                     res = sim.run_sim([sim_print_str,param_print_str,mc_print_str])
-                    # add results to results container
-                    # results.append(res)
+                   
                     mc_mse_results[:,:,m-1] = res['results']['agent_mse']
+
+                    state_error.append(res['results']['agent_state_error'])
+                    cov_error.append(res['results']['agent_cov_error'])
+                    cov_results.append(res['results']['agent_cov_histories'])
 
                     mc_msgs_total[:,m-1] = res['results']['agent_msgs_total']
                     mc_msgs_sent[:,m-1] = res['results']['agent_msgs_sent']
@@ -726,7 +743,25 @@ def main(plot=False,cfg_path=None,save_path=None):
                 mc_avg_ci_total = np.mean(mc_ci_total,axis=1)
                 mc_avg_ci_rate = np.mean(mc_ci_rate,axis=1)
 
+                state_error_mc_avg = [state_error[0][x] for x in range(0,len(state_error[0]))]
+                cov_histories_mc_avg = [cov_results[0][x] for x in range(0,len(cov_results[0]))]
+                cov_error_mc_avg = [cov_error[0][x] for x in range(0,len(cov_error[0]))]
+                for ii in range(1,len(state_error)):
+                    for jj in range(0,len(state_error[ii])):
+                        state_error_mc_avg[jj] += state_error[ii][jj]
+                        cov_histories_mc_avg[jj] += cov_results[ii][jj]
+                        cov_error_mc_avg[jj] += cov_error[ii][jj]
+
+                state_error_mc_avg = [state_error_mc_avg[x]/num_mc_sim for x in range(0,len(state_error_mc_avg))]
+                cov_histories_mc_avg = [cov_histories_mc_avg[x]/num_mc_sim for x in range(0,len(cov_histories_mc_avg))]
+                cov_error_mc_avg = [cov_error_mc_avg[x]/num_mc_sim for x in range(0,len(cov_error_mc_avg))]
+
+
                 results = {'mse': mc_avg_mse_results,
+                            'state_error': state_error_mc_avg,
+                            'cov_error': cov_error_mc_avg,
+                            'state_history': state_results,
+                            'cov_history': cov_histories_mc_avg,
                             'msgs_total': mc_avg_msgs_total,
                             'msgs_sent': mc_avg_msgs_sent,
                             'ci_total': mc_avg_ci_total,
