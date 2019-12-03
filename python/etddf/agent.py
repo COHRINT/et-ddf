@@ -13,10 +13,10 @@ Usage:
 import numpy as np
 from numpy.linalg import inv
 from copy import deepcopy
-# import pudb; pudb.set_trace()
+import pudb#; pudb.set_trace()
 import time
 
-from etddf.covar_intersect import covar_intersect, gen_sim_transform, covariance_union_simple
+from etddf.covar_intersect import covar_intersect, gen_sim_transform#, covariance_union_simple
 from etddf.helpers.msg_handling import MeasurementMsg, StateMsg
 
 from etddf.quantization import Quantizer, covar_diagonalize
@@ -60,7 +60,7 @@ class Agent(object):
         self.tau_goal = tau_goal
         self.tau = tau
         self.connection_tau_rates = np.zeros( (len(self.connections),1) )
-        self.epsilon_1 = 0.1
+        self.epsilon_1 = 0.01
         self.epsilon_2 = 0.1
 
         self.use_adaptive_tau = use_adaptive_tau
@@ -128,6 +128,9 @@ class Agent(object):
 
         # propagate local and common info filters
         self.local_filter.predict(input_vec)
+        if np.isnan(self.local_filter.x).any() or np.isnan(self.local_filter.P).any():
+            pudb.set_trace()
+
         for filter_ in self.common_estimates:
             # common information filters get no knowledge of control input
             # b/c others have no idea what your control input was
@@ -153,6 +156,9 @@ class Agent(object):
 
             # update local filter
             self.local_filter.msg_update(msg)
+
+            if np.isnan(self.local_filter.x).any() or np.isnan(self.local_filter.P).any():
+                pudb.set_trace()
 
             # threshold measurement and update w/ relevant common info ests
             for id_ in self.meas_connections:
@@ -236,7 +242,7 @@ class Agent(object):
             # simulate message quantization
             if self.quantization and len(msg.data)>0:
                 element_types = ['position' for x in msg.data] # assuming gps or lin rel measurements
-                num_bins = [1000 for x in msg.data]
+                num_bins = [100 for x in msg.data]
                 bits = self.quantizer.meas2quant(msg.data,elements=element_types,measurement_num_bins=num_bins)
                 meas_quant = self.quantizer.quant2meas(bits[0],len(msg.data),elements=element_types,measurement_num_bins=num_bins)
                 msg.data = meas_quant
@@ -248,6 +254,9 @@ class Agent(object):
             x_local = self.local_filter.x
             P_local = self.local_filter.P
             self.local_filter.msg_update(msg,x_local,P_local)
+
+            if np.isnan(self.local_filter.x).any() or np.isnan(self.local_filter.P).any():
+                pudb.set_trace()
 
             # update common information filters
             for filter_ in self.common_estimates:
@@ -289,6 +298,9 @@ class Agent(object):
 
         xa = deepcopy(self.local_filter.x)
         Pa = deepcopy(self.local_filter.P)
+
+        if np.isnan(xa).any() or np.isnan(Pa).any():
+            pudb.set_trace()
 
         # construct transform
         Ta, il_a, inter = gen_sim_transform(self.agent_id,list(self.connections),
@@ -369,23 +381,23 @@ class Agent(object):
                 assert(not np.isnan(PbTred).any())
 
                 # first diagonalize
-                cova_diag = covar_diagonalize(PaTred)
+                # cova_diag = covar_diagonalize(PaTred)
                 covb_diag = covar_diagonalize(PbTred)
 
                 # then quantize
-                bits_a = self.quantizer.state2quant(xaTred, cova_diag, element_types, diag_only=True)
+                # bits_a = self.quantizer.state2quant(xaTred, cova_diag, element_types, diag_only=True)
                 bits_b = self.quantizer.state2quant(xbTred, covb_diag, element_types, diag_only=True)
 
                 # then decompress
-                meana_quant, cova_quant = self.quantizer.quant2state(bits_a[0], 2*cova_diag.shape[0], element_types, diag_only=True)
+                # meana_quant, cova_quant = self.quantizer.quant2state(bits_a[0], 2*cova_diag.shape[0], element_types, diag_only=True)
                 meanb_quant, covb_quant = self.quantizer.quant2state(bits_b[0], 2*covb_diag.shape[0], element_types, diag_only=True)
 
-                assert(cova_quant.shape == PaTred.shape)
+                # assert(cova_quant.shape == PaTred.shape)
 
                 # add back to state messages
-                meana_quant = np.reshape(meana_quant,xaTred.shape)
-                xaTred_quant = meana_quant
-                PaTred_quant = cova_quant
+                # meana_quant = np.reshape(meana_quant,xaTred.shape)
+                # xaTred_quant = meana_quant
+                # PaTred_quant = cova_quant
                 meanb_quant = np.reshape(meanb_quant,xbTred.shape)
                 xbTred_quant = meanb_quant
                 PbTred_quant = covb_quant
@@ -424,13 +436,19 @@ class Agent(object):
 
             # perform covariance intersection with reduced estimates
             alpha = np.ones((PaTred.shape[0],1))
-            # xc, Pc = covar_intersect(xaTred,xbTred,PaTred,PbTred,alpha)
-            xc, Pc = covariance_union_simple(xaTred,xbTred,PaTred,PbTred)
+            xc, Pc = covar_intersect(xaTred,xbTred_quant,PaTred,PbTred_quant,alpha)
+            # xc, Pc = covariance_union_simple(np.copy(xaTred),np.copy(xbTred),np.copy(PaTred),np.copy(PbTred))
             # xc = np.reshape(xc,(xc.shape[0],1))
+
+            if np.isnan(xc).any():
+                pudb.set_trace()
 
             # compute information delta for conditional update
             invD = inv(Pc) - inv(PaTred)
             invDd = np.dot(inv(Pc),xc) - np.dot(inv(PaTred),xaTred)
+
+            if np.isnan(invD).any() or np.isnan(invDd).any():
+                pudb.set_trace()
 
             # conditional gaussian update
             if (PaT.shape[0]-Pc.shape[0] == 0) or (PaT.shape[1]-Pc.shape[1] == 0):
@@ -448,6 +466,9 @@ class Agent(object):
             # transform back to normal state order
             xa = np.dot(Ta,v)
             Pa = np.dot(Ta,np.dot(V,inv(Ta)))
+
+            if np.isnan(xa).any() or np.isnan(Pa).any():
+                pudb.set_trace()
 
             # update local estimates
             self.local_filter.x = deepcopy(xa)

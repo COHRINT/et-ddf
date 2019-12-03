@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+from __future__ import division
+
 """
 Simulation instance class implementation.
 """
@@ -200,19 +202,45 @@ class SimInstance(object):
             self.neighbor_connections = {}
             self.neighbor_meas_connections = {}
             # loop through all connections of each of self's connections
-            for i in self.connections[agent_id]:
-                if i is not agent_id:
-                    neighbor_agent_id = deepcopy(i)
+            # for i in self.connections[agent_id]:
+            #     if i is not agent_id:
+            #         neighbor_agent_id = deepcopy(i)
+            #         ids_new = sorted(deepcopy(self.connections[neighbor_agent_id]))
+            #         ids_new.append(neighbor_agent_id)
+
+            #         # build list of distance one and distance two neighbors for each agent
+            #         # each agent gets full list of connections
+            #         neighbor_conn_ids = []
+            #         for j in range(0,len(self.connections[neighbor_agent_id])):
+            #             for k in range(0,len(self.connections[self.connections[neighbor_agent_id][j]])):
+            #                 if not self.connections[self.connections[neighbor_agent_id][j]][k] in neighbor_conn_ids:
+            #                     neighbor_conn_ids += deepcopy(self.connections[self.connections[neighbor_agent_id][j]])
+
+            #                 # remove agent's own id from list of neighbors
+            #                 if neighbor_agent_id in neighbor_conn_ids:
+            #                     neighbor_conn_ids.remove(neighbor_agent_id)
+
+            #         # combine with direct connection ids and sort
+            #         ids_new = list(set(sorted(ids_new + neighbor_conn_ids)))
+
+            #         # divide out direct measurement connections and all connections
+            #         neighbor_connections_new = list(set(sorted(neighbor_conn_ids + deepcopy(self.connections[neighbor_agent_id]))))
+            #         meas_connections_new = deepcopy(self.connections[neighbor_agent_id])
+            #         self.neighbor_meas_connections[i] = deepcopy(meas_connections_new)
+            #         self.neighbor_connections[i] = deepcopy(neighbor_connections_new)
+            for ii in self.connections[agent_id]:
+                if ii is not agent_id:
+                    neighbor_agent_id = deepcopy(ii) # TODO this should be deepcopy(ii)
                     ids_new = sorted(deepcopy(self.connections[neighbor_agent_id]))
                     ids_new.append(neighbor_agent_id)
 
                     # build list of distance one and distance two neighbors for each agent
                     # each agent gets full list of connections
                     neighbor_conn_ids = []
-                    for j in range(0,len(self.connections[neighbor_agent_id])):
-                        for k in range(0,len(self.connections[self.connections[neighbor_agent_id][j]])):
-                            if not self.connections[self.connections[neighbor_agent_id][j]][k] in neighbor_conn_ids:
-                                neighbor_conn_ids += deepcopy(self.connections[self.connections[neighbor_agent_id][j]])
+                    for jj in range(0,len(self.connections[neighbor_agent_id])):
+                        for kk in range(0,len(self.connections[self.connections[neighbor_agent_id][jj]])):
+                            if not self.connections[self.connections[neighbor_agent_id][jj]][kk] in neighbor_conn_ids:
+                                neighbor_conn_ids += deepcopy(self.connections[self.connections[neighbor_agent_id][jj]])
 
                             # remove agent's own id from list of neighbors
                             if neighbor_agent_id in neighbor_conn_ids:
@@ -224,8 +252,8 @@ class SimInstance(object):
                     # divide out direct measurement connections and all connections
                     neighbor_connections_new = list(set(sorted(neighbor_conn_ids + deepcopy(self.connections[neighbor_agent_id]))))
                     meas_connections_new = deepcopy(self.connections[neighbor_agent_id])
-                    self.neighbor_meas_connections[i] = deepcopy(meas_connections_new)
-                    self.neighbor_connections[i] = deepcopy(neighbor_connections_new)
+                    self.neighbor_meas_connections[ii] = deepcopy(meas_connections_new)
+                    self.neighbor_connections[ii] = deepcopy(neighbor_connections_new)
 
             # construct local estimate
             # TODO: remove hardcoded 6
@@ -402,9 +430,10 @@ class SimInstance(object):
         for j, agent in enumerate(self.agents):
             
         #     # check covariance trace for triggering CI
+            agent.ci_trigger_rate = agent.ci_trigger_cnt / (self.sim_time_step+1)
             if np.trace(agent.local_filter.P) > agent.tau: # or agent.ci_trigger_cnt < 75:
+            # if self.sim_time_step % 2 == 0:
                 agent.ci_trigger_cnt += 1
-                agent.ci_trigger_rate = agent.ci_trigger_cnt / (i-1)
 
                 for conn_id in agent.meas_connections:
                     
@@ -412,72 +441,9 @@ class SimInstance(object):
                     msg_a = agent.gen_ci_message(conn_id,list(self.agents[conn_id].connections))
                     msg_b = self.agents[conn_id].gen_ci_message(agent.agent_id,list(agent.connections))
 
-                    # # compress state messages
-                    # if self.quantization and self.diagonalization:
-
-                    #     # create element types list: assumes position, velocity alternating structure
-                    #     element_types = []
-                    #     for el_idx in range(0,msg_a.est_cov.shape[0]):
-                    #         if el_idx % 2 == 0: element_types.append('position')
-                    #         else: element_types.append('velocity')
-
-                    #     # first diagonalize
-                    #     cova_diag = covar_diagonalize(msg_a.est_cov)
-                    #     covb_diag = covar_diagonalize(msg_b.est_cov)
-
-                    #     # then quantize
-                    #     bits_a = self.quantizer.state2quant(msg_a.state_est, cova_diag, element_types, diag_only=True)
-                    #     bits_b = self.quantizer.state2quant(msg_b.state_est, covb_diag, element_types, diag_only=True)
-
-                    #     # then decompress
-                    #     meana_quant, cova_quant = self.quantizer.quant2state(bits_a[0], 2*cova_diag.shape[0], element_types, diag_only=True)
-                    #     meanb_quant, covb_quant = self.quantizer.quant2state(bits_b[0], 2*covb_diag.shape[0], element_types, diag_only=True)
-
-                    #     assert(cova_quant.shape == msg_a.est_cov.shape)
-
-                    #     # add back to state messages
-                    #     meana_quant = np.reshape(meana_quant,msg_a.state_est.shape)
-                    #     msg_a.state_est = meana_quant
-                    #     msg_a.est_cov = cova_quant
-                    #     meanb_quant = np.reshape(meanb_quant,msg_b.state_est.shape)
-                    #     msg_b.state_est = meanb_quant
-                    #     msg_b.est_cov = covb_quant
-
-                    # elif self.quantization:
-
-                    #     # create element types list: assumes position, velocity alternating structure
-                    #     element_types = []
-                    #     for el_idx in range(0,msg_a.est_cov.shape[0]):
-                    #         if el_idx % 2 == 0: element_types.append('position')
-                    #         else: element_types.append('velocity')
-
-                    #     # quantize
-                    #     bits_a = self.quantizer.state2quant(msg_a.state_est, msg_a.est_cov, element_types)
-                    #     bits_b = self.quantizer.state2quant(msg_b.state_est, msg_b.est_cov, element_types)
-
-                    #     # then decompress
-                    #     meana_quant, cova_quant = self.quantizer.quant2state(bits_a[0], int(msg_a.est_cov.shape[0] + (msg_a.est_cov.shape[0]**2 + msg_a.est_cov.shape[0])/2), element_types)
-                    #     meanb_quant, covb_quant = self.quantizer.quant2state(bits_b[0], int(msg_b.est_cov.shape[0] + (msg_b.est_cov.shape[0]**2 + msg_b.est_cov.shape[0])/2), element_types)
-
-                    #     # add back to state messages
-                    #     meana_quant = np.reshape(meana_quant,msg_a.state_est.shape)
-                    #     msg_a.state_est = meana_quant
-                    #     msg_a.est_cov = cova_quant
-                    #     meanb_quant = np.reshape(meanb_quant,msg_b.state_est.shape)
-                    #     msg_b.state_est = meanb_quant
-                    #     msg_b.est_cov = covb_quant
-
-                    # elif self.diagonalization:
-                    #     # diagonalize
-                    #     cova_diag = covar_diagonalize(msg_a.est_cov)
-                    #     covb_diag = covar_diagonalize(msg_b.est_cov)
-
-                    #     msg_a.est_cov = cova_diag
-                    #     msg_b.est_cov = covb_diag
-
                     # add messages to ci inbox
                     ci_inbox[conn_id].append(deepcopy(msg_a))
-                    ci_inbox[agent.agent_id].append(msg_b)
+                    ci_inbox[agent.agent_id].append(deepcopy(msg_b))
 
         # # process inbox messages
         for j, msg_list in enumerate(ci_inbox):
