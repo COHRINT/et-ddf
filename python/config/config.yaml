@@ -14,8 +14,8 @@ use_adaptive_tau: True
 fixed_rng: False
 
 # data compression techniques
-quantization: False
-diagonalization: False
+quantization: True
+diagonalization: True
 
 agent_cfg:
     conn_struct_type: "tree"

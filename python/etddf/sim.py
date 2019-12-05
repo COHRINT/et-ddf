@@ -147,6 +147,9 @@ class SimInstance(object):
         # create filter instance
         baseline_filter = KF(F_full,G_full,0,0,Q_full,R_abs,R_rel,x0_full,P0_full,0)
 
+        # add mse history
+        baseline_filter.mse_history = [[] for x in range(0,self.num_agents)]
+
         return baseline_filter
 
     def init_agents(self,x_true_vec,dynamics_fxn='lin_ncv',dynamics_fxn_params={},sensors={}):
@@ -271,6 +274,7 @@ class SimInstance(object):
                     x = np.array((0,0,0,0,0,0)).transpose()
                 x0 = np.hstack( (x0,x) )
 
+            # P0 = 5000*np.eye(6*est_state_length)
             P0 = 5000*np.eye(6*est_state_length)
 
             local_filter = ETKF(F,G,0,0,Q,np.array(R_abs),np.array(R_rel),
@@ -294,6 +298,7 @@ class SimInstance(object):
                     x0_comm = np.hstack( (x0_comm,x) )
                 
                 # create comm info filter initial covariance
+                # P0_comm = 5000*np.eye(6*len(comm_ids))
                 P0_comm = 5000*np.eye(6*len(comm_ids))
 
                 # generate dynamics
@@ -463,6 +468,17 @@ class SimInstance(object):
             agent_mse = np.linalg.norm(np.take(agent.local_filter.x,[idx[0],idx[2],idx[4]]) - np.take(agent.true_state[-1],[0,2,4]),ord=2)**2 
             agent.mse_history.append(agent_mse)
 
+            # relative position mse
+            for k in range(0,len(agent.meas_connections)):
+                # get est location
+                _,rel_idx = agent.get_location(agent.meas_connections[k])
+                agent_rel_mse = np.linalg.norm( (np.take(agent.local_filter.x,[idx[0],idx[2],idx[4]]) - np.take(agent.local_filter.x,[rel_idx[0],rel_idx[2],rel_idx[4]])) - \
+                                (np.take(agent.true_state[-1],[0,2,4]) - np.take(self.agents[agent.meas_connections[k]].true_state[-1],[0,2,4])),ord=2)**2
+                agent.rel_mse_history[k].append(agent_rel_mse)
+
+            baseline_agent_mse = np.linalg.norm(np.take(self.baseline_filter.x,[j*6,(j*6)+2,(j*6)+4]) - np.take(agent.true_state[-1],[0,2,4]),ord=2)**2 
+            self.baseline_filter.mse_history[j].append(baseline_agent_mse)
+
         # update baseline est and cov histories
         self.baseline_filter.state_history.append(self.baseline_filter.x)
         self.baseline_filter.cov_history.append(self.baseline_filter.P)
@@ -501,7 +517,9 @@ class SimInstance(object):
 
         # create empty numpy arrays to store results -> rows=time, columns=agents
         mse_results_array = np.empty((self.sim_time_step,self.num_agents))
+        rel_mse_array = [np.empty((self.sim_time_step,len(agent.meas_connections))) for i,agent in enumerate(self.agents)]
         local_filter_history = np.empty(())
+        baseline_mse_array = np.empty((self.sim_time_step,self.num_agents))
 
         baseline_state_history = np.array(self.baseline_filter.state_history)
         baseline_cov_history = np.array(self.baseline_filter.cov_history)
@@ -520,6 +538,7 @@ class SimInstance(object):
 
         for i,a in enumerate(self.agents):
             mse_results_array[:,i] = np.array(a.mse_history)
+            baseline_mse_array[:,i] = np.array(self.baseline_filter.mse_history[i])
 
             agent_state_histories.append(np.array(a.local_filter.state_history))
             agent_cov_histories.append(np.array(a.local_filter.cov_history))
@@ -533,6 +552,10 @@ class SimInstance(object):
                 cov_error.append(a.local_filter.cov_history[j][np.ix_(id_idx,id_idx)])
             agent_state_error.append(np.array(state_error))
             agent_cov_error.append(np.array(cov_error))
+
+            # relative mse
+            for j,conn in enumerate(a.meas_connections):
+                rel_mse_array[i][:,j] = np.array(a.rel_mse_history[j])
 
             agent_msgs_total.append(a.total_msgs)
             agent_msgs_sent.append(a.msgs_sent)
@@ -551,11 +574,13 @@ class SimInstance(object):
         # res = package_results()
         # results_dict = {'baseline': self.baseline_filter, 'agents': self.agents}
         results_dict = {'agent_mse': mse_results_array,
+                        'agent_rel_mse': rel_mse_array,
                         'agent_state_histories': agent_state_histories,
                         'agent_cov_histories': agent_cov_histories,
                         'agent_true_states': agent_true_states,
                         'agent_state_error': agent_state_error,
                         'agent_cov_error': agent_cov_error,
+                        'baseline_mse': baseline_mse_array,
                         'baseline_state_history': baseline_state_history,
                         'baseline_cov_history': baseline_cov_history,
                         # 'baseline_state_error': baseline_state_error,
@@ -656,6 +681,8 @@ def main(plot=False,cfg_path=None,save_path=None):
 
                 # numpy array for monte carlo averaged results
                 mc_mse_results = np.empty((int(cfg['max_time']/cfg['dt'] + 1),len(cfg['agent_cfg']['conns']),num_mc_sim))
+                mc_baseline_mse_results = np.empty((int(cfg['max_time']/cfg['dt'] + 1),len(cfg['agent_cfg']['conns']),num_mc_sim))
+                mc_rel_mse_results = [np.empty((int(cfg['max_time']/cfg['dt'] + 1),len(cfg['agent_cfg']['conns'][x]),num_mc_sim)) for x in range(0,len(cfg['agent_cfg']['conns']))]
                 state_results = []
                 cov_results = []
                 baseline_results = []
@@ -690,6 +717,10 @@ def main(plot=False,cfg_path=None,save_path=None):
                     res = sim.run_sim([sim_print_str,param_print_str,mc_print_str])
                    
                     mc_mse_results[:,:,m-1] = res['results']['agent_mse']
+                    mc_baseline_mse_results[:,:,m-1] = res['results']['baseline_mse']
+
+                    for ii in range(0,len(cfg['agent_cfg']['conns'])):
+                        mc_rel_mse_results[ii][:,:,m-1] = res['results']['agent_rel_mse'][ii]
 
                     state_error.append(res['results']['agent_state_error'])
                     cov_error.append(res['results']['agent_cov_error'])
@@ -703,11 +734,21 @@ def main(plot=False,cfg_path=None,save_path=None):
                     sim_cnt += 1
 
                 mc_avg_mse_results = np.mean(mc_mse_results,axis=2)
+                mc_std_mse_results = np.std(mc_mse_results,axis=2)
+                mc_avg_baseline_mse_results = np.mean(mc_baseline_mse_results,axis=2)
+                mc_std_baseline_mse_results = np.std(mc_baseline_mse_results,axis=2)
+                mc_avg_rel_mse_results = [np.mean(mc_rel_mse_results[x],axis=2) for x in range(0,len(mc_rel_mse_results))]
+                mc_std_rel_mse_results = [np.std(mc_rel_mse_results[x],axis=2) for x in range(0,len(mc_rel_mse_results))]
 
                 mc_avg_msgs_total = np.mean(mc_msgs_total,axis=1)
                 mc_avg_msgs_sent = np.mean(mc_msgs_sent,axis=1)
                 mc_avg_ci_total = np.mean(mc_ci_total,axis=1)
                 mc_avg_ci_rate = np.mean(mc_ci_rate,axis=1)
+
+                mc_std_msgs_total = np.std(mc_msgs_total,axis=1)
+                mc_std_msgs_sent = np.std(mc_msgs_sent,axis=1)
+                mc_std_ci_total = np.std(mc_ci_total,axis=1)
+                mc_std_ci_rate = np.std(mc_ci_rate,axis=1)
 
                 state_error_mc_avg = [state_error[0][x] for x in range(0,len(state_error[0]))]
                 cov_histories_mc_avg = [cov_results[0][x] for x in range(0,len(cov_results[0]))]
@@ -724,6 +765,8 @@ def main(plot=False,cfg_path=None,save_path=None):
 
 
                 results = {'mse': mc_avg_mse_results,
+                            'rel_mse': mc_avg_rel_mse_results,
+                            'baseline_mse': mc_avg_baseline_mse_results,
                             'state_error': state_error_mc_avg,
                             'cov_error': cov_error_mc_avg,
                             'state_history': state_results,
@@ -731,7 +774,14 @@ def main(plot=False,cfg_path=None,save_path=None):
                             'msgs_total': mc_avg_msgs_total,
                             'msgs_sent': mc_avg_msgs_sent,
                             'ci_total': mc_avg_ci_total,
-                            'ci_rate': mc_avg_ci_rate}
+                            'ci_rate': mc_avg_ci_rate,
+                            'mse_std': mc_std_mse_results,
+                            'rel_mse_std': mc_std_rel_mse_results,
+                            'baseline_mse_std': mc_std_baseline_mse_results,
+                            'msgs_total_std': mc_std_msgs_total,
+                            'msgs_sent_std': mc_std_msgs_sent,
+                            'ci_total_std': mc_std_ci_total,
+                            'ci_rate_std': mc_std_ci_rate}
 
                 # create metadata dictionary
                 metadata_dict = {'num_mc_sim': num_mc_sim,

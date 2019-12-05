@@ -46,6 +46,7 @@ class Agent(object):
         # true starting position and MSE
         self.true_state = [x_true]
         self.mse_history = []
+        self.rel_mse_history = [[] for x in self.meas_connections]
         
         # CI trigger count
         self.ci_trigger_cnt = 0
@@ -399,8 +400,8 @@ class Agent(object):
                 # xaTred_quant = meana_quant
                 # PaTred_quant = cova_quant
                 meanb_quant = np.reshape(meanb_quant,xbTred.shape)
-                xbTred_quant = meanb_quant
-                PbTred_quant = covb_quant
+                xbTred = meanb_quant
+                PbTred = covb_quant
 
             elif self.quantization:
 
@@ -436,9 +437,8 @@ class Agent(object):
 
             # perform covariance intersection with reduced estimates
             alpha = np.ones((PaTred.shape[0],1))
-            xc, Pc = covar_intersect(xaTred,xbTred_quant,PaTred,PbTred_quant,alpha)
-            # xc, Pc = covariance_union_simple(np.copy(xaTred),np.copy(xbTred),np.copy(PaTred),np.copy(PbTred))
-            # xc = np.reshape(xc,(xc.shape[0],1))
+            xc, Pc = covar_intersect(xaTred,xbTred,PaTred,PbTred,alpha)
+            # xc, Pc = covar_intersect(xaTred,xbTred_quant,PaTred,PbTred_quant,alpha)
 
             if np.isnan(xc).any():
                 pudb.set_trace()
