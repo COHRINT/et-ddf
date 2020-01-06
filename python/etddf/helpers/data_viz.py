@@ -9,6 +9,7 @@ import sys
 import pprint
 import numpy as np
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 import argparse
 import pudb; pudb.set_trace()
 
@@ -52,7 +53,7 @@ def mse_plots(path,agent_ids):
     # figs = [['delta05','drop00','tau30'],['delta10','drop00','tau30'],['delta15','drop00','tau30'],['delta20','drop00','tau30']]
     # figs = [['delta15','drop00','tau30']]
     # figs = [['delta15','drop00','tau70']]
-    figs = [['delta10','drop00','tau35'],['delta10','drop00','tau5']]
+    figs = [['delta10','drop00','tau35'],['delta10','drop00','tau5'],['delta20','drop00','tau35'],['delta20','drop00','tau5']]
 
     # load simulation metadata and get ids of agents to plot
     metadata = load_metadata(path)['cfg']
@@ -122,12 +123,14 @@ def mse_plots(path,agent_ids):
                 # baseline_mse_data = param_data['results']['baseline_mse'][:,id_]
                 # baseline_mse_data_avg = np.mean(baseline_mse_data,axis=1)
 
-                mse_std_data = np.mean(param_data['results']['mse_std'][:,id_])
-                print('Agent {} RMSE avg std: {}'.format(id_,np.sqrt(mse_std_data)))
+                mse_std_data_avg = np.mean(param_data['results']['mse_std'][:,id_])
+                rmse_std_data = np.sqrt(param_data['results']['mse_std'][:,id_])
+                print('Agent {} RMSE avg std: {} {}'.format(id_,np.sqrt(mse_std_data_avg),np.mean(rmse_std_data)))
 
                 color_str = 'C' + str(color_cnt%12)
 
-                plt.plot(time_vec,np.sqrt(mse_data),color=color_str)
+                plt.plot(time_vec[1:],np.sqrt(mse_data[1:]),color=color_str)
+                plt.fill_between(time_vec[1:],np.sqrt(mse_data[1:])+2*rmse_std_data[1:],np.sqrt(mse_data[1:])-2*rmse_std_data[1:],color=color_str,alpha=0.2)
                 # plt.plot(time_vec,np.sqrt(baseline_mse_data),'--',color=color_str)
                 # plt.plot(time_vec,np.sqrt(baseline_mse_data_avg),'--',color='C7')
 
@@ -182,7 +185,8 @@ def rel_mse_plots(path,agent_ids):
     # figs = [['delta05','drop00','tau30'],['delta10','drop00','tau30'],['delta15','drop00','tau30'],['delta20','drop00','tau30']]
     # figs = [['delta15','drop00','tau30']]
     # figs = [['delta15','drop00','tau70']]
-    figs = [['delta10','drop00','tau35'],['delta10','drop00','tau5']]
+    # figs = [['delta10','drop00','tau35'],['delta10','drop00','tau5']]
+    figs = [['delta10','drop00','tau35'],['delta10','drop00','tau5'],['delta20','drop00','tau35'],['delta20','drop00','tau5']]
 
     # load simulation metadata and get ids of agents to plot
     metadata = load_metadata(path)['cfg']
@@ -248,7 +252,7 @@ def rel_mse_plots(path,agent_ids):
                 for conn in range(0,rel_mse_data.shape[1]):
                     color_str = 'C' + str(color_cnt%10)
 
-                    plt.plot(time_vec,np.sqrt(rel_mse_data[:,conn]),color=color_str)
+                    plt.plot(time_vec[1:],np.sqrt(rel_mse_data[1:,conn]),color=color_str)
 
                     legend_str.append(r'${}\rightarrow {}$'.format(id_,metadata['agent_cfg']['conns'][id_][conn]))
                     color_cnt += 1
@@ -460,6 +464,139 @@ def time_trace_plots(path, agent_ids):
 
     # plt.show()
 
+def trajectory_plots(path,agent_ids):
+    """
+    Creates plot of vehicle trajectories.
+
+    Inputs:
+
+        metadata -- sim run metadata
+        data -- sim results data structure
+        agent_ids -- list of agent ids to plot
+
+    Outputs:
+
+        plots -- matplotlib plot objects
+    """
+    # list of params for figures --> params not specified will have all values plotted
+    # figs = [['delta10','drop00','tau5'],['delta10','drop00','tau7'],['delta20','drop00','tau5'],['delta20','drop00','tau7']]
+    # figs = [['drop00','delta15','tau5'],['drop02','delta20','tau5']]
+    # figs = [['delta10','drop00','tau5'],['delta10','drop00','tau7'],['delta20','drop00','tau5'],['delta20','drop00','tau7']]#,
+    #         ['delta05','drop00','tau5'],['delta05','drop00','tau7'],['delta15','drop00','tau5'],['delta15','drop00','tau7'],
+    #         ['delta05','drop00','tau35'],['delta10','drop00','tau35'],['delta15','drop00','tau35'],['delta20','drop00','tau35']]
+    # figs = [['delta10','drop00','tau0'],['delta10','drop00','tau05'],['delta20','drop00','tau0'],['delta20','drop00','tau05'],
+    #         ['delta05','drop00','tau0'],['delta05','drop00','tau05'],['delta15','drop00','tau0'],['delta15','drop00','tau05'],
+    #         ['delta05','drop00','tau1'],['delta10','drop00','tau1'],['delta15','drop00','tau1'],['delta20','drop00','tau1']]
+    # figs = [['delta05','drop00','tau15'],['delta10','drop00','tau15'],['delta15','drop00','tau15'],['delta20','drop00','tau15']]
+    # figs = [['delta05','drop00','tau20'],['delta10','drop00','tau20'],['delta15','drop00','tau20'],['delta20','drop00','tau20'],
+    #         ['delta05','drop00','tau25'],['delta10','drop00','tau25'],['delta15','drop00','tau25'],['delta20','drop00','tau25'],
+    # figs = [['delta05','drop00','tau30'],['delta10','drop00','tau30'],['delta15','drop00','tau30'],['delta20','drop00','tau30']]
+    # figs = [['delta15','drop00','tau30']]
+    # figs = [['delta15','drop00','tau70']]
+    # figs = [['delta10','drop00','tau7'],['delta25','drop00','tau7']]
+    # figs = [['delta10','drop00','tau50'],['delta20','drop00','tau50']]
+    figs = [['delta10','drop00','tau5']]
+
+    # load simulation metadata and get ids of agents to plot
+    metadata = load_metadata(path)['cfg']
+    if len(agent_ids) == 1 and agent_ids[0] == -1:
+        agent_ids = list(range(0,len(metadata['agent_cfg']['conns'])))
+
+    # plot handles
+    f = [[] for x in range(0,len(figs))]
+
+    plt.rc('text', usetex=True)
+    plt.rc('font',family='serif')
+
+    # for each fig to be created, get data
+    for i,fig in enumerate(figs):
+
+        # get all sim data files with desired params
+        all_files = os.listdir(path)
+        files_to_load = []
+        for file in all_files:
+            keep_flag = True
+            for param in fig:
+                if param not in file:
+                    keep_flag = False
+            if keep_flag: files_to_load.append(file)
+        
+        data = []
+        for file in files_to_load:
+            data.append(load_sim_data(os.path.join(os.path.abspath(path),file)))
+
+        # create time vector -- common to all plots
+        time_vec = np.arange(start=0,
+                            stop=metadata['max_time']+metadata['dt'],
+                            step=metadata['dt'])
+
+        # create figure for figure parameter set
+        f[i] = plt.figure()
+        plt.grid(True)
+        ax = f[i].add_subplot(111, projection='3d')
+        legend_str = []
+        # create params title
+        delta_str = fig[0].split('delta')[1]
+        if int(delta_str) > 9:
+            delta_str = str(int(delta_str)/10)
+        tau_str = fig[2].split('tau')[1]
+        if int(tau_str) > 9:
+            tau_str = str(int(tau_str)/10)
+        params_str = r'$\delta$=' + delta_str + r', $\tau$=' + tau_str
+
+        # color_cnt = 0
+
+        # configure pyplot for using latex
+        # plt.rc('text', usetex=True)
+        # plt.rc('font',family='serif')
+        plt.title('Sample trajectories, ' + params_str + ', GPS agents: ' + str(metadata['agent_cfg']['sensors']['lin_abs_pos']['agents']),size=TITLE_SIZE)
+        # plt.xlabel('Time [s]',size=LABEL_SIZE)
+        # plt.ylabel(r'Est error [$m$]',size=LABEL_SIZE)
+        plt.xlabel(r'$\eta$ [$m$]',size=LABEL_SIZE)
+        plt.ylabel(r'$\xi$ [$m$]',size=LABEL_SIZE)
+        ax.set_zlabel(r'$d$ [$m$]',size=LABEL_SIZE)
+
+        for label in (plt.gca().get_xticklabels() + plt.gca().get_yticklabels()):
+            label.set_fontsize(TICK_SIZE)
+
+        # for each loaded data file
+        # for param_data in data:
+        #     # for each agent generate mse plot
+        #     color_cnt = 0
+        #     for id_ in agent_ids:
+        #         # extract agent data to plot
+        #         rel_mse_data = param_data['results']['etddf_rel_mse'][id_]
+
+        print(len(data))
+
+        # for sample trajectory, we just need one plot, and one trajectory from one monte carlo sim
+        for id_ in agent_ids:
+            true_pos = data[0]['results']['true_states'][0][id_]
+            print(true_pos.shape)
+            
+            
+            # ax = Axes3D(fig1)
+            # plt.plot(gt_data[:,0], gt_data[:,1])
+            # ax.plot(gt_data[:,0],gt_data[:,1],gt_data[:,2])
+            # plt.plot(est[:,0],est[:,1])
+            # ax.plot(true_pos[0,:-8],true_pos[1,:-8],true_pos[2,:-8])
+            ax.plot(true_pos[:-8,0],true_pos[:-8,2],true_pos[:-8,4])
+            # ax.scatter(true_pos[0,-9],true_pos[1,-9],true_pos[2,-9],marker='>',label='_nolegend_')
+            ax.scatter(true_pos[-9,0],true_pos[-9,2],true_pos[-9,4],marker='>',label='_nolegend_')
+            # ax.plot(generated_measurements['GPS'][:,0],generated_measurements['GPS'][:,1],generated_measurements['GPS'][:,2],'x')
+            # plt.title('Ground Truth 3D Position')
+            # plt.xlabel('X Position [m]')
+            # plt.ylabel('Y Position [m]')
+            # ax.set_zlabel('Z Position [m]')
+            # plt.legend(['ground truth','ins estimate','gps measurements'])
+            # ax.set_xlim([-100,100])
+            # ax.set_ylim([-100,100])
+            # ax.set_zlim([-100,100])
+
+            legend_str.append('{}'.format(id_))
+
+        plt.legend(legend_str,loc='center left')
+
 def test_mse_plots():
 
     save_path = '../../data/sim_20190418-010908.pckl'
@@ -487,6 +624,8 @@ if __name__ == "__main__":
                     help='specify path to sim data directory')
     parser.add_argument('-r','--rel-mse',dest='rel_mse_flag',action='store_true',
                     help='plot relative mean-squared-errors (relMSE)')
+    parser.add_argument('-j','--traj',dest='traj_flag',action='store_true',
+                    help='plot vehicle trajectory')
     args = parser.parse_args()
 
     # TODO: add arg for local, common, or both
@@ -516,6 +655,9 @@ if __name__ == "__main__":
 
     if args.rel_mse_flag:
         rel_mse_plots(args.dir_path, agents)
+
+    if args.traj_flag:
+        trajectory_plots(args.dir_path, agents)
 
     plt.show()
     # if args.data_usage:

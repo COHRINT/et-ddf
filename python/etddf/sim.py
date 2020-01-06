@@ -731,6 +731,8 @@ def main(plot=False,cfg_path=None,save_path=None):
                     mc_ci_total[:,m-1] = res['results']['agent_ci_total']
                     mc_ci_rate[:,m-1] = res['results']['agent_ci_rate']
 
+                    true_states.append(res['results']['agent_true_states'])
+
                     sim_cnt += 1
 
                 mc_avg_mse_results = np.mean(mc_mse_results,axis=2)
@@ -771,6 +773,7 @@ def main(plot=False,cfg_path=None,save_path=None):
                             'cov_error': cov_error_mc_avg,
                             'state_history': state_results,
                             'cov_history': cov_histories_mc_avg,
+                            'true_states': true_states,
                             'msgs_total': mc_avg_msgs_total,
                             'msgs_sent': mc_avg_msgs_sent,
                             'ci_total': mc_avg_ci_total,

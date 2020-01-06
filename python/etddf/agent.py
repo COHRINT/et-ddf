@@ -340,7 +340,7 @@ class Agent(object):
 
         for msg in msgs:
             
-            start_time = time.clock()
+            # start_time = time.clock()
 
             # grab state estimate from local filter
             xa = deepcopy(self.local_filter.x)
@@ -488,8 +488,8 @@ class Agent(object):
                                 self.ci_trigger_rate) +
                                 self.epsilon_2*(self.tau_goal-self.tau))
 
-            time_elapsed = time.clock() - start_time
-            if time_elapsed > self.ci_process_worst_case_time: self.ci_process_worst_case_time = time_elapsed
+            # time_elapsed = time.clock() - start_time
+            # if time_elapsed > self.ci_process_worst_case_time: self.ci_process_worst_case_time = time_elapsed
 
 def test_agent():
     pass
