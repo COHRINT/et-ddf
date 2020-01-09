@@ -47,6 +47,7 @@ class AgentWrapper(object):
         # self.update_rate = cfg['update_rate']
         self.agent_name = rospy.get_namespace()
         self.agent_id = rospy.get_param('agent_id')
+        rospy.logerr('agent id: {}'.format(self.agent_id))
         self.update_rate = rospy.get_param('agent_update_rate')
         self.connections = rospy.get_param('connections')
         # self.meas_connections = rospy.get_param('meas_connections')
@@ -201,7 +202,7 @@ class AgentWrapper(object):
                 # msg_type = msg.type
                 msg_type = msg._type.split('/')[1]
                 del msg
-                rospy.logwarn('[Agent {}]: throwing away local {} message -- {} sec old'.format(self.agent_id,msg_type,how_old))
+                rospy.logwarn('[ET-DDF Agent {}]: throwing away local {} message -- {} sec old'.format(self.agent_id,msg_type,how_old))
         
         return local_measurements
 
@@ -222,7 +223,7 @@ class AgentWrapper(object):
                 src_agent = msg.src
                 msg_type = msg.type
                 del msg
-                rospy.logwarn('[Agent {}]: throwing away {} message from Agent {} -- {} sec old'.format(self.agent_id,msg_type,src_agent,how_old))
+                rospy.logwarn('[ET-DDF Agent {}]: throwing away {} message from Agent {} -- {} sec old'.format(self.agent_id,msg_type,src_agent,how_old))
         
         return received_measurements
 
@@ -237,9 +238,9 @@ class AgentWrapper(object):
             self.agent.ci_trigger_rate = self.agent.ci_trigger_cnt / self.update_cnt
 
             # generate CI requests
-            for conn in self.connections[self.agent_id]:
+            for conn in self.connections[self.ordered_connections.index(self.agent_id)]:
                 # request state of connection and queue
-                rospy.logdebug('[Agent {}]: waiting for CI update service from agent_{} to become available'.format(self.agent_id,conn))
+                rospy.logdebug('[ET-DDF Agent {}]: waiting for CI update service from agent_{} to become available'.format(self.agent_id,conn))
                 srv_name = '/'+self.agent_name.split('_')[0] +'_' +str(conn) + '/ci_update'
                 rospy.wait_for_service(srv_name)
 
@@ -251,17 +252,17 @@ class AgentWrapper(object):
                 # send request and wait for response
                 try:
                     res = ci_request(request_msg)
-                    rospy.logdebug('[Agent {}]: CI update response received'.format(self.agent_id))
+                    rospy.logdebug('[ET-DDF Agent {}]: CI update response received'.format(self.agent_id))
                     # add response to ci queue
                     self.ci_queue.put(deepcopy(res.response_state))
                 except rospy.ServiceException as e:
-                    rospy.logerr('[Agent {}]: CI update service request failed: {}'.format(self.agent_id,e))
+                    rospy.logerr('[ET-DDF Agent {}]: CI update service request failed: {}'.format(self.agent_id,e))
 
     def process_ci_queue(self):
         """
         Process queued CI update messages, and perform CI and conditional updates for each.
         """
-        rospy.logdebug('[Agent {}]: Emptying CI message queue...'.format(self.agent_id))
+        rospy.logdebug('[ET-DDF Agent {}]: Emptying CI message queue...'.format(self.agent_id))
 
         # get current number of messages in queue
         num_messages = self.ci_queue.qsize()
@@ -275,9 +276,9 @@ class AgentWrapper(object):
                 how_old = (rospy.Time.now() - msg.header.stamp).to_sec()
                 src_agent = msg.src
                 del msg
-                rospy.logwarn('[Agent {}]: throwing away CI message from Agent {} -- {} sec old'.format(self.agent_id,src_agent,how_old))
+                rospy.logwarn('[ET-DDF Agent {}]: throwing away CI message from Agent {} -- {} sec old'.format(self.agent_id,src_agent,how_old))
 
-        rospy.logdebug('[Agent {}]: Grabbed {} message(s) from CI message queue.'.format(self.agent_id,num_messages))
+        rospy.logdebug('[ET-DDF Agent {}]: Grabbed {} message(s) from CI message queue.'.format(self.agent_id,num_messages))
 
         return ci_messages
 
@@ -285,7 +286,7 @@ class AgentWrapper(object):
         """
         Handler for CI service requests.
         """
-        rospy.logdebug('[Agent {}]: CI update request received'.format(self.agent_id))
+        rospy.logdebug('[ET-DDF Agent {}]: CI update request received'.format(self.agent_id))
         # queue recevied request message
         self.ci_queue.put(deepcopy(req.request_state))
 
@@ -361,13 +362,13 @@ class AgentWrapper(object):
         """
         Main update function to process measurements, and ci messages.
         """
-        rospy.loginfo("UPDATING")
         # increment update count
         self.update_cnt += 1
+        rospy.logdebug("[ET-DDF Agent {}] Updating...".format(self.agent_id))
 
         # process measurement queues
         local_measurements = self.process_local_measurement_queue()
-        rospy.loginfo("local_measurements: " + str(local_measurements))
+        rospy.logdebug("[ET-DDF Agent {}] local_measurements: ".format(self.agent_id) + str(local_measurements))
 
         # convert messages from AgentMeasurement and AgentState ROS msg types to
         # MeasurementMsg and StateMsg python msg types (they're pretty much the same)
@@ -405,7 +406,7 @@ class AgentWrapper(object):
             if type(m.src_connections) is str:
                 # m.src_connections = [ord(m.src_connections)]
                 m.src_connections = array.array('b',m.src_connections).tolist()
-                # rospy.logwarn('[Agent {}]: Src connections in CI message from Agent {} retrieved as bytes. Converting...'.format(self.agent_id,m.src))
+                # rospy.logwarn('[ET-DDF Agent {}]: Src connections in CI message from Agent {} retrieved as bytes. Converting...'.format(self.agent_id,m.src))
             # elif (type(m.src_connections) is list) and (type(m.src_connections)) 
         
             assert((type(m.src_connections) is list) or ((type(m.src_connections) is int) or (type(m.src_connections) is tuple)) )
@@ -435,18 +436,24 @@ class AgentWrapper(object):
         R_rel = sensors['lin_rel']['noise']
 
         agent_id = deepcopy(self.agent_id)
-        ids = sorted(deepcopy(self.connections[agent_id]))
+        
+        self.ordered_connections = []
+        for conn in self.connections:
+            self.ordered_connections += conn
+        self.ordered_connections = sorted(list(set(self.ordered_connections)))
+        agent_id_index = self.ordered_connections.index(agent_id)
+
+        ids = sorted(deepcopy(self.connections[agent_id_index]))
         ids.append(agent_id)
 
         # build list of distance one and distance two neighbors for each agent
         # each agent gets full list of connections
         neighbor_conn_ids = []
-        for j in range(0,len(self.connections[agent_id])):
-            for k in range(0,len(self.connections[self.connections[agent_id][j]])):
-                # if not any(self.connections[self.connections[agent_id][j]][k] == x for x in neighbor_conn_ids):
-                #     neighbor_conn_ids += self.connections[self.connections[agent_id][j]]
-                if not self.connections[self.connections[agent_id][j]][k] in neighbor_conn_ids:
-                    neighbor_conn_ids += self.connections[self.connections[agent_id][j]]
+        for j in range(0,len(self.connections[agent_id_index])):
+            for k in range(0,len(self.connections[self.ordered_connections.index(self.connections[agent_id_index][j])])):
+
+                if not self.connections[self.ordered_connections.index(self.connections[agent_id_index][j])][k] in neighbor_conn_ids:
+                    neighbor_conn_ids += self.connections[self.ordered_connections.index(self.connections[agent_id_index][j])]
 
                 # remove agent's own id from list of neighbors
                 if agent_id in neighbor_conn_ids:
@@ -456,8 +463,8 @@ class AgentWrapper(object):
         ids = list(set(sorted(ids + neighbor_conn_ids)))
 
         # divide out direct measurement connections and all connections
-        connections_new = list(set(sorted(neighbor_conn_ids + self.connections[agent_id])))
-        meas_connections = self.connections[agent_id]
+        connections_new = list(set(sorted(neighbor_conn_ids + self.connections[agent_id_index])))
+        meas_connections = self.connections[agent_id_index]
         self.meas_connections = meas_connections
         self.agent_connections = connections_new
 
@@ -467,21 +474,21 @@ class AgentWrapper(object):
         self.neighbor_connections = {}
         self.neighbor_meas_connections = {}
         # loop through all connections of each of self's connections
-        for i in self.connections[self.agent_id]:
+        for i in self.connections[agent_id_index]:
             if i is not self.agent_id:
                 neighbor_agent_id = deepcopy(i)
-                ids_new = sorted(deepcopy(self.connections[neighbor_agent_id]))
+                neighbor_agent_id_index = self.ordered_connections.index(neighbor_agent_id)
+                ids_new = sorted(deepcopy(self.connections[neighbor_agent_id_index]))
                 ids_new.append(neighbor_agent_id)
 
                 # build list of distance one and distance two neighbors for each agent
                 # each agent gets full list of connections
                 neighbor_conn_ids = []
-                for j in range(0,len(self.connections[neighbor_agent_id])):
-                    for k in range(0,len(self.connections[self.connections[neighbor_agent_id][j]])):
-                        # if not any(self.connections[self.connections[neighbor_agent_id][j]][k] == x for x in neighbor_conn_ids):
-                            # neighbor_conn_ids += deepcopy(self.connections[self.connections[neighbor_agent_id][j]])
-                        if not self.connections[self.connections[neighbor_agent_id][j]][k] in neighbor_conn_ids:
-                            neighbor_conn_ids += deepcopy(self.connections[self.connections[neighbor_agent_id][j]])
+                for j in range(0,len(self.connections[neighbor_agent_id_index])):
+                    for k in range(0,len(self.connections[self.ordered_connections.index(self.connections[neighbor_agent_id_index][j])])):
+                        
+                        if not self.connections[self.ordered_connections.index(self.connections[neighbor_agent_id_index][j])][k] in neighbor_conn_ids:
+                            neighbor_conn_ids += deepcopy(self.connections[self.ordered_connections.index(self.connections[neighbor_agent_id_index][j])])
 
                         # remove agent's own id from list of neighbors
                         if neighbor_agent_id in neighbor_conn_ids:
@@ -491,8 +498,8 @@ class AgentWrapper(object):
                 ids_new = list(set(sorted(ids_new + neighbor_conn_ids)))
 
                 # divide out direct measurement connections and all connections
-                neighbor_connections_new = list(set(sorted(neighbor_conn_ids + deepcopy(self.connections[neighbor_agent_id]))))
-                meas_connections_new = deepcopy(self.connections[neighbor_agent_id])
+                neighbor_connections_new = list(set(sorted(neighbor_conn_ids + deepcopy(self.connections[neighbor_agent_id_index]))))
+                meas_connections_new = deepcopy(self.connections[neighbor_agent_id_index])
                 self.neighbor_meas_connections[i] = deepcopy(meas_connections_new)
                 self.neighbor_connections[i] = deepcopy(neighbor_connections_new)
 
@@ -501,8 +508,6 @@ class AgentWrapper(object):
         n = (est_state_length)*6
         F,G,Q = globals()[dynamics_fxn](self.update_rate,est_state_length,**dynamics_fxn_params)
 
-        # sort all connections
-        # ids = sorted([agent_id] + connections_new)
         # create initial state estimate by grabbing relevant ground truth from full ground truth vector
         x0 = np.array([])
         for j in range(0,len(ids)):
@@ -523,8 +528,7 @@ class AgentWrapper(object):
         for j in range(0,len(meas_connections)):
             
             # find unique states between direct connections
-            # inter_states = set(meas_connections).intersection(self.connections[self.connections[i][j]])
-            unique_states = set(meas_connections+self.connections[self.connections[agent_id][j]])
+            unique_states = set(meas_connections+self.connections[self.ordered_connections.index(self.connections[agent_id_index][j])])
             comm_ids = list(unique_states)
             x0_comm = np.array([])
             for k in range(0,len(comm_ids)):
@@ -557,8 +561,10 @@ class AgentWrapper(object):
                             0,len(x0)*self.tau_goal,len(x0)*self.tau,
                             self.use_adaptive_tau)
 
-        rospy.loginfo('[Agent {}]: Agent initialized w/ delta -- {} \t tau_goal -- {} \t tau -- {}'.format(
+        rospy.loginfo('[ET-DDF Agent {}]: Agent initialized w/ delta -- {} \t tau_goal -- {} \t tau -- {}'.format(
                         agent_id,self.delta,len(x0)*self.tau_goal,len(x0)*self.tau))
+
+        rospy.logwarn('[ET-DDF Agent {}]: connections -- {}, meas connections -- {}'.format(agent_id,connections_new,meas_connections))
 
         return agent
 

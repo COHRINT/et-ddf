@@ -45,6 +45,7 @@ def gen_measurement_msg(agent_id,msg):
                 elif m._type == 'etddf_ros/gpsMeasurement':
                     new_msg.type = 'abs'
                     new_msg.data = [m.x, m.y, m.z]
+                    new_msg.target = agent_id
 
                 new_msg.status = [1 for x in new_msg.data]
 
