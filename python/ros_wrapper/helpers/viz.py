@@ -226,7 +226,28 @@ class PerformanceViz(object):
         # get ownship location in estimate
         agent_id = msg.src
         id_index = self.ordered_ids.index(agent_id)
-        conn_ids = sorted(self.connections[id_index] + [agent_id])
+        conn_ids = sorted(copy.deepcopy(self.connections[id_index]) + [agent_id])
+
+        # build list of distance one and distance two neighbors for each agent
+        # each agent gets full list of connections
+        neighbor_conn_ids = []
+        for j in range(0,len(self.connections[id_index])):
+            for k in range(0,len(self.connections[self.ordered_ids.index(self.connections[id_index][j])])):
+
+                if not self.connections[self.ordered_ids.index(self.connections[id_index][j])][k] in neighbor_conn_ids:
+                    neighbor_conn_ids += self.connections[self.ordered_ids.index(self.connections[id_index][j])]
+
+                # remove agent's own id from list of neighbors
+                if agent_id in neighbor_conn_ids:
+                    neighbor_conn_ids.remove(agent_id)
+
+        # combine with direct connection ids and sort
+        conn_ids = list(set(sorted(conn_ids + neighbor_conn_ids)))
+
+        # divide out direct measurement connections and all connections
+        connections_new = list(set(sorted(neighbor_conn_ids + self.connections[id_index])))
+
+        # find ownship location in ids
         ownship_index = conn_ids.index(agent_id)
 
         estimate_mean = np.take(msg.mean[6*ownship_index:6*ownship_index+6],[0,2,4])
