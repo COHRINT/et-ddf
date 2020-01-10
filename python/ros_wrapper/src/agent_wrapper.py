@@ -44,10 +44,8 @@ class AgentWrapper(object):
         # cfg = self.load_config(config_path)
 
         # set update rate
-        # self.update_rate = cfg['update_rate']
         self.agent_name = rospy.get_namespace()
         self.agent_id = rospy.get_param('agent_id')
-        rospy.logerr('agent id: {}'.format(self.agent_id))
         self.update_rate = rospy.get_param('agent_update_rate')
         self.connections = rospy.get_param('connections')
         # self.meas_connections = rospy.get_param('meas_connections')
@@ -82,7 +80,6 @@ class AgentWrapper(object):
         rate = rospy.Rate(self.update_rate)
 
         # instantiate Agent object
-        # ground_truth = self.init_ground_truth()
         self.agent = self.init_agent(start_state,dynamics_fxn,dynamics_fxn_params,sensors)
         rospy.loginfo('Agent {} & filters initialized.'.format(self.agent_id))
 
@@ -93,8 +90,6 @@ class AgentWrapper(object):
         self.received_measurement_cnt = 0
 
         # create local and recevied covariance intersection queue
-        # self.local_ci_queue = queue.LifoQueue()
-        # self.recevied_ci_queue = queue.LifoQueue()
         self.ci_queue = queue.LifoQueue()
         self.ci_cnt = 0
 
@@ -102,7 +97,6 @@ class AgentWrapper(object):
         self.update_cnt = 0
 
         # create subscriber to control input
-        # rospy.Subscriber('~actuator_control',ActuatorControl,self.control_input_cb)
         rospy.Subscriber('new_twist',TwistStamped,self.control_input_cb)
 
         # create subscribers to sensors
@@ -122,8 +116,7 @@ class AgentWrapper(object):
 
         # create publisher of local esimate
         self.local_est_pub = rospy.Publisher('local_estimate', AgentState, queue_size=10)
-        # create CI threshold publisher
-        # self.tau_pub = rospy.Publisher('ci_threshold', Float64, queue_size=10)
+        
         # create message statistics publisher and timer
         self.msg_stats_pub = rospy.Publisher('msg_stats',MsgStats,queue_size=10)
         self.msg_stats_timer = rospy.Timer(rospy.Duration(rospy.get_param('msg_stats_rate')),
@@ -133,7 +126,6 @@ class AgentWrapper(object):
         self.ci_srv = rospy.Service('ci_update',CIUpdate,self.ci_service_handler)
 
         # begin update loop
-        rospy.logerr("Entering main loop.")
         while not rospy.is_shutdown():
             
             # process all queue measurements and ci messages
@@ -141,10 +133,6 @@ class AgentWrapper(object):
 
             # publish state estimate
             self.publish_estimate()
-            # publish CI threshold tau
-            # tau_msg = Float64()
-            # tau_msg.data = self.agent.tau
-            # self.tau_pub.publish(tau_msg)
 
             # sleep until next update
             rate.sleep()
@@ -404,10 +392,7 @@ class AgentWrapper(object):
         # It's probably a race condition in the CI queue...
         for m in ci_messages_ros:
             if type(m.src_connections) is str:
-                # m.src_connections = [ord(m.src_connections)]
                 m.src_connections = array.array('b',m.src_connections).tolist()
-                # rospy.logwarn('[ET-DDF Agent {}]: Src connections in CI message from Agent {} retrieved as bytes. Converting...'.format(self.agent_id,m.src))
-            # elif (type(m.src_connections) is list) and (type(m.src_connections)) 
         
             assert((type(m.src_connections) is list) or ((type(m.src_connections) is int) or (type(m.src_connections) is tuple)) )
 
@@ -504,7 +489,6 @@ class AgentWrapper(object):
                 self.neighbor_connections[i] = deepcopy(neighbor_connections_new)
 
         # construct local estimate
-        # TODO: remove hardcoded 4
         n = (est_state_length)*6
         F,G,Q = globals()[dynamics_fxn](self.update_rate,est_state_length,**dynamics_fxn_params)
 
