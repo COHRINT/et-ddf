@@ -2,7 +2,7 @@
 import rospy
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Float64
-from etddf_ros.msg import gpsMeasurement, linrelMeasurement
+from etddf_ros.msg import gpsMeasurement, linrelMeasurement, depthMeasurement, usblMeasurement
 from geometry_msgs.msg import Pose
 from decimal import Decimal
 import numpy as np
@@ -22,46 +22,54 @@ class SensorPub:
 
     auvs = {}
     
-    def __init__(self, name, active_robots):
+    def __init__(self, name, id, active_robots):
+
+        # create subcribers to ground truth topics for vehicles of interest
         self.name = name
+        gt_topic = rospy.get_param('gt_topic')
         for rob in active_robots:
-            rospy.Subscriber('/' + rob + '/pose_gt', Odometry, self.pose_callback)
+            rospy.Subscriber('/' + rob + '/' + gt_topic, Odometry, self.pose_callback)
             self.auvs[rob] = None
         self.pose = None
 
         # Publishers
-        # self.depth_pub = rospy.Publisher('depth', depthMeasurement, queue_size=10)
-        # self.usbl_pub = rospy.Publisher('usbl', usblMeasurement, queue_size=10)
+        self.depth_pub = rospy.Publisher('depth', depthMeasurement, queue_size=10)
+        self.usbl_pub = rospy.Publisher('usbl', usblMeasurement, queue_size=10)
         self.gps_pub = rospy.Publisher('gps',gpsMeasurement,queue_size=10)
         self.linrel_pub = rospy.Publisher('lin_rel',linrelMeasurement,queue_size=10)
 
         # Timer callbacks
-        # depth_rate = 1 / float(rospy.get_param('/sensors/depth_pub_rate', 50))
-        # usbl_rate = 1 / float(rospy.get_param('/sensors/usbl_pub_rate', 0.5))
-        # self.depth_timer = rospy.Timer(rospy.Duration(depth_rate), self.depth_callback)
-        # self.usbl_timer = rospy.Timer(rospy.Duration(usbl_rate), self.usbl_callback)
-        gps_rate = 1 / float(rospy.get_param('/sensors/gps_pub_rate', 50))
-        linrel_rate = 1 / float(rospy.get_param('/sensors/lin_rel_pub_rate', 0.5))
+        depth_rate = 1 / float(rospy.get_param('depth_pub_rate', 50))
+        usbl_rate = 1 / float(rospy.get_param('usbl_pub_rate', 0.5))
+        
+        self.depth_timer = rospy.Timer(rospy.Duration(depth_rate), self.depth_callback)
+        self.usbl_timer = rospy.Timer(rospy.Duration(usbl_rate), self.usbl_callback)
+        
+        gps_rate = 1 / float(rospy.get_param('gps_pub_rate', 10))
+        linrel_rate = 1 / float(rospy.get_param('lin_rel_pub_rate', 0.5))
+        
         self.gps_timer = rospy.Timer(rospy.Duration(gps_rate), self.gps_callback)
         self.linrel_timer = rospy.Timer(rospy.Duration(linrel_rate), self.linrel_callback)
 
         # Noise
-        self.noise = rospy.get_param('/sensors/noise',False)
-        # self.depth_noise = float(rospy.get_param('/sensors/depth_noise', 0.03))
-        # self.angular_noise = float(rospy.get_param('/sensors/angular_noise',1))
-        # self.distance_noise = float(rospy.get_param('/sensors/distance_noise', 1.0))
-        self.gps_noise = float(rospy.get_param('/sensors/gps_noise'))
-        self.lin_rel_noise = float(rospy.get_param('/sensors/lin_rel_noise'))
+        self.noise = rospy.get_param('noise',False)
+        self.depth_noise = float(rospy.get_param('depth_noise', 0.03))
+        self.angular_noise = float(rospy.get_param('angular_noise',1))
+        self.distance_noise = float(rospy.get_param('distance_noise', 1.0))
+        self.gps_noise = float(rospy.get_param('gps_noise'))
+        self.lin_rel_noise = float(rospy.get_param('lin_rel_noise'))
 
         # Resolutions
-        # self.dist_res = int(rospy.get_param('/sensors/distance_res', 1))
-        # self.angular_res = int(rospy.get_param('/sensors/angular_res', 1))
-        # self.depth_res = int(rospy.get_param('/sensors/depth_res', 2))
-        # self.pos_res = int(rospy.get_param('/sensors/positioning_res',1))
+        self.dist_res = int(rospy.get_param('distance_res', 1))
+        self.angular_res = int(rospy.get_param('angular_res', 1))
+        self.depth_res = int(rospy.get_param('depth_res', 2))
+        self.pos_res = int(rospy.get_param('positioning_res',1))
         
         rospy.loginfo("Sensor pub for " + name + " initialized")
         self.gpsSeq = 0
         self.linrelSeq = 0
+        self.depthSeq = 0
+        self.usblSeq = 0
 
     def pose_callback(self, msg):
         topic = msg._connection_header['topic']
@@ -135,6 +143,7 @@ class SensorPub:
         self.gpsSeq += 1
 
     def linrel_callback(self,msg):
+        # rospy.loginfo("Publishing measurement")
         meas = linrelMeasurement()
         for auv in self.auvs:
             if self.auvs[auv] == None or self.pose == None:
@@ -263,7 +272,7 @@ def test1():
     o2 = Odometry()
     o2.pose.pose = pose2
 
-    sp = SensorPub('rob', ['rob','bob'])
+    sp = SensorPub('rob', 0, ['rob','bob'])
     sp.auvs['bob'] = o1
     sp.pose = o2.pose.pose
     # sp.get_distance(pose1.position, pose2.position)
@@ -272,14 +281,24 @@ def test1():
 
 def main():
     rospy.init_node('sensor_pub', anonymous=True)
-    
-    ns = rospy.get_namespace()
-    name = rospy.get_param('agent_name')
-    
-    active_auvs = rospy.get_param('meas_connections')
+
+    # get vehicle name and id from namespace
+    name = rospy.get_namespace().split('/')[1]
+    agent_id = int(name.split('_')[1])
+
+    # get id location in all ordered ids
+    connections = rospy.get_param('connections')
+    ordered_ids = []
+    for conn in connections:
+        ordered_ids += conn
+    ordered_ids = sorted(list(set(ordered_ids))) # remove non unique values
+
+    # create connection names, for use in topic subscription
+    active_auv_ids = connections[ordered_ids.index(agent_id)]
+    active_auvs = [name.split('_')[0] + '_' + str(x) for x in active_auv_ids]
     active_auvs.append(name)
     
-    sp = SensorPub(name, active_auvs)
+    sp = SensorPub(name, agent_id, active_auvs)
     rospy.spin()
 
 if __name__ == "__main__":
