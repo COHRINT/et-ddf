@@ -13,17 +13,20 @@ Usage:
 import numpy as np
 from numpy.linalg import inv
 from copy import deepcopy
-# import pudb; pudb.set_trace()
+import pudb#; pudb.set_trace()
 import time
 
-from .covar_intersect import covar_intersect, gen_sim_transform
-from .helpers.msg_handling import MeasurementMsg, StateMsg
+from etddf.covar_intersect import covar_intersect, gen_sim_transform#, covariance_union_simple
+from etddf.helpers.msg_handling import MeasurementMsg, StateMsg
+
+from etddf.quantization import Quantizer, covar_diagonalize
 
 class Agent(object):
     
     def __init__(self,agent_id,connections,meas_connections,neighbor_connections,
                     local_filter,common_estimates,x_true,msg_drop_prob,tau_goal,
-                    tau,use_adaptive_tau):    
+                    tau,use_adaptive_tau,quantization_flag,diagonalization_flag,
+                    quantization_config='../config/quantization_config.yaml'):
         # agent id
         self.agent_id = agent_id
         
@@ -44,6 +47,7 @@ class Agent(object):
         # true starting position and MSE
         self.true_state = [x_true]
         self.mse_history = []
+        self.rel_mse_history = [[] for x in self.meas_connections]
         
         # CI trigger count
         self.ci_trigger_cnt = 0
@@ -58,21 +62,22 @@ class Agent(object):
         self.tau_goal = tau_goal
         self.tau = tau
         self.connection_tau_rates = np.zeros( (len(self.connections),1) )
-        self.epsilon_1 = 0.05
+        self.epsilon_1 = 0.01
         self.epsilon_2 = 0.1
 
         self.use_adaptive_tau = use_adaptive_tau
 
         self.ci_process_worst_case_time = 0
 
+        # data compression flags and object
+        self.quantization = quantization_flag
+        self.diagonalization = diagonalization_flag
+        if self.quantization:
+            self.quantizer = Quantizer(quantizer_fxn='x2',config_path=quantization_config)
+
     def get_location(self,id_):
         """
         Get location of agent specified by :param id in state estimate, as well as indicies.
-
-        :param id - scalar id
-
-        TODO:
-        - add support for list of ids
         """
         loc = []
         idx = []
@@ -91,8 +96,6 @@ class Agent(object):
     def get_id(self,loc):
         """ 
         Get id of agent from location in state estimate
-        
-        :param loc -> int - location in state estimate
         """
         ids = list(self.connections)
         ids.append(self.agent_id)
@@ -120,6 +123,9 @@ class Agent(object):
 
         # propagate local and common info filters
         self.local_filter.predict(input_vec)
+        if np.isnan(self.local_filter.x).any() or np.isnan(self.local_filter.P).any():
+            pudb.set_trace()
+
         for filter_ in self.common_estimates:
             # common information filters get no knowledge of control input
             # b/c others have no idea what your control input was
@@ -145,6 +151,9 @@ class Agent(object):
 
             # update local filter
             self.local_filter.msg_update(msg)
+
+            if np.isnan(self.local_filter.x).any() or np.isnan(self.local_filter.P).any():
+                pudb.set_trace()
 
             # threshold measurement and update w/ relevant common info ests
             for id_ in self.meas_connections:
@@ -225,6 +234,14 @@ class Agent(object):
             # make sure message dest is current agent
             assert(msg.dest == self.agent_id)
 
+            # simulate message quantization
+            if self.quantization and len(msg.data)>0:
+                element_types = ['position' for x in msg.data] # assuming gps or lin rel measurements
+                num_bins = [100 for x in msg.data]
+                bits = self.quantizer.meas2quant(msg.data,elements=element_types,measurement_num_bins=num_bins)
+                meas_quant = self.quantizer.quant2meas(bits[0],len(msg.data),elements=element_types,measurement_num_bins=num_bins)
+                msg.data = meas_quant
+
             # imperfect comms sim: coin flip for dropping message
             # TODO: add binomial draw w/ msgs drop prob here
              
@@ -232,6 +249,9 @@ class Agent(object):
             x_local = self.local_filter.x
             P_local = self.local_filter.P
             self.local_filter.msg_update(msg,x_local,P_local)
+
+            if np.isnan(self.local_filter.x).any() or np.isnan(self.local_filter.P).any():
+                pudb.set_trace()
 
             # update common information filters
             for filter_ in self.common_estimates:
@@ -274,6 +294,9 @@ class Agent(object):
         xa = deepcopy(self.local_filter.x)
         Pa = deepcopy(self.local_filter.P)
 
+        if np.isnan(xa).any() or np.isnan(Pa).any():
+            pudb.set_trace()
+
         # construct transform
         Ta, il_a, inter = gen_sim_transform(self.agent_id,list(self.connections),
                                             dest_id,dest_connections,num_states=6)
@@ -310,8 +333,6 @@ class Agent(object):
         """
 
         for msg in msgs:
-            
-            start_time = time.clock()
 
             # grab state estimate from local filter
             xa = deepcopy(self.local_filter.x)
@@ -339,13 +360,86 @@ class Agent(object):
             xbTred = xb
             PbTred = Pb
 
+            # compress state messages
+            if self.quantization and self.diagonalization:
+
+                # create element types list: assumes position, velocity alternating structure
+                element_types = []
+                for el_idx in range(0,PaTred.shape[0]):
+                    if el_idx % 2 == 0: element_types.append('position')
+                    else: element_types.append('velocity')
+
+                # make sure there are no infs or nans
+                assert(not np.isnan(PaTred).any())
+                assert(not np.isnan(PbTred).any())
+
+                # first diagonalize
+                # cova_diag = covar_diagonalize(PaTred)
+                covb_diag = covar_diagonalize(PbTred)
+
+                # then quantize
+                # bits_a = self.quantizer.state2quant(xaTred, cova_diag, element_types, diag_only=True)
+                bits_b = self.quantizer.state2quant(xbTred, covb_diag, element_types, diag_only=True)
+
+                # then decompress
+                # meana_quant, cova_quant = self.quantizer.quant2state(bits_a[0], 2*cova_diag.shape[0], element_types, diag_only=True)
+                meanb_quant, covb_quant = self.quantizer.quant2state(bits_b[0], 2*covb_diag.shape[0], element_types, diag_only=True)
+
+                # assert(cova_quant.shape == PaTred.shape)
+
+                # add back to state messages
+                # meana_quant = np.reshape(meana_quant,xaTred.shape)
+                # xaTred_quant = meana_quant
+                # PaTred_quant = cova_quant
+                meanb_quant = np.reshape(meanb_quant,xbTred.shape)
+                xbTred = meanb_quant
+                PbTred = covb_quant
+
+            elif self.quantization:
+
+                # create element types list: assumes position, velocity alternating structure
+                element_types = []
+                for el_idx in range(0,PaTred.shape[0]):
+                    if el_idx % 2 == 0: element_types.append('position')
+                    else: element_types.append('velocity')
+
+                # quantize
+                bits_a = self.quantizer.state2quant(xaTred, m, element_types)
+                bits_b = self.quantizer.state2quant(xbTred, PbTred, element_types)
+
+                # then decompress
+                meana_quant, cova_quant = self.quantizer.quant2state(bits_a[0], int(PaTred.shape[0] + (PaTred.shape[0]**2 + PaTred.shape[0])/2), element_types)
+                meanb_quant, covb_quant = self.quantizer.quant2state(bits_b[0], int(PbTred.shape[0] + (PbTred.shape[0]**2 + PbTred.shape[0])/2), element_types)
+
+                # add back to state messages
+                meana_quant = np.reshape(meana_quant,xaTred.shape)
+                xaTred_quant = meana_quant
+                PaTred_quant = cova_quant
+                meanb_quant = np.reshape(meanb_quant,xbTred.shape)
+                xbTred_quant = meanb_quant
+                PbTred_quant = covb_quant
+
+            elif self.diagonalization:
+                # diagonalize
+                cova_diag = covar_diagonalize(PaTred)
+                covb_diag = covar_diagonalize(PbTred)
+
+                PaTred_quant = cova_diag
+                PbTred_quant = covb_diag
+
             # perform covariance intersection with reduced estimates
             alpha = np.ones((PaTred.shape[0],1))
             xc, Pc = covar_intersect(xaTred,xbTred,PaTred,PbTred,alpha)
 
+            if np.isnan(xc).any():
+                pudb.set_trace()
+
             # compute information delta for conditional update
             invD = inv(Pc) - inv(PaTred)
             invDd = np.dot(inv(Pc),xc) - np.dot(inv(PaTred),xaTred)
+
+            if np.isnan(invD).any() or np.isnan(invDd).any():
+                pudb.set_trace()
 
             # conditional gaussian update
             if (PaT.shape[0]-Pc.shape[0] == 0) or (PaT.shape[1]-Pc.shape[1] == 0):
@@ -364,6 +458,9 @@ class Agent(object):
             xa = np.dot(Ta,v)
             Pa = np.dot(Ta,np.dot(V,inv(Ta)))
 
+            if np.isnan(xa).any() or np.isnan(Pa).any():
+                pudb.set_trace()
+
             # update local estimates
             self.local_filter.x = deepcopy(xa)
             self.local_filter.P = deepcopy(Pa)
@@ -381,9 +478,6 @@ class Agent(object):
                                 self.epsilon_1*sum(-self.connection_tau_rates +
                                 self.ci_trigger_rate) +
                                 self.epsilon_2*(self.tau_goal-self.tau))
-
-            time_elapsed = time.clock() - start_time
-            if time_elapsed > self.ci_process_worst_case_time: self.ci_process_worst_case_time = time_elapsed
 
 def test_agent():
     pass

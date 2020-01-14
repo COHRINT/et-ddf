@@ -2,7 +2,7 @@
 
 This repository provides a library of Matlab and Python code implementing event-trigged decentralized data fusion (ET-DDF) algorithms, which enable decentralized cooperative localization and tracking at significantly reduced communication overheads. See [[1]](#References) and [[2]](#References) for more information about the algorithms themselves.
 
-These algorithms, and their implementations in this repository are currently in use as part of DARPA sprinter project OFFSET, as well as a collaboration between Orbit Logic, the University of Colorado Boulder, the University of California San Diego, and the Office of Naval Research called MinAu.
+These algorithms, and their implementations in this repository are currently in use as part of DARPA sprinter project OFFSET, as well as a collaboration between Orbit Logic, the University of Colorado Boulder, the University of California San Diego, and the Office of Naval Research called MinAu (Minimal Autonomy).
 
 
 ## Python Simulation
