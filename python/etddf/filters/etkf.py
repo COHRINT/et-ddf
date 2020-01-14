@@ -136,8 +136,6 @@ class ETKF(object):
         for i in range(0,len(data)):
 
             # create measurement fxn
-            #TODO this needs to be generalized to measurements are any length
-            # as well as of any type
             H = np.zeros( (1,self.F.shape[0]) )
             if type_ == "abs":
                 H[0,6*src_loc+2*i] = 1
@@ -180,8 +178,6 @@ class ETKF(object):
 
         i = data_idx
         # create measurement fxn
-        #TODO this needs to be generalized to measurements are any length
-        # as well as of any type
         H = np.zeros( (1,self.F.shape[0]) )
         if type_ == "abs":
             H[0,6*src_loc+2*i] = 1
@@ -206,8 +202,6 @@ class ETKF(object):
 
         self.x = x_curr
         self.P = 0.5*P_curr + 0.5*P_curr.transpose()
-        # self.state_history.append(x_curr)
-        # self.cov_history.append(P_curr)
 
         return x_curr,P_curr
 
@@ -232,15 +226,11 @@ class ETKF(object):
         """
 
         # fxn handles for standard normal distribution pdf and cdf
-        # phi = norm.pdf
         phi = lambda z: (1/np.sqrt(2*np.pi))*np.exp(-0.5*(z**2)) 
-        # Qfxn = norm.cdf
         Qfxn = lambda x: 1 - 0.5*(1+erf(x/np.sqrt(2)))
 
         i = data_idx
         # create measurement fxn
-        #TODO this needs to be generalized to measurements are any length
-        # as well as of any type
         H = np.zeros( (1,self.F.shape[0]) )
         if type_ == "abs":
             H[0,6*src_loc+2*i] = 1
@@ -323,9 +313,6 @@ class ETKF(object):
         data_cnt = 0
         for i in range(0,len(status)):
 
-            # if np.isnan(self.x).any() or np.isnan(self.P).any():
-            #     pudb.set_trace()
-
             # if status for element is true, fuse explicitly
             if status[i]:
                 prev_shape = self.x.shape
@@ -333,16 +320,10 @@ class ETKF(object):
                 assert(self.x.shape == prev_shape)
                 data_cnt += 1
 
-                # if np.isnan(self.x).any() or np.isnan(self.P).any():
-                #     pudb.set_trace()
-            # else, implcit update
             else:
                 prev_shape = self.x.shape
                 self.implicit_update(src_loc,target_loc,type_,x_local,P_local,i)
                 assert(self.x.shape == prev_shape)
-
-                # if np.isnan(self.x).any() or np.isnan(self.P).any():
-                #     pudb.set_trace()
 
 def test_etkf():
     pass

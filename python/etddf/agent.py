@@ -25,7 +25,8 @@ class Agent(object):
     
     def __init__(self,agent_id,connections,meas_connections,neighbor_connections,
                     local_filter,common_estimates,x_true,msg_drop_prob,tau_goal,
-                    tau,use_adaptive_tau,quantization_flag,diagonalization_flag):    
+                    tau,use_adaptive_tau,quantization_flag,diagonalization_flag,
+                    quantization_config='../config/quantization_config.yaml'):
         # agent id
         self.agent_id = agent_id
         
@@ -72,16 +73,11 @@ class Agent(object):
         self.quantization = quantization_flag
         self.diagonalization = diagonalization_flag
         if self.quantization:
-            self.quantizer = Quantizer(quantizer_fxn='x2')
+            self.quantizer = Quantizer(quantizer_fxn='x2',config_path=quantization_config)
 
     def get_location(self,id_):
         """
         Get location of agent specified by :param id in state estimate, as well as indicies.
-
-        :param id - scalar id
-
-        TODO:
-        - add support for list of ids
         """
         loc = []
         idx = []
@@ -100,8 +96,6 @@ class Agent(object):
     def get_id(self,loc):
         """ 
         Get id of agent from location in state estimate
-        
-        :param loc -> int - location in state estimate
         """
         ids = list(self.connections)
         ids.append(self.agent_id)
@@ -339,8 +333,6 @@ class Agent(object):
         """
 
         for msg in msgs:
-            
-            # start_time = time.clock()
 
             # grab state estimate from local filter
             xa = deepcopy(self.local_filter.x)
@@ -438,7 +430,6 @@ class Agent(object):
             # perform covariance intersection with reduced estimates
             alpha = np.ones((PaTred.shape[0],1))
             xc, Pc = covar_intersect(xaTred,xbTred,PaTred,PbTred,alpha)
-            # xc, Pc = covar_intersect(xaTred,xbTred_quant,PaTred,PbTred_quant,alpha)
 
             if np.isnan(xc).any():
                 pudb.set_trace()
@@ -487,9 +478,6 @@ class Agent(object):
                                 self.epsilon_1*sum(-self.connection_tau_rates +
                                 self.ci_trigger_rate) +
                                 self.epsilon_2*(self.tau_goal-self.tau))
-
-            # time_elapsed = time.clock() - start_time
-            # if time_elapsed > self.ci_process_worst_case_time: self.ci_process_worst_case_time = time_elapsed
 
 def test_agent():
     pass
