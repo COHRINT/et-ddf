@@ -18,9 +18,19 @@ class CommsModule(object):
         rospy.init_node('comms_module')
 
         # load parameters from the parameter server
-        self.agent_name = rospy.get_namespace()
+        self.agent_name = rospy.get_namespace().split('/')[1]
+        self.agent_id = int(self.agent_name.split('_')[1])
         self.drop_incoming_prob = rospy.get_param('comm_drop_prob')
-        self.connections = rospy.get_param('meas_connections')
+
+        # get id location in all ordered ids
+        connection_ids = rospy.get_param('connections')
+        ordered_ids = []
+        for conn in connection_ids:
+            ordered_ids += conn
+        ordered_ids = sorted(list(set(ordered_ids))) # remove non unique values
+
+        self.connection_ids = connection_ids[ordered_ids.index(self.agent_id)]
+        self.connections = [self.agent_name.split('_')[0] + '_' + str(x) for x in self.connection_ids]
 
         # create topic subscriptions for incoming messages (i.e | connections -> comms |-> agent)
         for sub_name in self.connections:
