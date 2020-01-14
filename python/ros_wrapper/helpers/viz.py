@@ -5,6 +5,7 @@ Performance visualization for applications of ET-DDF.
 """
 
 import rospy
+import copy
 import numpy as np
 from scipy.stats import chi2
 
@@ -19,7 +20,9 @@ from visualization_msgs.msg import Marker, MarkerArray
 MARKER_COLOR = [[1.0,0.0,0.0],
                 [0.0,1.0,0.0],
                 [0.0,0.0,1.0],
-                [0.0,0.5,0.5]]
+                [0.0,0.5,0.5],
+                [0.5,0.5,0.0],
+                [0.33,0.33,0.33]]
 
 class PerformanceViz(object):
     """
@@ -37,44 +40,27 @@ class PerformanceViz(object):
 
         # get parameters from parameter server
         self.connections = rospy.get_param('/bluerov2_3/connections')
+        agent_name = 'bluerov2'
         self.ordered_ids = []
         for conn in self.connections:
             self.ordered_ids += conn
         self.ordered_ids = sorted(list(set(self.ordered_ids)))
 
-        # create subscribers to all estimate and ground truth topics
-        rospy.Subscriber('/bluerov2_3/local_estimate',AgentState,self.estimate_cb_0)
-        rospy.Subscriber('/bluerov2_4/local_estimate',AgentState,self.estimate_cb_1)
-        rospy.Subscriber('/bluerov2_5/local_estimate',AgentState,self.estimate_cb_2)
-        rospy.Subscriber('/bluerov2_6/local_estimate',AgentState,self.estimate_cb_3)
+        self.est_err_pubs = []
+        self.est_cov_pubs = []
+        self.rmse_pubs = []
+        self.recent_gts = [[0,0,0] for id_ in self.ordered_ids]
 
-        rospy.Subscriber('/bluerov2_3/pose_gt',Odometry,self.gt_cb_0)
-        rospy.Subscriber('/bluerov2_4/pose_gt',Odometry,self.gt_cb_1)
-        rospy.Subscriber('/bluerov2_5/pose_gt',Odometry,self.gt_cb_2)
-        rospy.Subscriber('/bluerov2_6/pose_gt',Odometry,self.gt_cb_3)
+        for id_ in self.ordered_ids:
+            # create subscribers to et-ddf estimates and ground truth
+            rospy.Subscriber('/{}_{}/local_estimate'.format(agent_name,id_), AgentState, self.estimate_cb, callback_args=id_)
+            rospy.Subscriber('/{}_{}/local_estimate'.format(agent_name,id_), AgentState, self.marker_pub_fxn, callback_args=id_)
+            rospy.Subscriber('/{}_{}/pose_gt'.format(agent_name,id_), Odometry, self.gt_cb, callback_args=id_)
 
-        # create publishers for estimate error
-        self.est_err_pub_0 = rospy.Publisher('/bluerov2_3/estimate_error',Point,queue_size=10)
-        self.est_err_pub_1 = rospy.Publisher('/bluerov2_4/estimate_error',Point,queue_size=10)
-        self.est_err_pub_2 = rospy.Publisher('/bluerov2_5/estimate_error',Point,queue_size=10)
-        self.est_err_pub_3 = rospy.Publisher('/bluerov2_6/estimate_error',Point,queue_size=10)
-
-        # create publishers for estimate error
-        self.est_cov_pub_0 = rospy.Publisher('/bluerov2_3/estimate_covariance',Point,queue_size=10)
-        self.est_cov_pub_1 = rospy.Publisher('/bluerov2_4/estimate_covariance',Point,queue_size=10)
-        self.est_cov_pub_2 = rospy.Publisher('/bluerov2_5/estimate_covariance',Point,queue_size=10)
-        self.est_cov_pub_3 = rospy.Publisher('/bluerov2_6/estimate_covariance',Point,queue_size=10)
-
-        # create MSE publishers
-        self.mse_pub_0 = rospy.Publisher('/bluerov2_3/position_mse',Float64,queue_size=10)
-        self.mse_pub_1 = rospy.Publisher('/bluerov2_4/position_mse',Float64,queue_size=10)
-        self.mse_pub_2 = rospy.Publisher('/bluerov2_5/position_mse',Float64,queue_size=10)
-        self.mse_pub_3 = rospy.Publisher('/bluerov2_6/position_mse',Float64,queue_size=10)
-
-        self.recent_ground_truth_0 = [0,0,0]
-        self.recent_ground_truth_1 = [0,0,0]
-        self.recent_ground_truth_2 = [0,0,0]
-        self.recent_ground_truth_3 = [0,0,0]
+            # create publishers for estimate error, covariance, and rmse
+            self.est_err_pubs.append(rospy.Publisher('/{}_{}/estimate_error'.format(agent_name,id_), Point, queue_size=10))
+            self.est_cov_pubs.append(rospy.Publisher('/{}_{}/estimate_covariance'.format(agent_name,id_), Point, queue_size=10))
+            self.rmse_pubs.append(rospy.Publisher('/{}_{}/position_rmse'.format(agent_name,id_), Float64, queue_size=10))
 
         # rviz marker publisher
         self.marker_pub = rospy.Publisher('visualization_marker',Marker,queue_size=10)
@@ -82,143 +68,70 @@ class PerformanceViz(object):
         # wait for messages
         rospy.spin()
 
-    def estimate_cb_0(self,msg):
+    def estimate_cb(self,msg,id_):
         """
-        Compute estimate error from most recent estimate and ground truth messages,
-        published to estimate error topic.
+        Compute estimate error from most recent estimate and ground truth messages, publshed to estimate error topics
         """
+        # get source id
+        agent_id = msg.src
+        id_index = self.ordered_ids.index(agent_id)
+        conn_ids = sorted(copy.deepcopy(self.connections[id_index]) + [agent_id])
+        
+        # build list of distance one and distance two neighbors for each agent
+        # each agent gets full list of connections
+        neighbor_conn_ids = []
+        for j in range(0,len(self.connections[id_index])):
+            for k in range(0,len(self.connections[self.ordered_ids.index(self.connections[id_index][j])])):
+
+                if not self.connections[self.ordered_ids.index(self.connections[id_index][j])][k] in neighbor_conn_ids:
+                    neighbor_conn_ids += self.connections[self.ordered_ids.index(self.connections[id_index][j])]
+
+                # remove agent's own id from list of neighbors
+                if agent_id in neighbor_conn_ids:
+                    neighbor_conn_ids.remove(agent_id)
+
+        # combine with direct connection ids and sort
+        conn_ids = list(set(sorted(conn_ids + neighbor_conn_ids)))
+
+        # divide out direct measurement connections and all connections
+        connections_new = list(set(sorted(neighbor_conn_ids + self.connections[id_index])))
+
+        # find ownship location in ids
+        ownship_index = conn_ids.index(agent_id)
 
         new_msg = Point()
-        new_msg.x = msg.mean[0] - self.recent_ground_truth_0[0]
-        new_msg.y = msg.mean[2] - self.recent_ground_truth_0[1]
-        new_msg.z = msg.mean[4] - self.recent_ground_truth_0[2]
+        new_msg.x = msg.mean[6*ownship_index] - self.recent_gts[self.ordered_ids.index(agent_id)][0]
+        new_msg.y = msg.mean[6*ownship_index+2] - self.recent_gts[self.ordered_ids.index(agent_id)][1]
+        new_msg.z = msg.mean[6*ownship_index+4] - self.recent_gts[self.ordered_ids.index(agent_id)][2]
 
         cov_msg = Point()
         cov = inflate_covariance(msg.covariance)
-        cov_msg.x = 2*np.sqrt(cov[0,0])
-        cov_msg.y = 2*np.sqrt(cov[2,2])
-        cov_msg.z = 2*np.sqrt(cov[4,4])
+        cov_msg.x = 2*np.sqrt(cov[6*ownship_index,6*ownship_index])
+        cov_msg.y = 2*np.sqrt(cov[6*ownship_index+2,6*ownship_index+2])
+        cov_msg.z = 2*np.sqrt(cov[6*ownship_index+4,6*ownship_index+4])
 
-        mse_msg = Float64()
-        mse_msg.data = float(np.linalg.norm(np.array( [msg.mean[0],msg.mean[2],msg.mean[4]] )- np.array(self.recent_ground_truth_0)))
+        rmse_msg = Float64()
+        rmse_msg.data = float(np.linalg.norm(np.array( [msg.mean[6*ownship_index],msg.mean[6*ownship_index+2],msg.mean[6*ownship_index+4]] )- np.array(self.recent_gts[self.ordered_ids.index(agent_id)])))
         
-        self.est_err_pub_0.publish(new_msg)
-        self.est_cov_pub_0.publish(cov_msg)
-        self.mse_pub_0.publish(mse_msg)
+        self.est_err_pubs[self.ordered_ids.index(agent_id)].publish(new_msg)
+        self.est_cov_pubs[self.ordered_ids.index(agent_id)].publish(cov_msg)
+        self.rmse_pubs[self.ordered_ids.index(agent_id)].publish(rmse_msg)
 
-        self.marker_pub_fxn(msg)
+        #self.marker_pub_fxn(msg)
 
-    def estimate_cb_1(self,msg):
+    def gt_cb(self,msg,id_):
         """
-        Compute estimate error from most recent estimate and ground truth messages,
-        published to estimate error topic.
+        Record vehicle ground truth for estimate error computation.
         """
-
-        new_msg = Point()
-        new_msg.x = msg.mean[6] - self.recent_ground_truth_1[0]
-        new_msg.y = msg.mean[8] - self.recent_ground_truth_1[1]
-        new_msg.z = msg.mean[10] - self.recent_ground_truth_1[2]
-
-        cov_msg = Point()
-        cov = inflate_covariance(msg.covariance)
-        cov_msg.x = 2*np.sqrt(cov[6,6])
-        cov_msg.y = 2*np.sqrt(cov[8,8])
-        cov_msg.z = 2*np.sqrt(cov[10,10])
-
-        mse_msg = Float64()
-        mse_msg.data = float(np.linalg.norm(np.array( [msg.mean[6],msg.mean[8],msg.mean[10]] )- np.array(self.recent_ground_truth_1)))
+        # get id of vehicle from publisher name
+        agent_id = id_
         
-        self.est_err_pub_1.publish(new_msg)
-        self.est_cov_pub_1.publish(cov_msg)
-        self.mse_pub_1.publish(mse_msg)
+        # record
+        self.recent_gts[self.ordered_ids.index(agent_id)][0] = msg.pose.pose.position.x
+        self.recent_gts[self.ordered_ids.index(agent_id)][1] = msg.pose.pose.position.y
+        self.recent_gts[self.ordered_ids.index(agent_id)][2] = msg.pose.pose.position.z
 
-        self.marker_pub_fxn(msg)
-
-    def estimate_cb_2(self,msg):
-        """
-        Compute estimate error from most recent estimate and ground truth messages,
-        published to estimate error topic.
-        """
-
-        new_msg = Point()
-        new_msg.x = msg.mean[12] - self.recent_ground_truth_2[0]
-        new_msg.y = msg.mean[14] - self.recent_ground_truth_2[1]
-        new_msg.z = msg.mean[16] - self.recent_ground_truth_2[2]
-
-        cov_msg = Point()
-        cov = inflate_covariance(msg.covariance)
-        cov_msg.x = 2*np.sqrt(cov[12,12])
-        cov_msg.y = 2*np.sqrt(cov[14,14])
-        cov_msg.z = 2*np.sqrt(cov[16,16])
-
-        mse_msg = Float64()
-        mse_msg.data = float(np.linalg.norm(np.array( [msg.mean[12],msg.mean[14],msg.mean[16]] )- np.array(self.recent_ground_truth_2)))
-        
-        self.est_err_pub_2.publish(new_msg)
-        self.est_cov_pub_2.publish(cov_msg)
-        self.mse_pub_2.publish(mse_msg)
-
-        self.marker_pub_fxn(msg)
-
-    def estimate_cb_3(self,msg):
-        """
-        Compute estimate error from most recent estimate and ground truth messages,
-        published to estimate error topic.
-        """
-
-        new_msg = Point()
-        new_msg.x = msg.mean[12] - self.recent_ground_truth_3[0]
-        new_msg.y = msg.mean[14] - self.recent_ground_truth_3[1]
-        new_msg.y = msg.mean[16] - self.recent_ground_truth_3[2]
-
-        cov_msg = Point()
-        cov = inflate_covariance(msg.covariance)
-        cov_msg.x = 2*np.sqrt(cov[12,12])
-        cov_msg.y = 2*np.sqrt(cov[14,14])
-        cov_msg.z = 2*np.sqrt(cov[16,16])
-
-        mse_msg = Float64()
-        mse_msg.data = float(np.linalg.norm(np.array( [msg.mean[12],msg.mean[14],msg.mean[16]] )- np.array(self.recent_ground_truth_3)))
-        
-        self.est_err_pub_3.publish(new_msg)
-        self.est_cov_pub_3.publish(cov_msg)
-        self.mse_pub_3.publish(mse_msg)
-
-        self.marker_pub_fxn(msg)
-
-    def gt_cb_0(self,msg):
-        """
-        Saves ground truth information.
-        """
-        self.recent_ground_truth_0[0] = msg.pose.pose.position.x
-        self.recent_ground_truth_0[1] = msg.pose.pose.position.y
-        self.recent_ground_truth_0[2] = msg.pose.pose.position.z
-
-    def gt_cb_1(self,msg):
-        """
-        Saves ground truth information.
-        """
-        self.recent_ground_truth_1[0] = msg.pose.pose.position.x
-        self.recent_ground_truth_1[1] = msg.pose.pose.position.y
-        self.recent_ground_truth_1[2] = msg.pose.pose.position.z
-
-    def gt_cb_2(self,msg):
-        """
-        Saves ground truth information.
-        """
-        self.recent_ground_truth_2[0] = msg.pose.pose.position.x
-        self.recent_ground_truth_2[1] = msg.pose.pose.position.y
-        self.recent_ground_truth_2[2] = msg.pose.pose.position.z
-
-    def gt_cb_3(self,msg):
-        """
-        Saves ground truth information.
-        """
-        self.recent_ground_truth_3[0] = msg.pose.pose.position.x
-        self.recent_ground_truth_3[1] = msg.pose.pose.position.y
-        self.recent_ground_truth_3[2] = msg.pose.pose.position.z
-
-    def marker_pub_fxn(self,msg):
+    def marker_pub_fxn(self,msg,id_):
         """
         Publish rviz markers for estimate means and covariances.
         """
@@ -290,6 +203,10 @@ def uncertain_ellipse(covariance,alpha=0.95):
     """
     # compute eigenvalues and vectors of covariance
     l, v = np.linalg.eig(covariance)
+    # sort fromn largest to smallest
+    idx = l.argsort()[::-1]
+    l = l[idx]
+    v = v[:,idx]
 
     conf_level = chi2.isf(1-alpha,3)
 
