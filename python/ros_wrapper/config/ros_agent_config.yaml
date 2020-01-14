@@ -41,7 +41,7 @@ dynamics:
 sensors:
     gps:
         agents: [3] # read as only agent 3 gets GPS
-        noise: [[1,0],[0,1]]
+        noise: [[1,0,0],[0,1,0],[0,0,1]]
     lin_rel:
         agents: [3,4,5,6]
-        noise: [[3,0],[0,3]]
+        noise: [[3,0,0],[0,3,0],[0,0,3]]
