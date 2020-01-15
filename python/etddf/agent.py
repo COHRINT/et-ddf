@@ -10,6 +10,7 @@ event-triggered filtering scenario.
 Usage:
 """
 
+import os
 import numpy as np
 from numpy.linalg import inv
 from copy import deepcopy
@@ -26,7 +27,8 @@ class Agent(object):
     def __init__(self,agent_id,connections,meas_connections,neighbor_connections,
                     local_filter,common_estimates,x_true,msg_drop_prob,tau_goal,
                     tau,use_adaptive_tau,quantization_flag,diagonalization_flag,
-                    quantization_config='../config/quantization_config.yaml'):
+                    quantization_config=os.path.abspath(os.path.join(os.path.dirname(__file__),
+                    '../config/quantization_config.yaml'))):
         # agent id
         self.agent_id = agent_id
         

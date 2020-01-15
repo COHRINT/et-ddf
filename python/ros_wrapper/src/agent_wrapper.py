@@ -56,9 +56,12 @@ class AgentWrapper(object):
         self.epsilon_1 = rospy.get_param('epsilon_1')
         self.epsilon_2 = rospy.get_param('epsilon_2')
 
+        # compression flags
+        self.quantization_flag = rospy.get_param('quantization')
+        self.diagonalization_flag = rospy.get_param('diagonalization')
+
         # get agent's initial position, all others assumed 0 w/ large covariance
         start_state = rospy.get_param('start_pos')
-        # TODO: add back z and zdot states
         start_state = np.array((start_state['x'],0,start_state['y'],0,start_state['z'],0))
 
         # create initial control input vector
@@ -543,7 +546,7 @@ class AgentWrapper(object):
         agent = Agent(agent_id,connections_new,meas_connections,neighbor_conn_ids,
                             local_filter,common_estimates,start_state,
                             0,len(x0)*self.tau_goal,len(x0)*self.tau,
-                            self.use_adaptive_tau)
+                            self.use_adaptive_tau,self.quantization_flag,self.diagonalization_flag)
 
         rospy.loginfo('[ET-DDF Agent {}]: Agent initialized w/ delta -- {} \t tau_goal -- {} \t tau -- {}'.format(
                         agent_id,self.delta,len(x0)*self.tau_goal,len(x0)*self.tau))

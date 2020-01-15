@@ -6,17 +6,21 @@
 connections: [[4,5],[3],[3,6],[5]]
 
 # update rate for et-ddf code
-agent_update_rate: 5 # [Hz]
+agent_update_rate: 10 # [Hz]
 
 # message statistics update rate
 msg_stats_rate: 1 # [hz]
 
 # event-triggering parameters
-delta: 1.5    # measurement-sharing Kalman innovation threshold param
-tau: 7         # covariance intersection uncertainty per state threshold
+delta: 0.5    # measurement-sharing Kalman innovation threshold param
+tau: 5.0         # covariance intersection uncertainty per state threshold
 
 # probability of dropping messages
 comm_drop_prob: 0.0
+
+# compression flags
+quantization: True
+diagonalization: True
 
 # adaptive CI thresholding params
 use_adaptive_tau: True
