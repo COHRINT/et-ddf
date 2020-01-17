@@ -130,6 +130,8 @@ class AgentWrapper(object):
 
         # create publisher of local esimate
         self.local_est_pub = rospy.Publisher('local_estimate', AgentState, queue_size=10)
+        # create ownship-only publisher
+        self.local_est_ownship_pub = rospy.Publisher('local_estimate_ownship', AgentState, queue_size=10)
         
         # create message statistics publisher and timer
         self.msg_stats_pub = rospy.Publisher('msg_stats',MsgStats,queue_size=10)
@@ -302,7 +304,7 @@ class AgentWrapper(object):
         # get state as response
         return res_msg_ros
 
-    def get_state_ros(self,dest=None):
+    def get_state_ros(self,dest=None,ownship_only=False):
         """
         Generates AgentState message for use in ROS network.
 
@@ -314,14 +316,21 @@ class AgentWrapper(object):
 
             msg -- generated AgentState message
         """
+        # get indicies for states
+        if ownship_only:
+            _, idx = self.agent.get_location(self.agent_id)
+        else:
+            idx = range(0,self.agent.local_filter.x.shape[0])
+        idx_grid = np.ix_(idx,idx)
+
         # create state message
         msg = AgentState()
         msg.header.stamp = rospy.Time.now()
         msg.src = self.agent_id
         msg.src_meas_connections = self.meas_connections
         msg.src_connections = self.agent_connections
-        msg.mean = self.agent.local_filter.x.transpose().tolist()[0]
-        msg.covariance = deflate_covariance(self.agent.local_filter.P)
+        msg.mean = self.agent.local_filter.x[idx].transpose().tolist()[0]
+        msg.covariance = deflate_covariance(self.agent.local_filter.P[idx_grid])
         msg.src_ci_rate = self.agent.ci_trigger_rate
 
         if dest is not None:
@@ -342,10 +351,14 @@ class AgentWrapper(object):
             none
         """
         # get ros state message
-        msg = self.get_state_ros()        
+        msg = self.get_state_ros()
+        # get ros state message with only ownship states
+        msg_ownship = self.get_state_ros(ownship_only=True)
 
         # publish message
         self.local_est_pub.publish(msg)
+        # publish ownship message
+        self.local_est_ownship_pub.publish(msg_ownship)
 
     def publish_msg_stats(self,msg_):
         """
