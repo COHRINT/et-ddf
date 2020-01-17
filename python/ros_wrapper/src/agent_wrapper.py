@@ -47,14 +47,28 @@ class AgentWrapper(object):
         self.agent_name = rospy.get_namespace()
         self.agent_id = rospy.get_param('agent_id')
         self.update_rate = rospy.get_param('agent_update_rate')
+
         self.connections = rospy.get_param('connections')
+        self.ordered_ids = []
+        for conn in self.connections:
+            self.ordered_ids += conn
+        self.ordered_ids = sorted(list(set(self.ordered_ids))) # remove non unique values
         # self.meas_connections = rospy.get_param('meas_connections')
+
         self.delta = rospy.get_param('delta')
         self.tau_goal = rospy.get_param('tau')
         self.tau = self.tau_goal*0.75
         self.use_adaptive_tau = rospy.get_param('use_adaptive_tau')
         self.epsilon_1 = rospy.get_param('epsilon_1')
         self.epsilon_2 = rospy.get_param('epsilon_2')
+
+        # collect names of robots this robot is connected to
+        self.connected_vehicle_names = []
+        active_vehicles = rospy.get_param('active_vehicles')
+        for conn in self.connections[self.ordered_ids.index(self.agent_id)]:
+            for vehicle_name in active_vehicles:
+                if int(vehicle_name.split('_')[1]) == conn:
+                    self.connected_vehicle_names.append(vehicle_name)
 
         # get agent's initial position, all others assumed 0 w/ large covariance
         start_state = rospy.get_param('start_pos')
@@ -226,10 +240,10 @@ class AgentWrapper(object):
             self.agent.ci_trigger_rate = self.agent.ci_trigger_cnt / self.update_cnt
 
             # generate CI requests
-            for conn in self.connections[self.ordered_connections.index(self.agent_id)]:
+            for i,conn in enumerate(self.connections[self.ordered_connections.index(self.agent_id)]):
                 # request state of connection and queue
                 rospy.logdebug('[ET-DDF Agent {}]: waiting for CI update service from agent_{} to become available'.format(self.agent_id,conn))
-                srv_name = '/'+self.agent_name.split('_')[0] +'_' +str(conn) + '/ci_update'
+                srv_name = '/'+ self.connected_vehicle_names[i] + '/ci_update'
                 rospy.wait_for_service(srv_name)
 
                 # create service proxy to send request
