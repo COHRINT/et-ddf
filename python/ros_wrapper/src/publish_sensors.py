@@ -301,8 +301,6 @@ def main():
             if int(vehicle_name.split('_')[1]) == conn:
                 connected_vehicle_names.append(vehicle_name)
     connected_vehicle_names.append(name)
-
-    rospy.logerr('[{}] connections: {}'.format(name,connected_vehicle_names))
     
     sp = SensorPub(name, agent_id, connected_vehicle_names)
     rospy.spin()
