@@ -20,7 +20,7 @@ fit error: values toward 0 are more confident, values 2-3 poor fits (res 0.01)
 
 class SensorPub:
 
-    auvs = {}
+    vehicle_names = {}
     
     def __init__(self, name, id, active_robots):
 
@@ -29,7 +29,7 @@ class SensorPub:
         gt_topic = rospy.get_param('gt_topic')
         for rob in active_robots:
             rospy.Subscriber('/' + rob + '/' + gt_topic, Odometry, self.pose_callback)
-            self.auvs[rob] = None
+            self.vehicle_names[rob] = None
         self.pose = None
 
         # Publishers
@@ -73,15 +73,15 @@ class SensorPub:
 
     def pose_callback(self, msg):
         topic = msg._connection_header['topic']
-        auv = None
-        for auv_name in self.auvs.keys():
-            if auv_name in topic:
-                auv = auv_name
+        vehicle = None
+        for name in self.vehicle_names.keys():
+            if name in topic:
+                vehicle = name
                 break
-        if auv == self.name:
+        if vehicle == self.name:
             self.pose = msg.pose.pose
         else:
-            self.auvs[auv] = msg
+            self.vehicle_names[vehicle] = msg
 
     def depth_callback(self, msg):
         if self.pose == None:
@@ -98,21 +98,21 @@ class SensorPub:
         
     def usbl_callback(self, msg):
         meas = usblMeasurement()
-        for auv in self.auvs:
-            if self.auvs[auv] == None or self.pose == None:
+        for name in self.vehicle_names:
+            if self.vehicle_names[name] == None or self.pose == None:
                 continue
 
             # Measurement
             meas.header.seq = self.usblSeq
             meas.header.stamp = rospy.Time.now()
             # meas.header.frame_id = TODO proper reference frame
-            meas.robot_measured = auv
-            _range = self.get_distance(self.pose.position, self.auvs[auv].pose.pose.position)
+            meas.robot_measured = name
+            _range = self.get_distance(self.pose.position, self.vehicle_names[name].pose.pose.position)
             _range = self.insert_noise(_range, self.distance_noise)
-            az, elev = self.get_bearing(self.pose,self.auvs[auv].pose.pose.position)
+            az, elev = self.get_bearing(self.pose,self.vehicle_names[name].pose.pose.position)
             az = self.insert_noise(az, self.angular_noise)
             elev = self.insert_noise(elev, self.angular_noise)
-            # rospy.loginfo("Publishing dist to " + auv)       
+            # rospy.loginfo("Publishing dist to " + name)
             meas.range = round(_range, self.dist_res)
             meas.azimuth = round(az, self.angular_res)
             meas.elevation = round(elev, self.angular_res)
@@ -145,23 +145,23 @@ class SensorPub:
     def linrel_callback(self,msg):
         # rospy.loginfo("Publishing measurement")
         meas = linrelMeasurement()
-        for auv in self.auvs:
-            if self.auvs[auv] == None or self.pose == None:
+        for name in self.vehicle_names:
+            if self.vehicle_names[name] == None or self.pose == None:
                 continue
 
             # Measurement
             meas.header.seq = self.linrelSeq
             meas.header.stamp = rospy.Time.now()
             # meas.header.frame_id = TODO proper reference frame
-            meas.robot_measured = auv
-            x,y,z = self.get_distance(self.pose.position, self.auvs[auv].pose.pose.position, linear=True)
+            meas.robot_measured = name
+            x,y,z = self.get_distance(self.pose.position, self.vehicle_names[name].pose.pose.position, linear=True)
             x = self.insert_noise(x, self.lin_rel_noise)
             y = self.insert_noise(y, self.lin_rel_noise)
             z = self.insert_noise(z, self.lin_rel_noise)
-            # az, elev = self.get_bearing(self.pose,self.auvs[auv].pose.pose.position)
+            # az, elev = self.get_bearing(self.pose,self.vehicle_names[name].pose.pose.position)
             # az = self.insert_noise(az, self.angular_noise)
             # elev = self.insert_noise(elev, self.angular_noise)
-            # # rospy.loginfo("Publishing dist to " + auv)       
+            # # rospy.loginfo("Publishing dist to " + name)
             # meas.range = round(_range, self.dist_res)
             # meas.azimuth = round(az, self.angular_res)
             # meas.elevation = round(elev, self.angular_res)
@@ -273,7 +273,7 @@ def test1():
     o2.pose.pose = pose2
 
     sp = SensorPub('rob', 0, ['rob','bob'])
-    sp.auvs['bob'] = o1
+    sp.vehicle_names['bob'] = o1
     sp.pose = o2.pose.pose
     # sp.get_distance(pose1.position, pose2.position)
     # sp.get_bearing(pose2, pose1.position)
@@ -293,12 +293,16 @@ def main():
         ordered_ids += conn
     ordered_ids = sorted(list(set(ordered_ids))) # remove non unique values
 
-    # create connection names, for use in topic subscription
-    active_auv_ids = connections[ordered_ids.index(agent_id)]
-    active_auvs = [name.split('_')[0] + '_' + str(x) for x in active_auv_ids]
-    active_auvs.append(name)
+    # collect names of robots this robot is connected to, and add ownship name
+    connected_vehicle_names = []
+    active_vehicles = rospy.get_param('active_vehicles')
+    for conn in connections[ordered_ids.index(agent_id)]:
+        for vehicle_name in active_vehicles:
+            if int(vehicle_name.split('_')[1]) == conn:
+                connected_vehicle_names.append(vehicle_name)
+    connected_vehicle_names.append(name)
     
-    sp = SensorPub(name, agent_id, active_auvs)
+    sp = SensorPub(name, agent_id, connected_vehicle_names)
     rospy.spin()
 
 if __name__ == "__main__":

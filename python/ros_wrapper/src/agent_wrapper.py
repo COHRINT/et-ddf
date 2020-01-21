@@ -47,8 +47,14 @@ class AgentWrapper(object):
         self.agent_name = rospy.get_namespace()
         self.agent_id = rospy.get_param('agent_id')
         self.update_rate = rospy.get_param('agent_update_rate')
+
         self.connections = rospy.get_param('connections')
+        self.ordered_ids = []
+        for conn in self.connections:
+            self.ordered_ids += conn
+        self.ordered_ids = sorted(list(set(self.ordered_ids))) # remove non unique values
         # self.meas_connections = rospy.get_param('meas_connections')
+
         self.delta = rospy.get_param('delta')
         self.tau_goal = rospy.get_param('tau')
         self.tau = self.tau_goal*0.75
@@ -59,6 +65,14 @@ class AgentWrapper(object):
         # compression flags
         self.quantization_flag = rospy.get_param('quantization')
         self.diagonalization_flag = rospy.get_param('diagonalization')
+        
+        # collect names of robots this robot is connected to
+        self.connected_vehicle_names = []
+        active_vehicles = rospy.get_param('active_vehicles')
+        for conn in self.connections[self.ordered_ids.index(self.agent_id)]:
+            for vehicle_name in active_vehicles:
+                if int(vehicle_name.split('_')[1]) == conn:
+                    self.connected_vehicle_names.append(vehicle_name)
 
         # get agent's initial position, all others assumed 0 w/ large covariance
         start_state = rospy.get_param('start_pos')
@@ -119,6 +133,8 @@ class AgentWrapper(object):
 
         # create publisher of local esimate
         self.local_est_pub = rospy.Publisher('local_estimate', AgentState, queue_size=10)
+        # create ownship-only publisher
+        self.local_est_ownship_pub = rospy.Publisher('local_estimate_ownship', AgentState, queue_size=10)
         
         # create message statistics publisher and timer
         self.msg_stats_pub = rospy.Publisher('msg_stats',MsgStats,queue_size=10)
@@ -229,10 +245,10 @@ class AgentWrapper(object):
             self.agent.ci_trigger_rate = self.agent.ci_trigger_cnt / self.update_cnt
 
             # generate CI requests
-            for conn in self.connections[self.ordered_connections.index(self.agent_id)]:
+            for i,conn in enumerate(self.connections[self.ordered_connections.index(self.agent_id)]):
                 # request state of connection and queue
                 rospy.logdebug('[ET-DDF Agent {}]: waiting for CI update service from agent_{} to become available'.format(self.agent_id,conn))
-                srv_name = '/'+self.agent_name.split('_')[0] +'_' +str(conn) + '/ci_update'
+                srv_name = '/'+ self.connected_vehicle_names[i] + '/ci_update'
                 rospy.wait_for_service(srv_name)
 
                 # create service proxy to send request
@@ -291,7 +307,7 @@ class AgentWrapper(object):
         # get state as response
         return res_msg_ros
 
-    def get_state_ros(self,dest=None):
+    def get_state_ros(self,dest=None,ownship_only=False):
         """
         Generates AgentState message for use in ROS network.
 
@@ -303,14 +319,21 @@ class AgentWrapper(object):
 
             msg -- generated AgentState message
         """
+        # get indicies for states
+        if ownship_only:
+            _, idx = self.agent.get_location(self.agent_id)
+        else:
+            idx = range(0,self.agent.local_filter.x.shape[0])
+        idx_grid = np.ix_(idx,idx)
+
         # create state message
         msg = AgentState()
         msg.header.stamp = rospy.Time.now()
         msg.src = self.agent_id
         msg.src_meas_connections = self.meas_connections
         msg.src_connections = self.agent_connections
-        msg.mean = self.agent.local_filter.x.transpose().tolist()[0]
-        msg.covariance = deflate_covariance(self.agent.local_filter.P)
+        msg.mean = self.agent.local_filter.x[idx].transpose().tolist()[0]
+        msg.covariance = deflate_covariance(self.agent.local_filter.P[idx_grid])
         msg.src_ci_rate = self.agent.ci_trigger_rate
 
         if dest is not None:
@@ -331,10 +354,14 @@ class AgentWrapper(object):
             none
         """
         # get ros state message
-        msg = self.get_state_ros()        
+        msg = self.get_state_ros()
+        # get ros state message with only ownship states
+        msg_ownship = self.get_state_ros(ownship_only=True)
 
         # publish message
         self.local_est_pub.publish(msg)
+        # publish ownship message
+        self.local_est_ownship_pub.publish(msg_ownship)
 
     def publish_msg_stats(self,msg_):
         """

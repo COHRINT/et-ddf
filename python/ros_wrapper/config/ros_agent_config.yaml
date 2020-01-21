@@ -5,6 +5,9 @@
 # connections: [[1,2],[0],[0,3],[2]]
 connections: [[4,5],[3],[3,6],[5]]
 
+# names and ids of vehicles
+active_vehicles: ['bluerov2_3','bluerov2_4','bluerov2_5','bluerov2_6']
+
 # update rate for et-ddf code
 agent_update_rate: 10 # [Hz]
 
