@@ -1,10 +1,10 @@
 # Quantization configuration
 
 # quantization types --> uniform discretization, adaptive binning w/ f(x)=x^3, etc.
-quant_types: ['uniform','x2','x3','x5']
+quant_types: ['uniform','x2']
 
-# number of available bits
-available_bits: 200
+# number of available bits -- not currently used
+available_bits: 240
 
 # measurement types --> angle zero centered = angle measurement that should be near zero most of the time
 # meas_types: ['position','velocity','angle_zero_centered','angle','range','other']
