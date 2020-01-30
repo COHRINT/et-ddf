@@ -11,8 +11,8 @@ distance_noise: 1     # m
 angular_noise: 1      # degrees
 depth_noise: 0.03     # m
 gps_noise: 1          # m std dev
-lin_rel_noise: 1.77       # m std dev
+lin_rel_noise: 1       # m std dev
 gps_pub_rate: 5
-lin_rel_pub_rate: 10
+lin_rel_pub_rate: 0.5
 
 gt_topic: pose_gt # topic for ground truth data
