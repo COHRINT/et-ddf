@@ -28,7 +28,8 @@ class Agent(object):
                     local_filter,common_estimates,x_true,msg_drop_prob,tau_goal,
                     tau,use_adaptive_tau,quantization_flag,diagonalization_flag,
                     quantization_config=os.path.abspath(os.path.join(os.path.dirname(__file__),
-                    '../config/quantization_config.yaml'))):
+                    '../config/quantization_config.yaml')),
+                    epsilon1=0.1,epsilon2=0.01):
         # agent id
         self.agent_id = agent_id
         
@@ -64,8 +65,8 @@ class Agent(object):
         self.tau_goal = tau_goal
         self.tau = tau
         self.connection_tau_rates = np.zeros( (len(self.connections),1) )
-        self.epsilon_1 = 0.01
-        self.epsilon_2 = 0.1
+        self.epsilon_1 = epsilon1
+        self.epsilon_2 = epsilon2
 
         self.use_adaptive_tau = use_adaptive_tau
 

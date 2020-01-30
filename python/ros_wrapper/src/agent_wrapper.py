@@ -573,7 +573,8 @@ class AgentWrapper(object):
         agent = Agent(agent_id,connections_new,meas_connections,neighbor_conn_ids,
                             local_filter,common_estimates,start_state,
                             0,len(x0)*self.tau_goal,len(x0)*self.tau,
-                            self.use_adaptive_tau,self.quantization_flag,self.diagonalization_flag)
+                            self.use_adaptive_tau,self.quantization_flag,self.diagonalization_flag,
+                            epsilon1=self.epsilon_1,epsilon2=self.epsilon_2)
 
         rospy.loginfo('[ET-DDF Agent {}]: Agent initialized w/ delta -- {} \t tau_goal -- {} \t tau -- {}'.format(
                         agent_id,self.delta,len(x0)*self.tau_goal,len(x0)*self.tau))
