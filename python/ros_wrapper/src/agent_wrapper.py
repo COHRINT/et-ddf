@@ -114,7 +114,8 @@ class AgentWrapper(object):
         self.update_cnt = 0
 
         # create subscriber to control input
-        rospy.Subscriber('new_twist',TwistStamped,self.control_input_cb)
+        control_input_topic = rospy.get_param('control_input_topic')
+        rospy.Subscriber(control_input_topic,TwistStamped,self.control_input_cb)
 
         # create subscribers to sensors
         sensors_agents = rospy.get_param('sensors')
