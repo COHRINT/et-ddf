@@ -238,11 +238,14 @@ class AgentWrapper(object):
         """
         Check if covariance intersection needs to happen. If so, generate service requests.
         """
+        # update CI trigger rate statistic
+        self.agent.ci_trigger_rate = self.agent.ci_trigger_cnt / self.update_cnt
+
+        # determine if CI needs to happen
         if np.trace(self.agent.local_filter.P) > self.agent.tau:
 
             # increment CI cnt
             self.agent.ci_trigger_cnt += 1
-            self.agent.ci_trigger_rate = self.agent.ci_trigger_cnt / self.update_cnt
 
             # generate CI requests
             for i,conn in enumerate(self.connections[self.ordered_connections.index(self.agent_id)]):
