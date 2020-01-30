@@ -1,0 +1,72 @@
+# Quantization configuration
+
+# quantization types --> uniform discretization, adaptive binning w/ f(x)=x^3, etc.
+quant_types: ['uniform','x2']
+
+# number of available bits -- not currently used
+available_bits: 240
+
+# measurement types --> angle zero centered = angle measurement that should be near zero most of the time
+# meas_types: ['position','velocity','angle_zero_centered','angle','range','other']
+meas_types:
+  gps: ['position','position','position']
+  lin_rel: ['position','position','position']
+  depth: ['position']
+  compass: ['angle']
+  usbl: ['range','angle_zero_centered','angle_zero_centered']
+
+# parameters for covariance off diagonal terms --> mean and diagonal are contained in element specifications
+covar_offdiag_range: [-5,5]
+covar_offdiag_resolution: 0.0001
+covar_offdiag_num_bins: 100
+covar_offdiag_center: 0
+
+position:
+  range: [-500,500]   # nominal operating area
+  resolution: 0.001  # resolution for uniform quantization
+  num_bins: 30       # number of allowed bins for adaptive scaling --> determines scale factor for adaptive binning
+  center: 0           # center of expected values for adaptive binning
+  variance_range: [0,10000]
+  variance_resolution: 0.001
+  variance_num_bins: 30
+  variance_center: 50
+
+velocity:
+  range: [-10,10]       # nominal operating area
+  resolution: 0.001 # resolution for uniform quantization
+  num_bins: 30       # number of allowed bins for adaptive scaling --> determines scale factor for adaptive binning
+  center: 0           # center of expected values for adaptive binning
+  variance_range: [0,50]
+  variance_resolution: 0.001
+  variance_num_bins: 30
+  variance_center: 20
+
+angle:
+  range: [0,6.28318530718]  # 0-2pi rad, # nominal operating area
+  resolution: 0.00001      # resolution for uniform quantization
+  num_bins: 100             # number of allowed bins for adaptive scaling --> determines scale factor for adaptive binning
+  center: 3.14159265359     # center of expected values for adaptive binning
+  variance_range: [0,9]
+  variance_resolution: 0.001
+  variance_num_bins: 100
+  variance_center: 3
+
+angle_zero_centered:
+  range: [-3.14159265359, 3.14159265359]  # nominal operating area
+  resolution: 0.00001                   # resolution for uniform quantization
+  num_bins: 100                           # number of allowed bins for adaptive scaling --> determines scale factor for adaptive binning
+  center: 0                               # center of expected values for adaptive binning
+  variance_range: [0,9]
+  variance_resolution: 0.0001
+  variance_num_bins: 100
+  variance_center: 3
+
+range:
+  range: [0,500]      # nominal operating area
+  resolution: 0.0001  # resolution for uniform quantization
+  num_bins: 100       # number of allowed bins for adaptive scaling --> determines scale factor for adaptive binning
+  center: 100          # center of expected values for adaptive binning
+  variance_range: [0,10000]
+  variance_resolution: 0.0001
+  variance_num_bins: 100
+  variance_center: 50

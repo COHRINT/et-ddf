@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+from __future__ import division
+
 """
 Simulation instance class implementation.
 """
@@ -20,8 +22,9 @@ from etddf.filters.etkf import ETKF
 from etddf.dynamics import *
 from etddf.helpers.config_handling import load_config
 from etddf.helpers.msg_handling import MeasurementMsg, StateMsg
-from etddf.helpers.data_handling import package_results, save_sim_data
+from etddf.helpers.data_handling import package_results, save_sim_data, make_data_directory, write_metadata_file
 from etddf.helpers.data_viz import mse_plots, time_trace_plots
+from etddf.quantization import Quantizer, covar_diagonalize
 
 class SimInstance(object):
     """
@@ -46,7 +49,8 @@ class SimInstance(object):
 
     def __init__(self,delta,tau,msg_drop_prob,baseline_cfg,
                     agent_cfg,max_time=20,dt=0.1,use_adaptive_tau=True,
-                    fixed_rng=None,process_noise=False,sensor_noise=False):
+                    fixed_rng=None,process_noise=False,sensor_noise=False,
+                    quantization_flag=False,diagonalization_flag=False):
 
         self.max_time = max_time
         self.dt = dt
@@ -65,8 +69,14 @@ class SimInstance(object):
         self.msg_drop_prob = msg_drop_prob
         self.use_adaptive_tau = use_adaptive_tau
 
+        # data compression flags and object
+        self.quantization = quantization_flag
+        self.diagonalization = diagonalization_flag
+        # if self.quantization:
+        #     self.quantizer = Quantizer(quantizer_fxn='x2')
+
         self.fixed_rng = fixed_rng
-        if self.fixed_rng is not None:
+        if self.fixed_rng is not False:
             np.random.seed(self.fixed_rng)
             print('Fixing random number generator with seed: {}'.format(self.fixed_rng))
 
@@ -137,6 +147,9 @@ class SimInstance(object):
         # create filter instance
         baseline_filter = KF(F_full,G_full,0,0,Q_full,R_abs,R_rel,x0_full,P0_full,0)
 
+        # add mse history
+        baseline_filter.mse_history = [[] for x in range(0,self.num_agents)]
+
         return baseline_filter
 
     def init_agents(self,x_true_vec,dynamics_fxn='lin_ncv',dynamics_fxn_params={},sensors={}):
@@ -192,19 +205,45 @@ class SimInstance(object):
             self.neighbor_connections = {}
             self.neighbor_meas_connections = {}
             # loop through all connections of each of self's connections
-            for i in self.connections[agent_id]:
-                if i is not agent_id:
-                    neighbor_agent_id = deepcopy(i)
+            # for i in self.connections[agent_id]:
+            #     if i is not agent_id:
+            #         neighbor_agent_id = deepcopy(i)
+            #         ids_new = sorted(deepcopy(self.connections[neighbor_agent_id]))
+            #         ids_new.append(neighbor_agent_id)
+
+            #         # build list of distance one and distance two neighbors for each agent
+            #         # each agent gets full list of connections
+            #         neighbor_conn_ids = []
+            #         for j in range(0,len(self.connections[neighbor_agent_id])):
+            #             for k in range(0,len(self.connections[self.connections[neighbor_agent_id][j]])):
+            #                 if not self.connections[self.connections[neighbor_agent_id][j]][k] in neighbor_conn_ids:
+            #                     neighbor_conn_ids += deepcopy(self.connections[self.connections[neighbor_agent_id][j]])
+
+            #                 # remove agent's own id from list of neighbors
+            #                 if neighbor_agent_id in neighbor_conn_ids:
+            #                     neighbor_conn_ids.remove(neighbor_agent_id)
+
+            #         # combine with direct connection ids and sort
+            #         ids_new = list(set(sorted(ids_new + neighbor_conn_ids)))
+
+            #         # divide out direct measurement connections and all connections
+            #         neighbor_connections_new = list(set(sorted(neighbor_conn_ids + deepcopy(self.connections[neighbor_agent_id]))))
+            #         meas_connections_new = deepcopy(self.connections[neighbor_agent_id])
+            #         self.neighbor_meas_connections[i] = deepcopy(meas_connections_new)
+            #         self.neighbor_connections[i] = deepcopy(neighbor_connections_new)
+            for ii in self.connections[agent_id]:
+                if ii is not agent_id:
+                    neighbor_agent_id = deepcopy(ii) # TODO this should be deepcopy(ii)
                     ids_new = sorted(deepcopy(self.connections[neighbor_agent_id]))
                     ids_new.append(neighbor_agent_id)
 
                     # build list of distance one and distance two neighbors for each agent
                     # each agent gets full list of connections
                     neighbor_conn_ids = []
-                    for j in range(0,len(self.connections[neighbor_agent_id])):
-                        for k in range(0,len(self.connections[self.connections[neighbor_agent_id][j]])):
-                            if not self.connections[self.connections[neighbor_agent_id][j]][k] in neighbor_conn_ids:
-                                neighbor_conn_ids += deepcopy(self.connections[self.connections[neighbor_agent_id][j]])
+                    for jj in range(0,len(self.connections[neighbor_agent_id])):
+                        for kk in range(0,len(self.connections[self.connections[neighbor_agent_id][jj]])):
+                            if not self.connections[self.connections[neighbor_agent_id][jj]][kk] in neighbor_conn_ids:
+                                neighbor_conn_ids += deepcopy(self.connections[self.connections[neighbor_agent_id][jj]])
 
                             # remove agent's own id from list of neighbors
                             if neighbor_agent_id in neighbor_conn_ids:
@@ -216,8 +255,8 @@ class SimInstance(object):
                     # divide out direct measurement connections and all connections
                     neighbor_connections_new = list(set(sorted(neighbor_conn_ids + deepcopy(self.connections[neighbor_agent_id]))))
                     meas_connections_new = deepcopy(self.connections[neighbor_agent_id])
-                    self.neighbor_meas_connections[i] = deepcopy(meas_connections_new)
-                    self.neighbor_connections[i] = deepcopy(neighbor_connections_new)
+                    self.neighbor_meas_connections[ii] = deepcopy(meas_connections_new)
+                    self.neighbor_connections[ii] = deepcopy(neighbor_connections_new)
 
             # construct local estimate
             # TODO: remove hardcoded 6
@@ -235,6 +274,7 @@ class SimInstance(object):
                     x = np.array((0,0,0,0,0,0)).transpose()
                 x0 = np.hstack( (x0,x) )
 
+            # P0 = 5000*np.eye(6*est_state_length)
             P0 = 5000*np.eye(6*est_state_length)
 
             local_filter = ETKF(F,G,0,0,Q,np.array(R_abs),np.array(R_rel),
@@ -258,6 +298,7 @@ class SimInstance(object):
                     x0_comm = np.hstack( (x0_comm,x) )
                 
                 # create comm info filter initial covariance
+                # P0_comm = 5000*np.eye(6*len(comm_ids))
                 P0_comm = 5000*np.eye(6*len(comm_ids))
 
                 # generate dynamics
@@ -278,7 +319,7 @@ class SimInstance(object):
             new_agent = Agent(agent_id,connections_new,meas_connections,neighbor_conn_ids,
                                 local_filter,common_estimates,x_true_vec[6*i:6*i+6],
                                 0,len(x0)*self.tau_state_goal,len(x0)*self.tau,
-                                self.use_adaptive_tau)
+                                self.use_adaptive_tau,self.quantization,self.diagonalization)
 
             agents.append(new_agent)
 
@@ -393,19 +434,21 @@ class SimInstance(object):
         # Everyone adds these messages to their inbox to be processed.
         for j, agent in enumerate(self.agents):
             
-        #     # check covaraince trace for triggering CI
-            if np.trace(agent.local_filter.P) > agent.tau:
+        #     # check covariance trace for triggering CI
+            agent.ci_trigger_rate = agent.ci_trigger_cnt / (self.sim_time_step+1)
+            if np.trace(agent.local_filter.P) > agent.tau: # or agent.ci_trigger_cnt < 75:
+            # if self.sim_time_step % 2 == 0:
                 agent.ci_trigger_cnt += 1
-                agent.ci_trigger_rate = agent.ci_trigger_cnt / (i-1)
 
                 for conn_id in agent.meas_connections:
                     
                     # generate message
                     msg_a = agent.gen_ci_message(conn_id,list(self.agents[conn_id].connections))
                     msg_b = self.agents[conn_id].gen_ci_message(agent.agent_id,list(agent.connections))
+
                     # add messages to ci inbox
                     ci_inbox[conn_id].append(deepcopy(msg_a))
-                    ci_inbox[agent.agent_id].append(msg_b)
+                    ci_inbox[agent.agent_id].append(deepcopy(msg_b))
 
         # # process inbox messages
         for j, msg_list in enumerate(ci_inbox):
@@ -424,6 +467,17 @@ class SimInstance(object):
             _,idx = agent.get_location(agent.agent_id)
             agent_mse = np.linalg.norm(np.take(agent.local_filter.x,[idx[0],idx[2],idx[4]]) - np.take(agent.true_state[-1],[0,2,4]),ord=2)**2 
             agent.mse_history.append(agent_mse)
+
+            # relative position mse
+            for k in range(0,len(agent.meas_connections)):
+                # get est location
+                _,rel_idx = agent.get_location(agent.meas_connections[k])
+                agent_rel_mse = np.linalg.norm( (np.take(agent.local_filter.x,[idx[0],idx[2],idx[4]]) - np.take(agent.local_filter.x,[rel_idx[0],rel_idx[2],rel_idx[4]])) - \
+                                (np.take(agent.true_state[-1],[0,2,4]) - np.take(self.agents[agent.meas_connections[k]].true_state[-1],[0,2,4])),ord=2)**2
+                agent.rel_mse_history[k].append(agent_rel_mse)
+
+            baseline_agent_mse = np.linalg.norm(np.take(self.baseline_filter.x,[j*6,(j*6)+2,(j*6)+4]) - np.take(agent.true_state[-1],[0,2,4]),ord=2)**2 
+            self.baseline_filter.mse_history[j].append(baseline_agent_mse)
 
         # update baseline est and cov histories
         self.baseline_filter.state_history.append(self.baseline_filter.x)
@@ -460,6 +514,57 @@ class SimInstance(object):
             # increament simulation time
             self.sim_time += self.dt
             self.sim_time_step += 1
+
+        # create empty numpy arrays to store results -> rows=time, columns=agents
+        mse_results_array = np.empty((self.sim_time_step,self.num_agents))
+        rel_mse_array = [np.empty((self.sim_time_step,len(agent.meas_connections))) for i,agent in enumerate(self.agents)]
+        local_filter_history = np.empty(())
+        baseline_mse_array = np.empty((self.sim_time_step,self.num_agents))
+
+        baseline_state_history = np.array(self.baseline_filter.state_history)
+        baseline_cov_history = np.array(self.baseline_filter.cov_history)
+
+        agent_msgs_total = []
+        agent_msgs_sent = []
+        agent_ci_total = []
+        agent_ci_rate = []
+
+        agent_state_histories = []
+        agent_cov_histories = []
+        agent_true_states = []
+        agent_state_error = []
+        agent_cov_error = []
+        baseline_state_error = []
+
+        for i,a in enumerate(self.agents):
+            mse_results_array[:,i] = np.array(a.mse_history)
+            baseline_mse_array[:,i] = np.array(self.baseline_filter.mse_history[i])
+
+            agent_state_histories.append(np.array(a.local_filter.state_history))
+            agent_cov_histories.append(np.array(a.local_filter.cov_history))
+            agent_true_states.append(np.array(a.true_state))
+
+            state_error = []
+            cov_error = []
+            for j in range(0,len(a.local_filter.state_history)-1):
+                id_loc,id_idx = a.get_location(a.agent_id)
+                state_error.append(np.squeeze(np.take(a.local_filter.state_history[j],[id_idx]))-a.true_state[j])
+                cov_error.append(a.local_filter.cov_history[j][np.ix_(id_idx,id_idx)])
+            agent_state_error.append(np.array(state_error))
+            agent_cov_error.append(np.array(cov_error))
+
+            # relative mse
+            for j,conn in enumerate(a.meas_connections):
+                rel_mse_array[i][:,j] = np.array(a.rel_mse_history[j])
+
+            agent_msgs_total.append(a.total_msgs)
+            agent_msgs_sent.append(a.msgs_sent)
+            agent_ci_total.append(a.ci_trigger_cnt)
+            agent_ci_rate.append(a.ci_trigger_rate)
+
+            # loc,idx = a.get_location(a.agent_id)
+            # agent_state_error.append(np.array(a.local_filter.state_history[idx])-np.array(a.true_state))
+            # baseline_state_error.append(np.array(baseline_state_history[6*a.agent_id:6*a.agent_id+6])-np.array(a.true_state))
             
         # print ci_process_worst_case_time for each agent
         # for i,a in enumerate(self.agents):
@@ -467,7 +572,23 @@ class SimInstance(object):
 
         # package simulation results
         # res = package_results()
-        results_dict = {'baseline': self.baseline_filter, 'agents': self.agents}
+        # results_dict = {'baseline': self.baseline_filter, 'agents': self.agents}
+        results_dict = {'agent_mse': mse_results_array,
+                        'agent_rel_mse': rel_mse_array,
+                        'agent_state_histories': agent_state_histories,
+                        'agent_cov_histories': agent_cov_histories,
+                        'agent_true_states': agent_true_states,
+                        'agent_state_error': agent_state_error,
+                        'agent_cov_error': agent_cov_error,
+                        'baseline_mse': baseline_mse_array,
+                        'baseline_state_history': baseline_state_history,
+                        'baseline_cov_history': baseline_cov_history,
+                        # 'baseline_state_error': baseline_state_error,
+                        'agent_msgs_total': agent_msgs_total,
+                        'agent_msgs_sent': agent_msgs_sent,
+                        'agent_ci_total': agent_ci_total,
+                        'agent_ci_rate': agent_ci_rate}
+                        
         # create metadata dictionary
         metadata_dict = {'max_time': self.max_time, 
                         'dt': self.dt,
@@ -538,6 +659,9 @@ def main(plot=False,cfg_path=None,save_path=None):
         save_path = os.path.abspath(os.path.join(os.path.dirname(__file__),
                         '../data/'))
 
+    # make new data directory for sim files
+    save_path = make_data_directory(save_path)
+
     # extract config params
     num_mc_sim = cfg['num_mc_sims']
     delta_values = cfg['delta_values']
@@ -554,6 +678,23 @@ def main(plot=False,cfg_path=None,save_path=None):
     for i in delta_values:
         for j in tau_values:
             for k in msg_drop_prob_values:
+
+                # numpy array for monte carlo averaged results
+                mc_mse_results = np.empty((int(cfg['max_time']/cfg['dt'] + 1),len(cfg['agent_cfg']['conns']),num_mc_sim))
+                mc_baseline_mse_results = np.empty((int(cfg['max_time']/cfg['dt'] + 1),len(cfg['agent_cfg']['conns']),num_mc_sim))
+                mc_rel_mse_results = [np.empty((int(cfg['max_time']/cfg['dt'] + 1),len(cfg['agent_cfg']['conns'][x]),num_mc_sim)) for x in range(0,len(cfg['agent_cfg']['conns']))]
+                state_results = []
+                cov_results = []
+                baseline_results = []
+                true_states = []
+                state_error = []
+                cov_error = []
+
+                mc_msgs_total = np.empty((len(cfg['agent_cfg']['conns']),num_mc_sim))
+                mc_msgs_sent = np.empty((len(cfg['agent_cfg']['conns']),num_mc_sim))
+                mc_ci_total = np.empty((len(cfg['agent_cfg']['conns']),num_mc_sim))
+                mc_ci_rate = np.empty((len(cfg['agent_cfg']['conns']),num_mc_sim))
+
                 for m in range(1,num_mc_sim+1):
                     # create simulation status strings to be printed
                     sim_print_str = 'Initializing simulation {} of {}'.format(sim_cnt,total_sims)
@@ -569,23 +710,98 @@ def main(plot=False,cfg_path=None,save_path=None):
                                         use_adaptive_tau=cfg['use_adaptive_tau'],
                                         fixed_rng=cfg['fixed_rng'],
                                         process_noise=False,
-                                        sensor_noise=False)
+                                        sensor_noise=False,
+                                        quantization_flag=cfg['quantization'],
+                                        diagonalization_flag=cfg['diagonalization'])
                     # run simulation
                     res = sim.run_sim([sim_print_str,param_print_str,mc_print_str])
-                    # add results to results container
-                    results.append(res)
+                   
+                    mc_mse_results[:,:,m-1] = res['results']['agent_mse']
+                    mc_baseline_mse_results[:,:,m-1] = res['results']['baseline_mse']
+
+                    for ii in range(0,len(cfg['agent_cfg']['conns'])):
+                        mc_rel_mse_results[ii][:,:,m-1] = res['results']['agent_rel_mse'][ii]
+
+                    state_error.append(res['results']['agent_state_error'])
+                    cov_error.append(res['results']['agent_cov_error'])
+                    cov_results.append(res['results']['agent_cov_histories'])
+
+                    mc_msgs_total[:,m-1] = res['results']['agent_msgs_total']
+                    mc_msgs_sent[:,m-1] = res['results']['agent_msgs_sent']
+                    mc_ci_total[:,m-1] = res['results']['agent_ci_total']
+                    mc_ci_rate[:,m-1] = res['results']['agent_ci_rate']
+
+                    true_states.append(res['results']['agent_true_states'])
 
                     sim_cnt += 1
 
-    # create metadata dictionary
-    metadata_dict = {'num_mc_sim': num_mc_sim,
-                    'delta_values': delta_values,
-                    'tau_values': tau_values,
-                    'msg_drop_prob_values': msg_drop_prob_values,
-                    'total_sims': total_sims}
+                mc_avg_mse_results = np.mean(mc_mse_results,axis=2)
+                mc_std_mse_results = np.std(mc_mse_results,axis=2)
+                mc_avg_baseline_mse_results = np.mean(mc_baseline_mse_results,axis=2)
+                mc_std_baseline_mse_results = np.std(mc_baseline_mse_results,axis=2)
+                mc_avg_rel_mse_results = [np.mean(mc_rel_mse_results[x],axis=2) for x in range(0,len(mc_rel_mse_results))]
+                mc_std_rel_mse_results = [np.std(mc_rel_mse_results[x],axis=2) for x in range(0,len(mc_rel_mse_results))]
 
-    # save data to pickle file
-    save_sim_data(metadata_dict,results,save_path)
+                mc_avg_msgs_total = np.mean(mc_msgs_total,axis=1)
+                mc_avg_msgs_sent = np.mean(mc_msgs_sent,axis=1)
+                mc_avg_ci_total = np.mean(mc_ci_total,axis=1)
+                mc_avg_ci_rate = np.mean(mc_ci_rate,axis=1)
+
+                mc_std_msgs_total = np.std(mc_msgs_total,axis=1)
+                mc_std_msgs_sent = np.std(mc_msgs_sent,axis=1)
+                mc_std_ci_total = np.std(mc_ci_total,axis=1)
+                mc_std_ci_rate = np.std(mc_ci_rate,axis=1)
+
+                state_error_mc_avg = [state_error[0][x] for x in range(0,len(state_error[0]))]
+                cov_histories_mc_avg = [cov_results[0][x] for x in range(0,len(cov_results[0]))]
+                cov_error_mc_avg = [cov_error[0][x] for x in range(0,len(cov_error[0]))]
+                for ii in range(1,len(state_error)):
+                    for jj in range(0,len(state_error[ii])):
+                        state_error_mc_avg[jj] += state_error[ii][jj]
+                        cov_histories_mc_avg[jj] += cov_results[ii][jj]
+                        cov_error_mc_avg[jj] += cov_error[ii][jj]
+
+                state_error_mc_avg = [state_error_mc_avg[x]/num_mc_sim for x in range(0,len(state_error_mc_avg))]
+                cov_histories_mc_avg = [cov_histories_mc_avg[x]/num_mc_sim for x in range(0,len(cov_histories_mc_avg))]
+                cov_error_mc_avg = [cov_error_mc_avg[x]/num_mc_sim for x in range(0,len(cov_error_mc_avg))]
+
+
+                results = {'mse': mc_avg_mse_results,
+                            'rel_mse': mc_avg_rel_mse_results,
+                            'baseline_mse': mc_avg_baseline_mse_results,
+                            'state_error': state_error_mc_avg,
+                            'cov_error': cov_error_mc_avg,
+                            'state_history': state_results,
+                            'cov_history': cov_histories_mc_avg,
+                            'true_states': true_states,
+                            'msgs_total': mc_avg_msgs_total,
+                            'msgs_sent': mc_avg_msgs_sent,
+                            'ci_total': mc_avg_ci_total,
+                            'ci_rate': mc_avg_ci_rate,
+                            'mse_std': mc_std_mse_results,
+                            'rel_mse_std': mc_std_rel_mse_results,
+                            'baseline_mse_std': mc_std_baseline_mse_results,
+                            'msgs_total_std': mc_std_msgs_total,
+                            'msgs_sent_std': mc_std_msgs_sent,
+                            'ci_total_std': mc_std_ci_total,
+                            'ci_rate_std': mc_std_ci_rate}
+
+                # create metadata dictionary
+                metadata_dict = {'num_mc_sim': num_mc_sim,
+                                'delta_value': (i,delta_values),
+                                'tau_value': (j,tau_values),
+                                'msg_drop_prob_value': (k,msg_drop_prob_values)}
+
+                # create filename
+                file_name = 'delta{}_tau{}_drop{}_mc{}'.format(i,j,k,num_mc_sim).replace('.','')
+
+                # save data to pickle file
+                save_sim_data(metadata_dict,results,save_path,file_name)
+
+    # write metadata file for data
+    sim_metadata = {'cfg': cfg}
+    write_metadata_file(save_path,sim_metadata)
+
 
     # if plot flag is set, plot results
     if plot:

@@ -62,6 +62,10 @@ class AgentWrapper(object):
         self.epsilon_1 = rospy.get_param('epsilon_1')
         self.epsilon_2 = rospy.get_param('epsilon_2')
 
+        # compression flags
+        self.quantization_flag = rospy.get_param('quantization')
+        self.diagonalization_flag = rospy.get_param('diagonalization')
+        
         # collect names of robots this robot is connected to
         self.connected_vehicle_names = []
         active_vehicles = rospy.get_param('active_vehicles')
@@ -72,7 +76,6 @@ class AgentWrapper(object):
 
         # get agent's initial position, all others assumed 0 w/ large covariance
         start_state = rospy.get_param('start_pos')
-        # TODO: add back z and zdot states
         start_state = np.array((start_state['x'],0,start_state['y'],0,start_state['z'],0))
 
         # create initial control input vector
@@ -111,7 +114,8 @@ class AgentWrapper(object):
         self.update_cnt = 0
 
         # create subscriber to control input
-        rospy.Subscriber('new_twist',TwistStamped,self.control_input_cb)
+        control_input_topic = rospy.get_param('control_input_topic')
+        rospy.Subscriber(control_input_topic,TwistStamped,self.control_input_cb)
 
         # create subscribers to sensors
         sensors_agents = rospy.get_param('sensors')
@@ -235,11 +239,14 @@ class AgentWrapper(object):
         """
         Check if covariance intersection needs to happen. If so, generate service requests.
         """
+        # update CI trigger rate statistic
+        self.agent.ci_trigger_rate = self.agent.ci_trigger_cnt / self.update_cnt
+
+        # determine if CI needs to happen
         if np.trace(self.agent.local_filter.P) > self.agent.tau:
 
             # increment CI cnt
             self.agent.ci_trigger_cnt += 1
-            self.agent.ci_trigger_rate = self.agent.ci_trigger_cnt / self.update_cnt
 
             # generate CI requests
             for i,conn in enumerate(self.connections[self.ordered_connections.index(self.agent_id)]):
@@ -570,7 +577,8 @@ class AgentWrapper(object):
         agent = Agent(agent_id,connections_new,meas_connections,neighbor_conn_ids,
                             local_filter,common_estimates,start_state,
                             0,len(x0)*self.tau_goal,len(x0)*self.tau,
-                            self.use_adaptive_tau)
+                            self.use_adaptive_tau,self.quantization_flag,self.diagonalization_flag,
+                            epsilon1=self.epsilon_1,epsilon2=self.epsilon_2)
 
         rospy.loginfo('[ET-DDF Agent {}]: Agent initialized w/ delta -- {} \t tau_goal -- {} \t tau -- {}'.format(
                         agent_id,self.delta,len(x0)*self.tau_goal,len(x0)*self.tau))

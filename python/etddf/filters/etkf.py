@@ -136,8 +136,6 @@ class ETKF(object):
         for i in range(0,len(data)):
 
             # create measurement fxn
-            #TODO this needs to be generalized to measurements are any length
-            # as well as of any type
             H = np.zeros( (1,self.F.shape[0]) )
             if type_ == "abs":
                 H[0,6*src_loc+2*i] = 1
@@ -180,8 +178,6 @@ class ETKF(object):
 
         i = data_idx
         # create measurement fxn
-        #TODO this needs to be generalized to measurements are any length
-        # as well as of any type
         H = np.zeros( (1,self.F.shape[0]) )
         if type_ == "abs":
             H[0,6*src_loc+2*i] = 1
@@ -206,8 +202,6 @@ class ETKF(object):
 
         self.x = x_curr
         self.P = 0.5*P_curr + 0.5*P_curr.transpose()
-        # self.state_history.append(x_curr)
-        # self.cov_history.append(P_curr)
 
         return x_curr,P_curr
 
@@ -232,15 +226,11 @@ class ETKF(object):
         """
 
         # fxn handles for standard normal distribution pdf and cdf
-        # phi = norm.pdf
         phi = lambda z: (1/np.sqrt(2*np.pi))*np.exp(-0.5*(z**2)) 
-        # Qfxn = norm.cdf
         Qfxn = lambda x: 1 - 0.5*(1+erf(x/np.sqrt(2)))
 
         i = data_idx
         # create measurement fxn
-        #TODO this needs to be generalized to measurements are any length
-        # as well as of any type
         H = np.zeros( (1,self.F.shape[0]) )
         if type_ == "abs":
             H[0,6*src_loc+2*i] = 1
@@ -265,6 +255,10 @@ class ETKF(object):
         zbar = ((phi(arg1)-phi(arg2))/(Qfxn(arg1)-Qfxn(arg2)))*np.sqrt(Qe)
         dcal = ((phi(arg1)-phi(arg2))/(Qfxn(arg1)-Qfxn(arg2))**2) - ((arg1)*phi(arg1)-arg2*phi(arg2)/(Qfxn(arg1)-Qfxn(arg2)))
 
+        if np.isnan(dcal) or np.isinf(dcal):
+            print('throwing away measurement element: dcal is nan or inf')
+            return np.copy(self.x), np.copy(self.P)
+
         # compute Kalman gain
         K = np.dot(np.dot(self.P,H.transpose()),np.linalg.inv(np.dot(np.dot(H,self.P),
                 H.transpose()) + R))
@@ -279,6 +273,9 @@ class ETKF(object):
         # update filter values
         self.x = x_curr
         self.P = 0.5*P_curr + 0.5*P_curr.transpose()
+
+        if np.isnan(self.x).any() or np.isnan(self.P).any():
+                pudb.set_trace()
 
         return x_curr, P_curr
 
@@ -322,7 +319,7 @@ class ETKF(object):
                 self.explicit_update(src_loc,target_loc,type_,data[data_cnt],i)
                 assert(self.x.shape == prev_shape)
                 data_cnt += 1
-            # else, implcit update
+
             else:
                 prev_shape = self.x.shape
                 self.implicit_update(src_loc,target_loc,type_,x_local,P_local,i)

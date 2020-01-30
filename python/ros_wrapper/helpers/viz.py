@@ -220,6 +220,13 @@ def uncertain_ellipse(covariance,alpha=0.95):
     q2 = (v[0,2]-v[2,0])/4*q0
     q3 = (v[1,0]-v[0,1])/4*q0
 
+    # normalize quaternion
+    qnorm = np.sqrt(q0**2 + q1**2 + q2**2 + q3**2)
+    q0 /= qnorm
+    q1 /= qnorm
+    q2 /= qnorm
+    q3 /= qnorm
+
     return np.array([x_scale,y_scale,z_scale]), np.array([q0,q1,q2,q3])
 
 def test_marker_viz():

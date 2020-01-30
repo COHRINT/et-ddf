@@ -89,9 +89,11 @@ The covariance intersection implementation resides in this file. Covariance inte
 
 ### Quantization
 
-To be updated to something more thorough.
+The `quantization.py` file contains the Quantizer class, which provides an interface to quantize and diagonalized measurements and state estimates in order to compress them, as well as decode quantized measurement and state estimates received from other ET-DDF instances. The Quantizer instance is configured using the `quantization_config.yaml` config file, also located in the [`config/` folder](../config/quantization_config.yaml).
 
-The `quantization.py` contains the Quantizer class, which provides an interface to quantize and diagonalized measurements and state estimates in order to compress them, as well as decode quantized measurement and state estimates received from other ET-DDF instances. The Quantizer instance is configured using the `quantization_config.yaml` config file, also located in the [`config/` folder](../config/quantization_config.yaml).
+In the config file, the number of quantization bins can be chosen, as well as the range of values over which the data will be quantized. The `num_bins` parameter should be used for quadratic binning, and the `resolution` parameter should be used for uniform binning. These are the only two quantization types currently supported.
+
+**Note:** The quantization of a covariance matrix produces a non positive semi-definite result, which creates many problems for fusing said covariance. As such, **the only type of compression currently supported is one using both quantization and diagonalization**, despite there being options to enable each separately in the config file, and the checks in `agent.py` having cases for each. Solving this is a research question that will addressed at some point in the future.
 
 ### Simulation
 

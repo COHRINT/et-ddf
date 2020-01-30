@@ -7,7 +7,8 @@ __date__ = "1.7.2018"
 
 import numpy as np
 import math
-# import pudb; pudb.set_trace()
+from scipy.optimize import minimize
+import pudb; #pudb.set_trace()
 
 def covar_intersect(xa,xb,Pa,Pb,alpha=-1):
     """
@@ -31,8 +32,13 @@ def covar_intersect(xa,xb,Pa,Pb,alpha=-1):
         alpha = np.ones(np.shape(xa))
 
     # create fxn handle to find omega that minimizes tr(P)
-    f = lambda omega: np.trace(np.linalg.inv(omega*np.linalg.inv(Pa) 
-                + (1-omega)*np.linalg.inv(Pb))*np.diag(alpha))
+    Pa_inv = np.linalg.inv(Pa)
+    Pb_inv = np.linalg.inv(Pb)
+    alpha_diag = np.diag(alpha)
+
+    # f = lambda omega: np.trace(np.linalg.inv(omega*np.linalg.inv(Pa) 
+                # + (1-omega)*np.linalg.inv(Pb))*np.diag(alpha))
+    f = lambda omega: np.trace(np.linalg.inv(omega*Pa_inv + (1-omega)*Pb_inv)*alpha_diag)
     omega = gss(f,0,1)
 
     Pc = np.linalg.inv(omega*np.linalg.inv(Pa) + (1-omega)*np.linalg.inv(Pb))
