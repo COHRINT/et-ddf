@@ -16,27 +16,11 @@ See the Python [ET-DDF README](python/etddf/README.md) for more information on r
 
 There is ROS package, `etddf_ros` that wraps the Python ET-DDF library described above. The package provides an interface for handling sensor measurements and inter-vechicle communications as ROS messages, allowing the algorithms to be run on an acutal system.
 
-To use the ROS ET-DDF package, make sure you have ROS installed on your machine, then see the [ROS ET-DDF README](python/ros_wrapper/README.md). *Note: the ROS package was developed in and tested with ROS Kinetic, however will likely work with other distributions* 
+To use the ROS ET-DDF package, make sure you have ROS installed on your machine, then see the [ROS ET-DDF README](python/ros_wrapper/README.md). *Note: the ROS package was developed in and tested with ROS Kinetic and Melodic, however will likely work with other distributions* 
 
 ## Matlab Simulation
 
-The project was originally implemented in Matlab, and has not received major updates since v1.0.
-To run the Matlab code, use:
-```matlab
-fci_main
-```
-The simulation configuration options are at the beginning of the script, including *network connections*, event-triggering threshold *$$\delta$$*, and covariance intersection threshold *$$\tau$$*.
-
-The **Agent** class functions as the message handling layer between the simulation and the **ETKF** event-triggered Kalman filter class.
-
-To analyze simulation results use
-```matlab
-fci_plotting -- generate time trace plots
-mse_plots -- generate mean-squared error plots
-comms_data_post -- generate communications usage, message sharing, and CI trigger plots
-```
-
-Vehicle dynamics and filters are currently all linear, with plans to implement nonlinear dynamics, measurements and filters in the first python version.
+The project was originally implemented in Matlab, and has not received major updates since v1.0. Please see the README located in the `matlab/` directory for instructions on using and particulars about the Matlab version of the code.
 
 ### __It is recommended to use the python or python/ROS versions of the code.__
 
