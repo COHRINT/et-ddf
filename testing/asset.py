@@ -22,7 +22,7 @@ class Asset:
             sharing = {}
             for asset_id in self.common_filters.keys():
                 common_filter = self.common_filters[asset_id]
-                if common_filter.check_implicit(asset_id, meas):
+                if common_filter.check_implicit(self.my_id, meas):
                     sharing[asset_id] = self._get_implicit_msg_equivalent(meas)
                 else: # share as explicit
                     sharing[asset_id] = meas

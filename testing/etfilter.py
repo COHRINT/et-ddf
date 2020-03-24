@@ -15,6 +15,7 @@ class ETFilter(object):
         self.B = B
         self.et_delta = et_delta
         self.num_assets = self.x_hat.size
+        print(self.et_delta)
 
         self.meas_queue = []
 
@@ -25,7 +26,7 @@ class ETFilter(object):
 
         C = self._get_measurement_jacobian(asset_id, meas)
         innovation = self._get_innovation(meas.data, C)
-        return innovation <= self.et_delta
+        return np.abs(innovation) <= self.et_delta
 
     def add_meas(self, asset_id, meas):
         if not isinstance(meas, Measurement):

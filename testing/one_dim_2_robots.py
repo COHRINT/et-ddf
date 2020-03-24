@@ -7,7 +7,7 @@ from asset import Asset
 from measurements import *
 
 # Simple simulation
-K = 10
+K = 1000
 dim = 2
 A = np.eye(dim)
 B = np.eye(dim)
@@ -23,7 +23,7 @@ initial_P = np.zeros((dim,dim))
 # robotB = Robot( initial_x, initial_P )
 # robots = [robotA] # robotB
 
-delta = 3
+delta = 5
 
 
 implicit_update_cnt = 0
@@ -32,7 +32,8 @@ asset0 = Asset(0, x_truth, initial_P, A, B, delta)
 asset1 = Asset(1, x_truth, initial_P, A, B, delta)
 
 for k in range(K):
-    u = np.random.randint(-10, 10, size=(dim,1))
+    u = np.random.randint(-1, 1, size=(dim,1))
+    # u = np.zeros((dim,1))
     w = np.random.normal(0, q, size=(dim,1))
 
     # Truth update
@@ -49,22 +50,33 @@ for k in range(K):
 
     meas_gps = GPSx_Explicit(meas[0,0], r)
     shared_meas = asset0.receive_meas(meas_gps, shareable=True)
-    print(shared_meas)
     if isinstance(shared_meas[1], Implicit):
+        # print("asset 0's sharing implicitly: " + str(meas_gps.data))
         implicit_update_cnt += 1
+    # else:
+        # print("asset 0's sharing explicitly: " + str(meas_gps.data))
     asset1.receive_shared_meas(0, shared_meas[1])
 
-    meas_gps = GPSx_Explicit(meas[1,0], r)
-    asset1.receive_meas(meas_gps, shareable=False)
-    # asset0.receive_shared_meas(1, shared_meas)
+    meas_gps2 = GPSx_Explicit(meas[1,0], r)
+    shared_meas2 = asset1.receive_meas(meas_gps2, shareable=True)
+    if isinstance(shared_meas2[0], Implicit):
+        # print("asset 1's sharing implicitly: " + str(meas_gps2.data))
+        implicit_update_cnt += 1
+    # else:
+        # print("asset 1's sharing explicitly: " + str(meas_gps2.data))
+    asset0.receive_shared_meas(1, shared_meas2[0])
 
 
     asset0.correct()
     asset1.correct()
 
-    print("Truth: \n" + str(x_truth))
-    # asset0.print_filters()
-    asset1.print_filters()
+print("Truth: \n" + str(x_truth))
+
+asset0.print_filters(main_only=True)
+asset1.print_filters(main_only=True)
+# asset0.print_filters()
+# asset1.print_filters()
+print("---------------------------------------------------------------")
 # print("x_hat: \n" + str(asset0.main_filter.x_hat))
 # print("P: \n" + str(asset0.main_filter.P))
 # print("Uncertainty sigma: \n" + str(2*np.sqrt(asset0.main_filter.P)))
@@ -72,4 +84,4 @@ for k in range(K):
 # uncertainty_range = [x_hat - 2*np.sqrt(P), x_hat + 2*np.sqrt(P)]
 # print("Uncertainty range: " + str(uncertainty_range))
 # print("Inside range? " + str(x > uncertainty_range[0] and x < uncertainty_range[1]))
-# print("Num implicit percentage: " + str(implicit_update_cnt / K ))
+print("Num implicit percentage: " + str(implicit_update_cnt / (2*K) ))
