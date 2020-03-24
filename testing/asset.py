@@ -26,6 +26,9 @@ class Asset:
                     sharing[asset_id] = self._get_implicit_msg_equivalent(meas)
                 else: # share as explicit
                     sharing[asset_id] = meas
+                    
+                # Add the measurement to the common filter
+                common_filter.add_meas(self.my_id, sharing[asset_id])
             return sharing
         else: # Not shareable
             return None
@@ -44,10 +47,25 @@ class Asset:
             self.common_filters[asset_id].correct()
         self.main_filter.correct()
 
+    def print_filters(self, main_only=False):
+        print(str(self.my_id)+"'s Main Filter")
+        print(self.main_filter.x_hat)
+        print(2*np.sqrt(self.main_filter.P))
+
+        if not main_only:
+            print("----------")
+            for asset_id in self.common_filters.keys():
+                print(str(self.my_id) + "_" + str(asset_id) + " common filter")
+                print(self.common_filters[asset_id].x_hat)
+                print(2*np.sqrt(self.common_filters[asset_id].P))
+                print("----------")
+
     def _get_implicit_msg_equivalent(self, meas):
-        if isinstance(meas, GPS_Explicit):
-            return GPS_Implicit(meas.R)
-        elif isinstance(meas, LinRel_Explicit):
-            return LinRel_Implicit(meas.other_asset, meas.R)
+        if isinstance(meas, GPSx_Explicit):
+            return GPSx_Implicit(meas.R)
+        elif isinstance(meas, LinRelx_Explicit):
+            return LinRelx_Implicit(meas.other_asset, meas.R)
         else:
             print("Implicit Msg equivalent not found: " + str(type(meas)))
+
+    
