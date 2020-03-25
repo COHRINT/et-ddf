@@ -3,8 +3,6 @@ import numpy as np
 from measurements import *
 from scipy.stats import norm as normal
 
-# NOT THREADSAFE
-
 class ETFilter(object):
 
     def __init__(self, my_id, x0, P0, A, B, et_delta):
@@ -15,7 +13,6 @@ class ETFilter(object):
         self.B = B
         self.et_delta = et_delta
         self.num_assets = self.x_hat.size
-        print(self.et_delta)
 
         self.meas_queue = []
 
@@ -87,7 +84,6 @@ class ETFilter(object):
         tmp = ( normal.pdf( arg1 ) - normal.pdf( arg2 ) ) / ( Q_func(arg1) - Q_func(arg2 ) )
         z_bar = tmp.dot( np.sqrt( Qe ) )
 
-        # Check this matrix squaring, not elementwise
         tmp2 = ( arg1.dot( normal.pdf( arg1)) - arg2.dot( normal.pdf( arg2 )) ) / ( Q_func(arg1) - Q_func(arg2))
         curly_theta = np.linalg.matrix_power(tmp, 2) - tmp2
 
@@ -96,8 +92,12 @@ class ETFilter(object):
     def _get_measurement_jacobian(self, asset_id, meas):
         C = None
         if isinstance(meas, GPSx_Explicit) or isinstance(meas, GPSx_Implicit):
-                    C = np.zeros((1, self.num_assets))
-                    C[0, asset_id] = 1
+            C = np.zeros((1, self.num_assets))
+            C[0, asset_id] = 1
+        elif isinstance(meas, LinRelx_Explicit) or isinstance(meas, LinRelx_Implicit):
+            C = np.zeros((1, self.num_assets))
+            C[0, asset_id] = -1
+            C[0, meas.other_asset] = 1
         else:
             print("Measurment Jacobian not implemented for: " + str(type(meas)))
         return C

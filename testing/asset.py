@@ -4,20 +4,21 @@ import numpy as np
 class Asset:
 
     def __init__(self, my_id, x0, P0, A, B, et_delta, red_team=[]):
-        # init filters
         self.my_id = my_id
 
-        # Load common filters between other assets
+        # Initialize common filters between other assets
         self.common_filters = {}
         for i in range(x0.size):
             if (i != my_id) and (i not in red_team):
                 self.common_filters[i] = ETFilter(my_id, x0, P0, A, B, et_delta)
 
+        # Initialize asset's primary filter
         self.main_filter = ETFilter_Main(my_id, x0, P0, A, B, et_delta, self.common_filters)
     
     def receive_meas(self, meas, shareable=True):
         self.main_filter.add_meas(self.my_id, meas)
 
+        # Determine if other assets should get an implicit or explicit version of this meas
         if shareable and len(self.common_filters) > 0:
             sharing = {}
             for asset_id in self.common_filters.keys():

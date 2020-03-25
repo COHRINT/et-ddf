@@ -38,24 +38,27 @@ class GPSz_Implicit(Implicit): # Same as Depth_Implicit
 class LinRelx_Explicit(Explicit):
     def __init__(self, delta, other_asset, R):
         self.data = delta
+        self.other_asset = other_asset
         self.R = R
 class LinRely_Explicit(Explicit):
     def __init__(self, delta, other_asset, R):
         self.data = delta
+        self.other_asset = other_asset
         self.R = R
 class LinRelz_Explicit(Explicit):
     def __init__(self, delta, other_asset, R):
         self.data = delta
+        self.other_asset = other_asset
         self.R = R
 class LinRelx_Implicit(Implicit):
     def __init__(self, other_asset, R):
-        self.dst = other_asset
+        self.other_asset = other_asset
         self.R = R
 class LinRely_Implicit(Implicit):
     def __init__(self, other_asset, R):
-        self.dst = other_asset
+        self.other_asset = other_asset
         self.R = R
 class LinRelz_Implicit(Implicit):
     def __init__(self, other_asset, R):
-        self.dst = other_asset
+        self.other_asset = other_asset
         self.R = R

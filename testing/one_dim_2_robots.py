@@ -39,34 +39,24 @@ for k in range(K):
     # Truth update
     x_truth = A.dot(x_truth) + B.dot(u) + w
     meas = x_truth + np.random.multivariate_normal( np.zeros((dim,)), R).reshape(-1,1)
-
-    # TODO see if we get increased accuracy with range measurements
-    # TODO 3 robots with relative range measurements
-    # TODO 3 robots, 2 with only relative range, 1 with GPS (that'll be really interesting)
-    # TODO implement covariance intersection with above when uncertainty gets above some bound!
+    relative_dist_01 = x_truth[1,0] - x_truth[0,0] + np.random.normal(0, r)
+    diff_meas = LinRelx_Explicit(relative_dist_01, 1, r)
 
     asset0.predict(u, Q)
     asset1.predict(u, Q)
 
-    meas_gps = GPSx_Explicit(meas[0,0], r)
-    shared_meas = asset0.receive_meas(meas_gps, shareable=True)
-    if isinstance(shared_meas[1], Implicit):
-        # print("asset 0's sharing implicitly: " + str(meas_gps.data))
-        implicit_update_cnt += 1
-    # else:
-        # print("asset 0's sharing explicitly: " + str(meas_gps.data))
+    # Asset 0 can get distance to other asset
+    shared_meas = asset0.receive_meas(diff_meas, shareable=True)
     asset1.receive_shared_meas(0, shared_meas[1])
-
+    
+    # Asset 1 has GPS
     meas_gps2 = GPSx_Explicit(meas[1,0], r)
     shared_meas2 = asset1.receive_meas(meas_gps2, shareable=True)
     if isinstance(shared_meas2[0], Implicit):
-        # print("asset 1's sharing implicitly: " + str(meas_gps2.data))
         implicit_update_cnt += 1
-    # else:
-        # print("asset 1's sharing explicitly: " + str(meas_gps2.data))
     asset0.receive_shared_meas(1, shared_meas2[0])
 
-
+    # By sharing measurements, asset0's position becomes fully observable
     asset0.correct()
     asset1.correct()
 
