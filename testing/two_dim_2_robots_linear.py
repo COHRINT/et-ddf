@@ -10,9 +10,9 @@ from measurements import *
 
 def main():
     # Simple simulation
-    K = 10
+    K = 100
     dim = 2
-    num_robots = 2
+    num_robots = 3
     num_states = dim * num_robots
     A = np.eye(num_states)
     B = np.eye(num_states)
@@ -32,8 +32,8 @@ def main():
     implicit_update_cnt = 0
 
     asset_list = []
-    asset = Asset(0, dim, x_truth, initial_P, A, B, delta)
-    asset1 = Asset(1, dim, x_truth, initial_P, A, B, delta)
+    asset = Asset(0, dim, x_truth, initial_P, A, B, delta, red_team=[2])
+    asset1 = Asset(1, dim, x_truth, initial_P, A, B, delta, red_team=[2])
     asset_list.append(asset)
     asset_list.append(asset1)
 
@@ -46,9 +46,14 @@ def main():
         # Truth update
         x_truth = A.dot(x_truth) + B.dot(u) + w
         meas = x_truth + np.random.multivariate_normal( np.zeros((num_states,)), R).reshape(-1,1)
-        relative_dist_01 = x_truth[2:,0] - x_truth[:2,0] + np.random.multivariate_normal( np.zeros((dim,)), np.eye(dim)*(r**2))
+        relative_dist_01 = x_truth[2:4,0] - x_truth[:2,0] + np.random.multivariate_normal( np.zeros((dim,)), np.eye(dim)*(r**2))
         diff_measx = LinRelx_Explicit(0, 1, relative_dist_01[0], r)
         diff_measy = LinRely_Explicit(0, 1, relative_dist_01[1], r)
+
+        relative_dist_12 = x_truth[4:,0] - x_truth[2:4,0] + np.random.multivariate_normal( np.zeros((dim,)), np.eye(dim)*(r**2))
+        diff_measx_red = LinRelx_Explicit(1, 2, relative_dist_12[0], r)
+        diff_measy_red = LinRely_Explicit(1, 2, relative_dist_12[1], r)
+
 
         x_meas0 = meas[0,0]
         y_meas0 = meas[1,0]
@@ -68,6 +73,8 @@ def main():
         sharing.append(asset.receive_meas(gpsy0, shareable=True))
         sharing.append(asset.receive_meas(diff_measx, shareable=True))
         sharing.append(asset.receive_meas(diff_measy, shareable=True))
+        sharing.append(asset1.receive_meas(diff_measx_red, shareable=True))
+        sharing.append(asset1.receive_meas(diff_measy_red, shareable=True))
         # sharing.append(asset1.receive_meas(gpsx1, shareable=True))
         # sharing.append(asset1.receive_meas(gpsy1, shareable=True))
         
@@ -111,7 +118,7 @@ def main():
     # uncertainty_range = [x_hat - 2*np.sqrt(P), x_hat + 2*np.sqrt(P)]
     # print("Uncertainty range: " + str(uncertainty_range))
     # print("Inside range? " + str(x > uncertainty_range[0] and x < uncertainty_range[1]))
-    print("Num implicit percentage: " + str(implicit_update_cnt / (4*K) ))
+    print("Num implicit percentage: " + str(implicit_update_cnt / (6*K) ))
 
 def get_asset_uncertainty(asset_id, cov, dim):
     first_index_of_asset = asset_id*dim
@@ -143,7 +150,7 @@ def plot_data(bag, dim):
             cov_pts = np.dot(2*np.sqrt(asset_uncertainty), circle_pts) + mle
             ax.scatter(cov_pts[0,:], cov_pts[1,:], c=color_array[i], label="estimate", s=4)
 
-        lim = 20
+        lim = 100
         ax.set_xlim(-lim, lim)
         ax.set_ylim(-lim, lim)
         title = "plt_" + str(seq)
@@ -154,11 +161,11 @@ def plot_data(bag, dim):
         plt.yticks(fontsize=10)
         # ax.legend(fontsize=12)
 
-        plt.show()
-        plt.close()
+        # plt.show()
+        # plt.close()
 
-        # plt.savefig("recording/" + title)
-        # plt.clf()
+        plt.savefig("recording/" + title)
+        plt.clf()
         seq += 1
 
 if __name__ == "__main__":
