@@ -1,4 +1,5 @@
 class Measurement:
+    src_id = None
     data = None
     R = None
 
@@ -13,52 +14,53 @@ class Explicit(Measurement):
 
 ########## GPS ##########
 class GPSx_Explicit(Explicit):
-    def __init__(self, x, R):
-        self.data = x
+    def __init__(self, src_id, data, R):
+        self.src_id = src_id
+        self.data = data
         self.R = R
 class GPSy_Explicit(Explicit):
-    def __init__(self, x, R):
-        self.data = x
+    def __init__(self, src_id, data, R):
+        self.src_id = src_id
+        self.data = data
         self.R = R
 class GPSz_Explicit(Explicit): # Same as Depth_Explicit
-    def __init__(self, x, R):
-        self.data = x
+    def __init__(self, src_id, data, R):
+        self.src_id = src_id
+        self.data = data
         self.R = R
 class GPSx_Implicit(Implicit):
-    def __init__(self, R):
-        self.R = R # data is None b/c it's implicit!
+    def __init__(self, src_id, R):
+        self.src_id = src_id
+        self.R = R
 class GPSy_Implicit(Implicit):
-    def __init__(self, R):
+    def __init__(self, src_id, R):
+        self.src_id = src_id
         self.R = R
 class GPSz_Implicit(Implicit): # Same as Depth_Implicit
-    def __init__(self, R):
+    def __init__(self, src_id, R):
+        self.src_id = src_id
         self.R = R
 
 ########## LinRel ##########
 class LinRelx_Explicit(Explicit):
-    def __init__(self, delta, other_asset, R):
+    def __init__(self, src_id, measured_asset, delta, R):
+        self.src_id = src_id
+        self.measured_asset = measured_asset
         self.data = delta
-        self.other_asset = other_asset
         self.R = R
 class LinRely_Explicit(Explicit):
-    def __init__(self, delta, other_asset, R):
+    def __init__(self, src_id, measured_asset, delta, R):
+        self.src_id = src_id
+        self.measured_asset = measured_asset
         self.data = delta
-        self.other_asset = other_asset
-        self.R = R
-class LinRelz_Explicit(Explicit):
-    def __init__(self, delta, other_asset, R):
-        self.data = delta
-        self.other_asset = other_asset
         self.R = R
 class LinRelx_Implicit(Implicit):
-    def __init__(self, other_asset, R):
-        self.other_asset = other_asset
+    def __init__(self, src_id, measured_asset, R):
+        self.src_id = src_id
+        self.measured_asset = measured_asset
         self.R = R
 class LinRely_Implicit(Implicit):
-    def __init__(self, other_asset, R):
-        self.other_asset = other_asset
-        self.R = R
-class LinRelz_Implicit(Implicit):
-    def __init__(self, other_asset, R):
-        self.other_asset = other_asset
+    def __init__(self, src_id, measured_asset, R):
+        self.src_id = src_id
+        self.measured_asset = measured_asset
         self.R = R

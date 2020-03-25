@@ -22,27 +22,27 @@ class Asset:
         self.main_filter = ETFilter_Main(my_id, num_states_per_asset, x0, P0, A, B, et_delta, self.common_filters)
     
     def receive_meas(self, meas, shareable=True):
-        self.main_filter.add_meas(self.my_id, meas)
+        self.main_filter.add_meas(meas)
 
         # Determine if other assets should get an implicit or explicit version of this meas
         if shareable and len(self.common_filters) > 0:
             sharing = {}
             for asset_id in self.common_filters.keys():
                 common_filter = self.common_filters[asset_id]
-                if common_filter.check_implicit(self.my_id, meas):
+                if common_filter.check_implicit(meas):
                     sharing[asset_id] = self._get_implicit_msg_equivalent(meas)
                 else: # share as explicit
                     sharing[asset_id] = meas
                     
                 # Add the measurement to the common filter
-                common_filter.add_meas(self.my_id, sharing[asset_id])
+                common_filter.add_meas(sharing[asset_id])
             return sharing
         else: # Not shareable
             return None
 
-    def receive_shared_meas(self, asset_id, meas):
-        self.main_filter.add_meas(asset_id, meas)
-        self.common_filters[asset_id].add_meas(asset_id, meas)    
+    def receive_shared_meas(self, meas):
+        self.main_filter.add_meas(meas)
+        self.common_filters[meas.src_id].add_meas(meas)
 
     def predict(self, u, Q):
         self.main_filter.predict(u, Q)
@@ -50,9 +50,9 @@ class Asset:
             self.common_filters[asset_id].predict(u, Q)
 
     def correct(self):
+        self.main_filter.correct()
         for asset_id in self.common_filters.keys():
             self.common_filters[asset_id].correct()
-        self.main_filter.correct()
 
     def print_filters(self, main_only=False):
         print(str(self.my_id)+"'s Main Filter")
@@ -69,11 +69,13 @@ class Asset:
 
     def _get_implicit_msg_equivalent(self, meas):
         if isinstance(meas, GPSx_Explicit):
-            return GPSx_Implicit(meas.R)
+            return GPSx_Implicit(meas.src_id, meas.R)
         elif isinstance(meas, GPSy_Explicit):
-            return GPSy_Implicit(meas.R)
+            return GPSy_Implicit(meas.src_id, meas.R)
         elif isinstance(meas, LinRelx_Explicit):
-            return LinRelx_Implicit(meas.other_asset, meas.R)
+            return LinRelx_Implicit(meas.src_id, meas.measured_asset, meas.R)
+        elif isinstance(meas, LinRely_Explicit):
+            return LinRely_Implicit(meas.src_id, meas.measured_asset, meas.R)
         else:
             raise NotImplementedError("Implicit equivalent not found: " + meas.__class__.__name__)
 

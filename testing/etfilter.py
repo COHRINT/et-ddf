@@ -19,19 +19,19 @@ class ETFilter(object):
         
         self.meas_queue = []
 
-    def check_implicit(self, asset_id, meas):
+    def check_implicit(self, meas):
         if not isinstance(meas, Measurement):
             raise Exception("meas must of type Measurement")
 
-        C = self._get_measurement_jacobian(asset_id, meas)
+        C = self._get_measurement_jacobian(meas)
         innovation = self._get_innovation(meas.data, C)
         return np.abs(innovation) <= self.et_delta
 
-    def add_meas(self, asset_id, meas):
+    def add_meas(self, meas):
         if not isinstance(meas, Measurement):
             raise Exception("meas must of type Measurement")
         
-        self.meas_queue.append([asset_id, meas])
+        self.meas_queue.append(meas)
     
     def predict(self, u, Q):
         self.x_hat = self.A.dot(self.x_hat) + self.B.dot(u)
@@ -44,18 +44,18 @@ class ETFilter(object):
 
         x_hat_start = self.x_hat
         P_start = self.P
-        for [asset_id, meas] in self.meas_queue:
+        for meas in self.meas_queue:
             K, C = None, None
             R = meas.R
             if isinstance(meas, Explicit):
-                C = self._get_measurement_jacobian(asset_id, meas)
+                C = self._get_measurement_jacobian(meas)
                 K = self._get_kalman_gain(C, R)
                 innovation = self._get_innovation(meas.data, C)
                 self.x_hat += K.dot(innovation)
                 self.P = ( np.eye(self.num_states) - K.dot(C) ).dot(self.P)
             else: # Implicit Update
-                C = self._get_measurement_jacobian(asset_id, meas)
-                mu, Qe, alpha = self._get_implicit_predata(C, R, x_hat_start, P_start, asset_id)
+                C = self._get_measurement_jacobian(meas)
+                mu, Qe, alpha = self._get_implicit_predata(C, R, x_hat_start, P_start, meas.src_id)
                 z_bar, curly_theta = self._get_implicit_data(mu, Qe, alpha)
                 K = self._get_kalman_gain(C, R)
                 self.x_hat += K.dot(z_bar)
@@ -90,18 +90,23 @@ class ETFilter(object):
 
         return z_bar, curly_theta
 
-    def _get_measurement_jacobian(self, asset_id, meas):
+    def _get_measurement_jacobian(self, meas):
         C = None
+        src_id = meas.src_id
         if isinstance(meas, GPSx_Explicit) or isinstance(meas, GPSx_Implicit):
             C = np.zeros((1, self.num_states))
-            C[0, asset_id*self.dim] = 1
+            C[0, src_id*self.dim] = 1
         elif isinstance(meas, GPSy_Explicit) or isinstance(meas, GPSy_Implicit):
             C = np.zeros((1, self.num_states))
-            C[0, asset_id*self.dim + 1] = 1
+            C[0, src_id*self.dim + 1] = 1
         elif isinstance(meas, LinRelx_Explicit) or isinstance(meas, LinRelx_Implicit):
             C = np.zeros((1, self.num_states))
-            C[0, asset_id*self.dim] = -1
-            C[0, meas.other_asset*self.dim] = 1
+            C[0, src_id*self.dim] = -1
+            C[0, meas.measured_asset*self.dim] = 1
+        elif isinstance(meas, LinRely_Explicit) or isinstance(meas, LinRely_Implicit):
+            C = np.zeros((1, self.num_states))
+            C[0, src_id*self.dim + 1] = -1
+            C[0, meas.measured_asset*self.dim + 1] = 1
         else:
             raise NotImplementedError("Measurment Jacobian not implemented for: " + meas.__class__.__name__)
         return C
