@@ -1,19 +1,25 @@
+from __future__ import division
 from etfilter import *
 import numpy as np
 
 class Asset:
 
-    def __init__(self, my_id, x0, P0, A, B, et_delta, red_team=[]):
+    def __init__(self, my_id, num_states_per_asset, x0, P0, A, B, et_delta, red_team=[]):
         self.my_id = my_id
 
+        num_states = x0.size
+        if (num_states % num_states_per_asset) != 0:
+            raise Exception("Dimensionality of state vector does not align with the number states per asset.")
+        num_assets = int( num_states / num_states_per_asset )
+        
         # Initialize common filters between other assets
         self.common_filters = {}
-        for i in range(x0.size):
+        for i in range(num_assets):
             if (i != my_id) and (i not in red_team):
-                self.common_filters[i] = ETFilter(my_id, x0, P0, A, B, et_delta)
+                self.common_filters[i] = ETFilter(my_id, num_states_per_asset, x0, P0, A, B, et_delta)
 
         # Initialize asset's primary filter
-        self.main_filter = ETFilter_Main(my_id, x0, P0, A, B, et_delta, self.common_filters)
+        self.main_filter = ETFilter_Main(my_id, num_states_per_asset, x0, P0, A, B, et_delta, self.common_filters)
     
     def receive_meas(self, meas, shareable=True):
         self.main_filter.add_meas(self.my_id, meas)
@@ -64,9 +70,11 @@ class Asset:
     def _get_implicit_msg_equivalent(self, meas):
         if isinstance(meas, GPSx_Explicit):
             return GPSx_Implicit(meas.R)
+        elif isinstance(meas, GPSy_Explicit):
+            return GPSy_Implicit(meas.R)
         elif isinstance(meas, LinRelx_Explicit):
             return LinRelx_Implicit(meas.other_asset, meas.R)
         else:
-            print("Implicit Msg equivalent not found: " + str(type(meas)))
+            raise NotImplementedError("Implicit equivalent not found: " + meas.__class__.__name__)
 
     

@@ -5,21 +5,23 @@ from scipy.stats import norm as normal
 
 class ETFilter(object):
 
-    def __init__(self, my_id, x0, P0, A, B, et_delta):
+    def __init__(self, my_id, num_states_per_asset, x0, P0, A, B, et_delta):
         self.my_id = my_id
+        self.dim = num_states_per_asset
         self.x_hat = x0
         self.P = P0
         self.A = A
         self.B = B
         self.et_delta = et_delta
-        self.num_assets = self.x_hat.size
-
+        self.num_states = self.x_hat.size
+        if (self.num_states % num_states_per_asset) != 0:
+            raise Exception("Dimensionality of state vector does not align with the number states per asset.")
+        
         self.meas_queue = []
 
     def check_implicit(self, asset_id, meas):
         if not isinstance(meas, Measurement):
-            print("[WARN] meas must of type Measurement")
-            return
+            raise Exception("meas must of type Measurement")
 
         C = self._get_measurement_jacobian(asset_id, meas)
         innovation = self._get_innovation(meas.data, C)
@@ -27,8 +29,7 @@ class ETFilter(object):
 
     def add_meas(self, asset_id, meas):
         if not isinstance(meas, Measurement):
-            print("[WARN] meas must of type Measurement")
-            return
+            raise Exception("meas must of type Measurement")
         
         self.meas_queue.append([asset_id, meas])
     
@@ -38,7 +39,7 @@ class ETFilter(object):
 
     def correct(self):
         if not self.meas_queue:
-            # print("[WARN] meas_queue is empty!")
+            # print("meas_queue is empty!")
             return
 
         x_hat_start = self.x_hat
@@ -51,7 +52,7 @@ class ETFilter(object):
                 K = self._get_kalman_gain(C, R)
                 innovation = self._get_innovation(meas.data, C)
                 self.x_hat += K.dot(innovation)
-                self.P = ( np.eye(self.num_assets) - K.dot(C) ).dot(self.P)
+                self.P = ( np.eye(self.num_states) - K.dot(C) ).dot(self.P)
             else: # Implicit Update
                 C = self._get_measurement_jacobian(asset_id, meas)
                 mu, Qe, alpha = self._get_implicit_predata(C, R, x_hat_start, P_start, asset_id)
@@ -92,14 +93,17 @@ class ETFilter(object):
     def _get_measurement_jacobian(self, asset_id, meas):
         C = None
         if isinstance(meas, GPSx_Explicit) or isinstance(meas, GPSx_Implicit):
-            C = np.zeros((1, self.num_assets))
-            C[0, asset_id] = 1
+            C = np.zeros((1, self.num_states))
+            C[0, asset_id*self.dim] = 1
+        elif isinstance(meas, GPSy_Explicit) or isinstance(meas, GPSy_Implicit):
+            C = np.zeros((1, self.num_states))
+            C[0, asset_id*self.dim + 1] = 1
         elif isinstance(meas, LinRelx_Explicit) or isinstance(meas, LinRelx_Implicit):
-            C = np.zeros((1, self.num_assets))
-            C[0, asset_id] = -1
-            C[0, meas.other_asset] = 1
+            C = np.zeros((1, self.num_states))
+            C[0, asset_id*self.dim] = -1
+            C[0, meas.other_asset*self.dim] = 1
         else:
-            print("Measurment Jacobian not implemented for: " + str(type(meas)))
+            raise NotImplementedError("Measurment Jacobian not implemented for: " + meas.__class__.__name__)
         return C
 
 """ Main filter
@@ -107,7 +111,7 @@ differs slightly from an ETFilter in its implicit measurement update
 If needs access to common filters for implicit measurement updates
 """
 class ETFilter_Main( ETFilter ):
-    def __init__(self, my_id, x0, P0, A, B, et_delta, common_filters):
+    def __init__(self, my_id, num_states_per_asset, x0, P0, A, B, et_delta, common_filters):
         """
         common_filters : dict
             key : int
@@ -115,7 +119,7 @@ class ETFilter_Main( ETFilter ):
             value : ETFiler
                 common filter between both assets
         """
-        super(ETFilter_Main, self).__init__(my_id, x0, P0, A, B, et_delta)
+        super(ETFilter_Main, self).__init__(my_id, num_states_per_asset, x0, P0, A, B, et_delta)
         self.common_filters = common_filters
     
     def _get_implicit_predata(self, C, R, x_hat_start, P_start, asset_id):
