@@ -4,22 +4,20 @@ import numpy as np
 
 class Asset:
 
-    def __init__(self, my_id, num_states_per_asset, x0, P0, A, B, et_delta, red_team=[]):
+    def __init__(self, my_id, num_ownship_states, world_dim, x0, P0, A, B, red_team=[]):
         self.my_id = my_id
 
         num_states = x0.size
-        if (num_states % num_states_per_asset) != 0:
-            raise Exception("Dimensionality of state vector does not align with the number states per asset.")
-        num_assets = int( num_states / num_states_per_asset )
+        num_assets = int( num_states / num_ownship_states )
         
         # Initialize common filters between other assets
         self.common_filters = {}
         for i in range(num_assets):
             if (i != my_id) and (i not in red_team):
-                self.common_filters[i] = ETFilter(my_id, num_states_per_asset, x0, P0, A, B, et_delta)
+                self.common_filters[i] = ETFilter(my_id, num_ownship_states, world_dim, x0, P0, A, B)
 
         # Initialize asset's primary filter
-        self.main_filter = ETFilter_Main(my_id, num_states_per_asset, x0, P0, A, B, et_delta, self.common_filters)
+        self.main_filter = ETFilter_Main(my_id, num_ownship_states, world_dim, x0, P0, A, B, self.common_filters)
     
     def receive_meas(self, meas, shareable=True):
         self.main_filter.add_meas(meas)
@@ -69,13 +67,15 @@ class Asset:
 
     def _get_implicit_msg_equivalent(self, meas):
         if isinstance(meas, GPSx_Explicit):
-            return GPSx_Implicit(meas.src_id, meas.R)
+            return GPSx_Implicit(meas.src_id, meas.R, meas.et_delta)
         elif isinstance(meas, GPSy_Explicit):
-            return GPSy_Implicit(meas.src_id, meas.R)
+            return GPSy_Implicit(meas.src_id, meas.R, meas.et_delta)
+        elif isinstance(meas, GPSyaw_Explicit):
+            return GPSyaw_Implicit(meas.src_id, meas.R, meas.et_delta)
         elif isinstance(meas, LinRelx_Explicit):
-            return LinRelx_Implicit(meas.src_id, meas.measured_asset, meas.R)
+            return LinRelx_Implicit(meas.src_id, meas.measured_asset, meas.R, meas.et_delta)
         elif isinstance(meas, LinRely_Explicit):
-            return LinRely_Implicit(meas.src_id, meas.measured_asset, meas.R)
+            return LinRely_Implicit(meas.src_id, meas.measured_asset, meas.R, meas.et_delta)
         else:
             raise NotImplementedError("Implicit equivalent not found: " + meas.__class__.__name__)
 
