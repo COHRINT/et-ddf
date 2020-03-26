@@ -3,6 +3,7 @@ import numpy as np
 from measurements import *
 from scipy.stats import norm as normal
 from copy import deepcopy
+from pdb import set_trace
 
 class ETFilter(object):
 
@@ -25,17 +26,17 @@ class ETFilter(object):
     def check_implicit(self, meas):
         if not isinstance(meas, Measurement):
             raise Exception("meas must of type Measurement")
-        if isinstance(meas, GPSyaw_Explicit):
+        if self._is_angle_meas(meas):
             meas.data = self._normalize_angle(meas.data)
 
         C = self._get_measurement_jacobian(meas)
-        innovation = self._get_innovation(meas.data, C)
+        innovation = self._get_innovation(meas, C)
         return np.abs(innovation) <= meas.et_delta
 
     def add_meas(self, meas):
         if not isinstance(meas, Measurement):
             raise Exception("meas must of type Measurement")
-        if isinstance(meas, GPSyaw_Explicit):
+        if self._is_angle_meas(meas):
             meas.data = self._normalize_angle(meas.data)
         
         self.meas_queue.append(meas)
@@ -50,6 +51,9 @@ class ETFilter(object):
         if not self.meas_queue:
             # print("meas_queue is empty!")
             return
+        # print("Msg queue:")
+        # for meas in self.meas_queue:
+        #     print(meas.data)
 
         x_hat_start = self.x_hat
         P_start = self.P
@@ -59,15 +63,17 @@ class ETFilter(object):
             if isinstance(meas, Explicit):
                 C = self._get_measurement_jacobian(meas)
                 K = self._get_kalman_gain(C, R)
-                innovation = self._get_innovation(meas.data, C)
-                self.x_hat += self._normalize_all_angles( K.dot(innovation) )
+                innovation = self._get_innovation(meas, C)
+                self.x_hat += K.dot(innovation)
                 self.P = ( np.eye(self.num_states) - K.dot(C) ).dot(self.P)
             else: # Implicit Update
                 C = self._get_measurement_jacobian(meas)
                 mu, Qe, alpha = self._get_implicit_predata(C, R, x_hat_start, P_start, meas.src_id)
                 z_bar, curly_theta = self._get_implicit_data(meas.et_delta, mu, Qe, alpha)
                 K = self._get_kalman_gain(C, R)
-                self.x_hat += self._normalize_all_angles( K.dot(z_bar) )
+                if self._is_angle_meas(meas):
+                    z_bar = self._normalize_angle(z_bar)
+                self.x_hat += K.dot(z_bar)
                 self.P = self.P - curly_theta * K.dot(C.dot(self.P))
             self.x_hat = self._normalize_all_angles( self.x_hat )
         # Clear measurement queue
@@ -80,7 +86,9 @@ class ETFilter(object):
         return mu, Qe, alpha
 
     def _get_innovation(self, meas, C):
-        return meas - C.dot(self.x_hat)
+        if self._is_angle_meas(meas):
+            return self._normalize_angle(meas.data - C.dot(self.x_hat))
+        return meas.data - C.dot(self.x_hat)
 
     def _get_kalman_gain(self, C, R):
         tmp = np.dot( np.dot(C, self.P), C.T ) + R
@@ -131,7 +139,7 @@ class ETFilter(object):
         return np.mod( angle + np.pi, 2*np.pi) - np.pi
     # Normalize all angles in our state
     def _normalize_all_angles(self, state_vector):
-        if self.world_dim == 2 and self.num_ownship_states == 3:
+        if self.world_dim == 2 and self.num_ownship_states in [3,6]:
             for i in range(self.num_assets):
                 asset_yaw_index = i*self.num_ownship_states + 2
                 state_vector[asset_yaw_index,0] = self._normalize_angle(state_vector[asset_yaw_index,0])
@@ -145,6 +153,12 @@ class ETFilter(object):
                 state_vector[asset_pitch_index,0] = self._normalize_angle(state_vector[asset_pitch_index,0])
                 state_vector[asset_yaw_index,0] = self._normalize_angle(state_vector[asset_yaw_index,0])
         return state_vector
+
+    def _is_angle_meas(self, meas):
+        if isinstance(meas, GPSyaw_Explicit) or isinstance(meas, GPSyaw_Implicit):
+            return True
+        else:
+            return False
 
 """ Main filter
 differs slightly from an ETFilter in its implicit measurement update

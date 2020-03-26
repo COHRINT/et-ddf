@@ -1,6 +1,7 @@
 from __future__ import division
 from etfilter import *
 import numpy as np
+np.set_printoptions(suppress=True)
 
 class Asset:
 
@@ -52,19 +53,23 @@ class Asset:
         for asset_id in self.common_filters.keys():
             self.common_filters[asset_id].correct()
 
-    def print_filters(self, main_only=False):
+    def print_filters(self, main_only=False, mean_only=False):
+        x_hat = np.matrix.round( deepcopy(self.main_filter.x_hat), 2)
+        P = np.matrix.round( deepcopy(self.main_filter.P), 2)
         print(str(self.my_id)+"'s Main Filter")
-        print(self.main_filter.x_hat)
-        print(self.main_filter.P)
-        # print(2*np.sqrt(self.main_filter.P))
+        print(x_hat)
+        if not mean_only:
+            print(2*np.matrix.round(np.sqrt(P),2))
 
         if not main_only:
             print("----------")
             for asset_id in self.common_filters.keys():
                 print(str(self.my_id) + "_" + str(asset_id) + " common filter")
-                print(self.common_filters[asset_id].x_hat)
-                # print(self.com)
-                print(2*np.sqrt(self.common_filters[asset_id].P))
+                x_hat = np.matrix.round( deepcopy(self.common_filters[asset_id].x_hat), 2)
+                P = np.matrix.round( deepcopy(self.common_filters[asset_id].P), 2)
+                print(x_hat)
+                if not mean_only:
+                    print(np.matrix.round( 2*np.sqrt(self.common_filters[asset_id].P), 2))
                 print("----------")
 
     def _get_implicit_msg_equivalent(self, meas):
