@@ -2,17 +2,17 @@ from __future__ import division
 import numpy as np
 from measurements import *
 from scipy.stats import norm as normal
+from copy import deepcopy
 
 class ETFilter(object):
 
-    def __init__(self, my_id, num_ownship_states, world_dim, x0, P0, A, B):
+    def __init__(self, my_id, num_ownship_states, world_dim, x0, P0, predict_func):
         self.my_id = my_id
         self.num_ownship_states = num_ownship_states
         self.world_dim = world_dim
         self.x_hat = x0
         self.P = P0
-        self.A = A
-        self.B = B
+        self.predict_func = predict_func
         self.num_states = self.x_hat.size
         if (self.num_states % num_ownship_states) != 0:
             raise Exception("Dimensionality of state vector does not align with the number of ownship states.")
@@ -41,8 +41,10 @@ class ETFilter(object):
         self.meas_queue.append(meas)
     
     def predict(self, u, Q):
-        self.x_hat = self.A.dot(self.x_hat) + self.B.dot(u)
-        self.P = self.A.dot(self.P.dot( self.A.T )) + Q
+        (self.x_hat, G) = self.predict_func( deepcopy(self.x_hat) , deepcopy(u), self.my_id) # Pass by value to function pointers
+        self.x_hat = self._normalize_all_angles(self.x_hat)
+
+        self.P = G.dot( self.P.dot( G.T )) + Q
 
     def correct(self):
         if not self.meas_queue:
@@ -149,7 +151,7 @@ differs slightly from an ETFilter in its implicit measurement update
 If needs access to common filters for implicit measurement updates
 """
 class ETFilter_Main( ETFilter ):
-    def __init__(self, my_id, num_ownship_states, world_dim, x0, P0, A, B, common_filters):
+    def __init__(self, my_id, num_ownship_states, world_dim, x0, P0, predict_func, common_filters):
         """
         common_filters : dict
             key : int
@@ -157,7 +159,7 @@ class ETFilter_Main( ETFilter ):
             value : ETFiler
                 common filter between both assets
         """
-        super(ETFilter_Main, self).__init__(my_id, num_ownship_states, world_dim, x0, P0, A, B)
+        super(ETFilter_Main, self).__init__(my_id, num_ownship_states, world_dim, x0, P0, predict_func)
         self.common_filters = common_filters
     
     def _get_implicit_predata(self, C, R, x_hat_start, P_start, asset_id):

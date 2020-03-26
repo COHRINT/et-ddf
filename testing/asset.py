@@ -4,7 +4,7 @@ import numpy as np
 
 class Asset:
 
-    def __init__(self, my_id, num_ownship_states, world_dim, x0, P0, A, B, red_team=[]):
+    def __init__(self, my_id, num_ownship_states, world_dim, x0, P0, predict_func, red_team=[]):
         self.my_id = my_id
 
         num_states = x0.size
@@ -14,10 +14,10 @@ class Asset:
         self.common_filters = {}
         for i in range(num_assets):
             if (i != my_id) and (i not in red_team):
-                self.common_filters[i] = ETFilter(my_id, num_ownship_states, world_dim, x0, P0, A, B)
+                self.common_filters[i] = ETFilter(my_id, num_ownship_states, world_dim, x0, P0, predict_func)
 
         # Initialize asset's primary filter
-        self.main_filter = ETFilter_Main(my_id, num_ownship_states, world_dim, x0, P0, A, B, self.common_filters)
+        self.main_filter = ETFilter_Main(my_id, num_ownship_states, world_dim, x0, P0, predict_func, self.common_filters)
     
     def receive_meas(self, meas, shareable=True):
         self.main_filter.add_meas(meas)
@@ -55,13 +55,15 @@ class Asset:
     def print_filters(self, main_only=False):
         print(str(self.my_id)+"'s Main Filter")
         print(self.main_filter.x_hat)
-        print(2*np.sqrt(self.main_filter.P))
+        print(self.main_filter.P)
+        # print(2*np.sqrt(self.main_filter.P))
 
         if not main_only:
             print("----------")
             for asset_id in self.common_filters.keys():
                 print(str(self.my_id) + "_" + str(asset_id) + " common filter")
                 print(self.common_filters[asset_id].x_hat)
+                # print(self.com)
                 print(2*np.sqrt(self.common_filters[asset_id].P))
                 print("----------")
 
