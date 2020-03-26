@@ -12,12 +12,12 @@ from copy import deepcopy
 
 from pdb import set_trace
 
-# np.random.seed(1)
+np.random.seed(1)
 
 # Simple simulation
 K = 100
 world_dim = 2
-num_assets = 1
+num_assets = 2
 num_ownship_states = 6
 num_states = num_ownship_states * num_assets
 
@@ -70,18 +70,20 @@ def main():
     # A = np.eye(num_states)
     # B = np.eye(num_states)
 
-    # Motion noise
-    q = 0.25
+    # Process noise
+    q = 0.1
     q_yaw = 0.01
-    r = 1
+
+    # Meas noise
+    r = 0.5
     R = np.eye(num_states) * (r**2)
     r_yaw = 0.1
 
     # x_truth = np.random.randint(-5,5, size=(num_states,1))
     x_truth = np.zeros((num_states,1))
-    # x_truth[num_ownship_states, 0] = 5
-    # x_truth[num_ownship_states+1, 0] = 5
-    # x_truth[num_ownship_states+2, 0] = -np.pi/2
+    # x_truth[num_ownship_states, 0] = 
+    x_truth[num_ownship_states+1, 0] = 15.6
+    x_truth[num_ownship_states+2, 0] = -np.pi
 
     initial_P = np.zeros((num_states,num_states))     
     # Set yaw states to start at a valid range
@@ -101,7 +103,7 @@ def main():
             x_truth[yaw_index,0] = np.random.uniform(-np.pi, np.pi)
 
 
-    delta_gps_xy = 5
+    delta_gps_xy = 3
     delta_gps_yaw = 0.3
     delta_linrel = 5
 
@@ -110,11 +112,11 @@ def main():
 
     asset_list = []
     asset = Asset(0, num_ownship_states, world_dim, x_truth, initial_P, g_func)
-    # asset1 = Asset(1, num_ownship_states, world_dim, x_truth, initial_P, g_func)
+    asset1 = Asset(1, num_ownship_states, world_dim, x_truth, initial_P, g_func)
     # asset = Asset(0, world_dim, x_truth, initial_P, A, B, delta, red_team=[2])
     # asset1 = Asset(1, world_dim, x_truth, initial_P, A, B, delta, red_team=[2])
-    # asset_list.append(asset)
-    # asset_list.append(asset1)
+    asset_list.append(asset)
+    asset_list.append(asset1)
 
     bag = []
     x_truth_bag = np.array([])
@@ -124,38 +126,32 @@ def main():
     for k in range(K):
         u = np.array([[1],[np.pi / (K/4)]]) #np.random.randint(-1, 1, size=(num_states,1))
         # w = np.random.normal(0, np.sqrt(q), size=(num_states,1))
-        w1 = np.zeros((num_ownship_states,1))
-        w2 = np.zeros((num_ownship_states,1))
+
+        # Process Noisee
+        w1 = np.zeros((num_states,1))
         w1[0,0] = np.random.normal(0, q)
         w1[1,0] = np.random.normal(0, q)
         w1[2,0] = np.random.normal(0, q_yaw)
-        w2[0,0] = np.random.normal(0, q)
-        w2[1,0] = np.random.normal(0, q)
-        w2[2,0] = np.random.normal(0, q_yaw)
-
+        w1[num_ownship_states,0] = np.random.normal(0, q)
+        w1[num_ownship_states+1,0] = np.random.normal(0, q)
+        w1[num_ownship_states+2,0] = np.random.normal(0, q_yaw)
         Q = np.zeros((num_states,num_states))
         Q[0,0] = q ** 2
         Q[1,1] = q ** 2
         Q[2,2] = q_yaw ** 2
-        # Q[num_ownship_states,num_ownship_states] = q ** 2
-        # Q[num_ownship_states+1,num_ownship_states+1] = q ** 2
-        # Q[num_ownship_states+2,num_ownship_states+2] = q_yaw ** 2
+        Q[num_ownship_states,num_ownship_states] = q ** 2
+        Q[num_ownship_states+1,num_ownship_states+1] = q ** 2
+        Q[num_ownship_states+2,num_ownship_states+2] = q_yaw ** 2
 
         # Truth update
-        x_truth, G = g_func(x_truth, u, 0)
-        x_truth[2,0] = normalize_angle(x_truth[2,0])
+        x_truth_0, G = g_func(x_truth, u, 0)
+        x_truth_1, G = g_func(x_truth, u, 1)
+        x_truth[:num_ownship_states,0] = x_truth_0[:num_ownship_states,0]
+        x_truth[num_ownship_states:,0] = x_truth_1[num_ownship_states:,0]
         x_truth += w1
-        # x_truth[2,0] = normalize_angle(x_truth[2,0])
-
-        # (x_truth_1, G) = g_func(x_truth, u, 1)
-        # x_truth[:num_ownship_states, 0] = x_truth_0[:num_ownship_states,0] + w1.T
-        # x_truth[num_ownship_states:,0] = x_truth_1[num_ownship_states:,0] + w2.T
-
-        # Normalize Angles
+        x_truth[2,0] = normalize_angle(x_truth[2,0])
+        x_truth[num_ownship_states+2,0] = normalize_angle(x_truth[num_ownship_states+2,0])
         
-        # x_truth[num_ownship_states+2,0] = normalize_angle(x_truth[num_ownship_states+2,0])
-
-        # Take measurements
         gps_meas = x_truth + np.random.multivariate_normal( np.zeros((num_states,)), R).reshape(-1,1)
 
         # relative_dist_01 = x_truth[3:5,0] - x_truth[:2,0] + np.random.multivariate_normal( np.zeros((world_dim,)), np.eye(world_dim)*(r**2)))
@@ -169,68 +165,66 @@ def main():
         x_meas0 = gps_meas[0,0]
         y_meas0 = gps_meas[1,0]
         yaw_meas0 = x_truth[2,0] + np.random.normal(0, r_yaw)
-        # yaw_meas0 = gps_meas[2,0]
-        # x_meas1 = gps_meas[num_ownship_states,0]
-        # y_meas1 = gps_meas[num_ownship_states+1,0]
-        # yaw_meas1 = gps_meas[num_ownship_states+2,0]
-
-        # yaw_meas0 = x_truth[2,0] + np.random.normal(0, 0.01)
-        # x_meas1 = meas[3,0]
-        # y_meas1 = meas[4,0]
-        # yaw_meas1 = x_truth[5,0] + np.random.normal(0, 0.01)
+        x_meas1 = gps_meas[num_ownship_states,0]
+        y_meas1 = gps_meas[num_ownship_states+1,0]
+        yaw_meas1 = x_truth[num_ownship_states+2,0] + np.random.normal(0, r_yaw)
 
         asset.predict(u,Q)
-        # asset1.predict(u,Q)
+        asset1.predict(u,Q)
 
-        gpsx0 = GPSx_Explicit(0, x_meas0, r, delta_gps_xy)
-        gpsy0 = GPSy_Explicit(0, y_meas0, r, delta_gps_xy)
+        gpsx0 = GPSx_Explicit(0, x_meas0, r**2, delta_gps_xy)
+        gpsy0 = GPSy_Explicit(0, y_meas0, r**2, delta_gps_xy)
         gpsyaw0 = GPSyaw_Explicit(0, yaw_meas0, r_yaw**2, delta_gps_yaw)
-        # gpsx1 = GPSx_Explicit(1, x_meas1, r, delta_gps_xy)
-        # gpsy1 = GPSy_Explicit(1, y_meas1, r, delta_gps_xy)
-        # gpsyaw1 = GPSyaw_Explicit(1, yaw_meas1, r_yaw**2, delta_gps_yaw)
+        gpsx1 = GPSx_Explicit(1, x_meas1, r**2, delta_gps_xy)
+        gpsy1 = GPSy_Explicit(1, y_meas1, r**2, delta_gps_xy)
+        gpsyaw1 = GPSyaw_Explicit(1, yaw_meas1, r_yaw**2, delta_gps_yaw)
 
-        asset.receive_meas(gpsx0)
-        asset.receive_meas(gpsy0)
-        asset.receive_meas(gpsyaw0)
+        # asset.receive_meas(gpsx0, shareable=False)
+        # asset.receive_meas(gpsy0, shareable=False)
+        # asset.receive_meas(gpsyaw0, shareable=False)
+        # asset1.receive_meas(gpsx1, shareable=False)
+        # asset1.receive_meas(gpsy1, shareable=False)
+        # asset1.receive_meas(gpsyaw1, shareable=False)
 
-        # sharing = []
-        # sharing.append(asset.receive_meas(gpsx0, shareable=True))
-        # sharing.append(asset.receive_meas(gpsy0, shareable=True))
-        # sharing.append(asset.receive_meas(gpsyaw0, shareable=True))
+        sharing = []
+        sharing.append(asset.receive_meas(gpsx0, shareable=True))
+        sharing.append(asset.receive_meas(gpsy0, shareable=True))
+        sharing.append(asset.receive_meas(gpsyaw0, shareable=True))
         # sharing.append(asset.receive_meas(diff_measx, shareable=True))
         # sharing.append(asset.receive_meas(diff_measy, shareable=True))
 
         # sharing.append(asset1.receive_meas(diff_measx_red, shareable=True))
         # sharing.append(asset1.receive_meas(diff_measy_red, shareable=True))
 
-        # sharing.append(asset1.receive_meas(gpsx1, shareable=True))
-        # sharing.append(asset1.receive_meas(gpsy1, shareable=True))
-        # sharing.append(asset1.receive_meas(gpsyaw1, shareable=True))
+        sharing.append(asset1.receive_meas(gpsx1, shareable=True))
+        sharing.append(asset1.receive_meas(gpsy1, shareable=True))
+        sharing.append(asset1.receive_meas(gpsyaw1, shareable=True))
         
 
-        # for s in sharing:
-        #     i = s.keys()[0]
-        #     # print("Asset "+str(i^1) + " sharing with " + str(i) + " " + s[i].__class__.__name__)
-        #     if isinstance(s[i], Implicit):
-        #         implicit_update_cnt += 1
-        #     total_num_meas_cnt += 2
-        #     a = asset_list[i]
-        #     a.receive_shared_meas(s[i])
+        for s in sharing:
+            i = s.keys()[0]
+            if isinstance(s[i], Implicit):
+                implicit_update_cnt += 1
+            total_num_meas_cnt += 2
+            a = asset_list[i]
+            meas = s[i]
+            # print("Asset "+ str(meas.src_id) + " sharing with " + str(i) + " " + s[i].__class__.__name__ + "| data: " + str(meas.data))
+            a.receive_shared_meas(meas)
 
         asset.correct()
-        # asset1.correct()
+        asset1.correct()
 
-        if x_estimate_bag.size == 0:
-            x_estimate_bag = asset.main_filter.x_hat
-        else:
-            x_estimate_bag = np.concatenate((x_estimate_bag, asset.main_filter.x_hat), axis=1)
+        # if x_estimate_bag.size == 0:
+        #     x_estimate_bag = asset.main_filter.x_hat
+        # else:
+        #     x_estimate_bag = np.concatenate((x_estimate_bag, asset.main_filter.x_hat), axis=1)
         
         if x_truth_bag.size == 0:
             x_truth_bag = x_truth
         else:
             x_truth_bag = np.concatenate((x_truth_bag, x_truth), axis=1)
 
-        bag.append([x_truth, asset.main_filter.x_hat, asset.main_filter.P])
+        # bag.append([x_truth, asset.main_filter.x_hat, asset.main_filter.P])
 
         # asset.print_filters(main_only=True)
 
@@ -243,32 +237,30 @@ def main():
         # asset0.correct()
         # asset1.correct()
         
-        print("Truth: \n" + str(np.matrix.round(x_truth,2)))
-        print(x_meas0)
-        print(y_meas0)
-        print(yaw_meas0)
+        # print("Truth: \n" + str(np.matrix.round(x_truth,2)))
+        # print(x_meas0)
+        # print(y_meas0)
+        # print(yaw_meas0)
 
-        asset.print_filters(main_only=True, mean_only=True)
-        print("\n#############################\n")
+        # asset.print_filters(main_only=True, mean_only=True)
+        # print("\n#############################\n")
         # set_trace()
-        seq += 1
-        if np.abs(x_truth[0,0] - asset.main_filter.x_hat[0,0]) > 10:
-            set_trace()
-        elif np.abs(x_truth[1,0] - asset.main_filter.x_hat[1,0]) > 10:
-            set_trace()
-        if np.abs( normalize_angle(x_truth[2,0] - asset.main_filter.x_hat[2,0])) > 0.1:
-            set_trace()
+        # seq += 1
+        # if np.abs(x_truth[0,0] - asset.main_filter.x_hat[0,0]) > 10:
+        #     set_trace()
+        # elif np.abs(x_truth[1,0] - asset.main_filter.x_hat[1,0]) > 10:
+        #     set_trace()
+        # if np.abs( normalize_angle(x_truth[2,0] - asset.main_filter.x_hat[2,0])) > 0.1:
+        #     set_trace()
         # if seq % 10 == 0:
         #     set_trace()
 
+    # plot_truth_data(x_truth_bag)
     # plot_data(bag, world_dim)
-    # print(x_truth_bag)
-    # print(x_truth_bag.shape)
-    # plot_data([x_truth_bag, x_estimate_bag], world_dim)
 
-    # asset1.print_filters(main_only=True)
-
-    # asset1.print_filters(main_only=True)
+    print("Truth: \n" + str(np.matrix.round(x_truth,2)))
+    asset.print_filters(main_only=True, mean_only=False)
+    asset1.print_filters(main_only=True, mean_only=False)
     # asset0.print_filters()
     # asset1.print_filters()
     # print("---------------------------------------------------------------")
@@ -289,6 +281,22 @@ def get_asset_uncertainty(asset_id, cov, world_dim):
     first_index_of_asset = asset_id*world_dim
     last_index_of_asset = asset_id*world_dim + world_dim
     return cov[first_index_of_asset:last_index_of_asset, first_index_of_asset:last_index_of_asset]
+
+def plot_truth_data(bag):
+    fig = plt.figure(0)
+    ax = fig.add_subplot(111)
+    ax.yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
+    ax.xaxis.set_major_formatter(FormatStrFormatter('%.2f'))
+    ax.scatter(bag[0,:], bag[1,:], c="k", s=20)
+    ax.scatter(bag[num_ownship_states,:], bag[num_ownship_states + 1,:], c="b", s=20)
+    plt.xlabel("x", fontsize=10)
+    plt.ylabel("y", fontsize=10)
+    plt.xticks(fontsize=10)
+    plt.yticks(fontsize=10)
+    # ax.legend(fontsize=12)
+
+    plt.show()
+    # plt.close()
 
 def plot_data(bag, world_dim):
     # fig = plt.figure(0)

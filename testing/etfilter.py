@@ -5,6 +5,8 @@ from scipy.stats import norm as normal
 from copy import deepcopy
 from pdb import set_trace
 
+DEBUG=False
+
 class ETFilter(object):
 
     def __init__(self, my_id, num_ownship_states, world_dim, x0, P0, predict_func):
@@ -34,6 +36,9 @@ class ETFilter(object):
         return np.abs(innovation) <= meas.et_delta
 
     def add_meas(self, meas):
+        if DEBUG:
+            print(str(self.my_id) + " receiving meas: " + meas.__class__.__name__ + "| data: " + str(meas.data))
+            
         if not isinstance(meas, Measurement):
             raise Exception("meas must of type Measurement")
         if self._is_angle_meas(meas):
@@ -71,7 +76,7 @@ class ETFilter(object):
                 mu, Qe, alpha = self._get_implicit_predata(C, R, x_hat_start, P_start, meas.src_id)
                 z_bar, curly_theta = self._get_implicit_data(meas.et_delta, mu, Qe, alpha)
                 K = self._get_kalman_gain(C, R)
-                if self._is_angle_meas(meas):
+                if self._is_angle_meas(meas, check_implicit=True):
                     z_bar = self._normalize_angle(z_bar)
                 self.x_hat += K.dot(z_bar)
                 self.P = self.P - curly_theta * K.dot(C.dot(self.P))
@@ -154,7 +159,9 @@ class ETFilter(object):
                 state_vector[asset_yaw_index,0] = self._normalize_angle(state_vector[asset_yaw_index,0])
         return state_vector
 
-    def _is_angle_meas(self, meas):
+    def _is_angle_meas(self, meas, check_implicit=False):
+        if not check_implicit and isinstance(meas, Implicit):
+            return False
         if isinstance(meas, GPSyaw_Explicit) or isinstance(meas, GPSyaw_Implicit):
             return True
         else:
