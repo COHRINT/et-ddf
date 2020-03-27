@@ -18,47 +18,51 @@ DEBUG = False
 
 # Simple simulation
 K = 1000
-world_dim = 1
-num_assets = 3
-num_ownship_states = 2
+world_dim = 2
+num_assets = 2
+num_ownship_states = 4
 num_states = num_ownship_states * num_assets
 
 def main():
 
     ######## DEFINE STATE && UNCERTAINTY #############
-    x_truth = np.array([[0,0,5,0,7,0]], dtype=np.float64).T
-    P_initial = np.array([[1,0,0,0,0,0], \
-                          [0,4,0,0,0,0], \
-                          [0,0,1,0,0,0], \
-                          [0,0,0,4,0,0],
-                          [0,0,0,0,1,0],
-                          [0,0,0,0,0,4]], dtype=np.float64)
+    x_truth = np.array([[0,0,0,0,5,5,0,0]], dtype=np.float64).T
+    P_initial = np.array([[1,0,0,0,0,0,0,0], \
+                          [0,1,0,0,0,0,0,0], \
+                          [0,0,4,0,0,0,0,0], \
+                          [0,0,0,4,0,0,0,0],
+                          [0,0,0,0,1,0,0,0],
+                          [0,0,0,0,0,1,0,0],
+                          [0,0,0,0,0,0,4,0],
+                          [0,0,0,0,0,0,0,4]], dtype=np.float64)
 
     ####### DEFINE PROCESS NOISE #######
     q = 0.1
 
     ####### DEFINE PERCEIVED PROCESS NOISE #######
-    Q_perceived = np.array([[4,0,0,0,0,0], \
-                            [0,0,0,0,0,0], \
-                            [0,0,4,0,0,0], \
-                            [0,0,0,0,0,0],
-                            [0,0,0,0,4,0],
-                            [0,0,0,0,0,0]], dtype=np.float64)
+    Q_perceived = np.array([[4,0,0,0,0,0,0,0], \
+                          [0,4,0,0,0,0,0,0], \
+                          [0,0,0,0,0,0,0,0], \
+                          [0,0,0,0,0,0,0,0],
+                          [0,0,0,0,4,0,0,0],
+                          [0,0,0,0,0,4,0,0],
+                          [0,0,0,0,0,0,0,0],
+                          [0,0,0,0,0,0,0,0]], dtype=np.float64)
 
     ###### DEFINE DYNAMICS #########
     linear_dynamics_status = True
 
     ########## DEFINE MEAS NOISE ##########
     r_gps = 0.1
-    r_gps_perceived = 1
+    r_gps_perceived = 0.7
 
     ########## DEFINE ET DELTAS ##########
     gps_xy_delta = 0.3
 
     ########## INITIALIZE ASSETS ##########
     asset_list = []
-    asset = Asset(0, num_ownship_states, world_dim, x_truth, P_initial, linear_dynamics_status, red_team=[2])
-    asset1 = Asset(1, num_ownship_states, world_dim, x_truth, P_initial, linear_dynamics_status, red_team=[2])
+    asset = Asset(0, num_ownship_states, world_dim, x_truth, P_initial, linear_dynamics_status)
+    asset1 = Asset(1, num_ownship_states, world_dim, x_truth, P_initial, linear_dynamics_status)
     asset_list.append(asset); asset_list.append(asset1)
 
     ########## DATA RECORDING ##########
@@ -74,18 +78,18 @@ def main():
 
     for k in range(K):
         ########## DEFINE CONTROL INPUT ##########
-        u0 = np.array([0.2], dtype=np.float64).reshape(-1,1)
-        u1 = np.array([0.1], dtype=np.float64).reshape(-1,1)
-        u2 = np.array([0.1], dtype=np.float64).reshape(-1,1)
+        u0 = np.array([0.2, 0.2], dtype=np.float64).reshape(-1,1)
+        u1 = np.array([0.1, 0.1], dtype=np.float64).reshape(-1,1)
+        # u2 = np.array([0.1], dtype=np.float64).reshape(-1,1)
 
         ########## SIMULATE TRUTH MOTION ##########
         # x_truth_prev = deepcopy(x_truth)
-        x_truth0 = linear_propagation(x_truth[:num_ownship_states,0], u0, world_dim, num_ownship_states).reshape(-1,1)
-        x_truth1 = linear_propagation(x_truth[num_ownship_states:2*num_ownship_states,0], u1, world_dim, num_ownship_states)
-        x_truth2 = linear_propagation(x_truth[2*num_ownship_states:3*num_ownship_states,0], u2, world_dim, num_ownship_states)
-        x_truth[:num_ownship_states,0] = x_truth0.ravel()
-        x_truth[num_ownship_states:2*num_ownship_states,0] = x_truth1.ravel()
-        x_truth[2*num_ownship_states:3*num_ownship_states,0] = x_truth2.ravel()
+        x_truth0 = linear_propagation(x_truth, u0, world_dim, num_ownship_states, 0).reshape(-1,1)
+        x_truth1 = linear_propagation(x_truth, u1, world_dim, num_ownship_states, 1)
+        # x_truth2 = linear_propagation(x_truth[2*num_ownship_states:3*num_ownship_states,0], u2, world_dim, num_ownship_states)
+        x_truth[:num_ownship_states,0] = x_truth0[:num_ownship_states].ravel()
+        x_truth[num_ownship_states:2*num_ownship_states,0] = x_truth1[num_ownship_states:2*num_ownship_states].ravel()
+        # x_truth[2*num_ownship_states:3*num_ownship_states,0] = x_truth2.ravel()
 
         ########## BAG TRUTH DATA ##########
         x_truth_bag = np.concatenate((x_truth_bag, x_truth.reshape(-1,1)), axis=1)
@@ -93,32 +97,41 @@ def main():
         ########## ADD NOISE TO TRUTH MOTION ##########
         x_truth_no_noise = deepcopy(x_truth)
         x_truth[0,0] += np.random.normal(0, np.sqrt(q))
+        x_truth[1,0] += np.random.normal(0, np.sqrt(q))
         x_truth[num_ownship_states,0] += + np.random.normal(0, np.sqrt(q))
-        x_truth[2*num_ownship_states,0] += + np.random.normal(0, np.sqrt(q))
+        x_truth[num_ownship_states+1,0] += + np.random.normal(0, np.sqrt(q))
+        # x_truth[2*num_ownship_states,0] += + np.random.normal(0, np.sqrt(q))
 
         ########## PREDICTION STEP  ##########
         asset.predict(u0, Q_perceived)
         asset1.predict(u1, Q_perceived)
 
-        # continue #** CHECK
+        # print(x_truth_no_noise)
+        # print(asset.main_filter.x_hat)
+        # print(asset1.main_filter.x_hat)
+        # break #** CHECK
 
         ########## GENERATE MEASUREMENTS VALUES ##########
         gpsx0 = x_truth[0,0]
         gpsx1 = x_truth[num_ownship_states,0]
-        gpsx2 = x_truth[2*num_ownship_states,0]        
+        gpsy0 = x_truth[1,0]
+        gpsy1 = x_truth[num_ownship_states+1,0]
+        # gpsx2 = x_truth[2*num_ownship_states,0]        
 
         ########## ADD NOIES TO MEASUREMENTS ##########
         gpsx0 += np.random.normal(0, r_gps)
         gpsx1 += np.random.normal(0, r_gps)
-        gpsx2 += np.random.normal(0, r_gps)
+        gpsy0 += np.random.normal(0, r_gps)
+        gpsy1 += np.random.normal(0, r_gps)
+        # gpsx2 += np.random.normal(0, r_gps)
 
         # STOP, CHECK PERFECT MEASUREMENTS
     
         ########## INITIALIZE MEASUREMENT TYPES ##########
         gpsx0_meas = GPSx_Explicit(0, gpsx0, r_gps_perceived**2, gps_xy_delta)
         gpsx1_meas = GPSx_Explicit(1, gpsx1, r_gps_perceived**2, gps_xy_delta)
-        gpsx2_meas = GPSx_Neighbor_Explicit(0,2, gpsx2, r_gps_perceived**2, gps_xy_delta)
-        # gpsx2_measp2 = GPSx_Neighbor_Explicit(1,2, gpsx2, r_gps_perceived**2, gps_xy_delta)
+        gpsy0_meas = GPSy_Explicit(0, gpsy0, r_gps_perceived**2, gps_xy_delta)
+        gpsy1_meas = GPSy_Explicit(1, gpsy1, r_gps_perceived**2, gps_xy_delta)
 
         ########## ASSETS RECEIVE UNSHAREABLE MEASUREMNTS  ##########
         # asset.receive_meas(gpsx0_meas, shareable=False)
@@ -132,8 +145,9 @@ def main():
         ########## ASSETS SHARE MEASUREMENTS  ##########
         sharing = []
         sharing.append(asset.receive_meas(gpsx0_meas, shareable=True))
-        sharing.append(asset.receive_meas(gpsx2_meas, shareable=True))
         sharing.append(asset1.receive_meas(gpsx1_meas, shareable=True))
+        sharing.append(asset.receive_meas(gpsy0_meas, shareable=True))
+        sharing.append(asset1.receive_meas(gpsy1_meas, shareable=True))
 
         # sharing.append(asset.receive_meas(diff_measx, shareable=True))
         # sharing.append(asset.receive_meas(diff_measy, shareable=True))

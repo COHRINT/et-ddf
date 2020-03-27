@@ -186,11 +186,13 @@ class ETFilter(object):
             return False
 
     def _linear_propagation(self, u):        
-        if self.world_dim == 1 and self.num_ownship_states == 1: # 1D not tracking velocity world
+        # 1D not tracking velocity world
+        if self.world_dim == 1 and self.num_ownship_states == 1:
             A = B = np.eye(1)
             self.x_hat = A*self.x_hat + B*u
             return A
-        if self.world_dim == 1 and self.num_ownship_states == 2: # 1D with velocity world
+        # 1D with velocity world
+        elif self.world_dim == 1 and self.num_ownship_states == 2:
             A = np.eye(self.num_states)
             for i in range(self.num_assets):
                 if i == self.my_id:
@@ -202,13 +204,27 @@ class ETFilter(object):
             B[self.my_id*self.num_ownship_states,0] = 1
             B[self.my_id*self.num_ownship_states+1,0] = 1
             self.x_hat = np.dot(A,self.x_hat) + np.dot(B,u)
-            # print(A)
-            # print(B)
-            # print(self.x_hat)
-            # print("---")
+            return A
+        # 2D with velocity tracking
+        elif self.world_dim == 2 and self.num_ownship_states == 4:
+            A = np.eye(self.num_states)
+            for i in range(self.num_assets):
+                if i == self.my_id:
+                    A[i*self.num_ownship_states+2,i*self.num_ownship_states+2] = 0 # set velocity to zero
+                    A[i*self.num_ownship_states+3,i*self.num_ownship_states+3] = 0 # set velocity to zero
+                else:
+                    A[i*self.num_ownship_states,i*self.num_ownship_states+2] = 1
+                    A[i*self.num_ownship_states+1,i*self.num_ownship_states+3] = 1
+            B = np.zeros((self.num_states,u.size))
+            B[self.my_id*self.num_ownship_states,0] = 1
+            B[self.my_id*self.num_ownship_states+1,0] = 1
+            B[self.my_id*self.num_ownship_states+2,1] = 1
+            B[self.my_id*self.num_ownship_states+3,1] = 1
+            self.x_hat = np.dot(A,self.x_hat) + np.dot(B,u)
             return A
         else:
-            raise NotImplementedError("Linear Propagation Not defined for state configuration")
+            raise NotImplementedError("Linear Propagation Not defined for state configuration. World dim: " \
+                + str(self.world_dim) + " | Num Ownship States: " + str(self.num_ownship_states))
 
     def _nonlinear_propagation(self, u):
         ## Written for 2D

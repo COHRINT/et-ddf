@@ -53,9 +53,11 @@ def g_func(x_hat, u, my_id, num_ownship_states):
     print(x_state)
     return (x_state, G)
 
-def linear_propagation(x, u, world_dim, num_ownship_states):
+def linear_propagation(x, u, world_dim, num_ownship_states, my_id=0):
     x = deepcopy(x).reshape(-1,1)
     u = deepcopy(u).reshape(-1,1)
+    num_states = x.size
+    num_assets = int(num_states / num_ownship_states)
     if world_dim == 1 and num_ownship_states == 1:
         A = B = np.eye(1)
         x = A*x + B*u
@@ -65,5 +67,21 @@ def linear_propagation(x, u, world_dim, num_ownship_states):
         B = np.array([[1],[1]])
         x_new = np.dot(A,x) + np.dot(B, u)
         return x_new
+    elif world_dim == 2 and num_ownship_states == 4:
+        A = np.eye(num_states)
+        for i in range(num_assets):
+            if i == my_id:
+                A[i*num_ownship_states+2,i*num_ownship_states+2] = 0 # set velocity to zero
+                A[i*num_ownship_states+3,i*num_ownship_states+3] = 0 # set velocity to zero
+            else:
+                A[i*num_ownship_states,i*num_ownship_states+2] = 1
+                A[i*num_ownship_states+1,i*num_ownship_states+3] = 1
+        B = np.zeros((num_states,u.size))
+        B[my_id*num_ownship_states,0] = 1
+        B[my_id*num_ownship_states+1,0] = 1
+        B[my_id*num_ownship_states+2,1] = 1
+        B[my_id*num_ownship_states+3,1] = 1
+        x = np.dot(A,x) + np.dot(B,u)
+        return x
     else:
         raise NotImplementedError("Linear Propagation Not defined for state configuration")
