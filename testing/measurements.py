@@ -75,3 +75,20 @@ class LinRely_Implicit(Implicit):
         self.measured_asset = measured_asset
         self.R = R
         self.et_delta = et_delta
+
+########## Debug GPS of Neighbors ##########
+# These measurements are impossible in reality but useful in debugging
+# They represent "src took a gps measurement of neighbor"
+class GPSx_Neighbor_Explicit(Explicit):
+    def __init__(self, src_id, neighbor_id, data, R, et_delta):
+        self.src_id = src_id
+        self.neighbor_id = neighbor_id
+        self.data = data
+        self.R = R
+        self.et_delta = et_delta
+class GPSx_Neighbor_Implicit(Implicit):
+    def __init__(self, src_id, neighbor_id, R, et_delta):
+        self.src_id = src_id
+        self.neighbor_id = neighbor_id
+        self.R = R
+        self.et_delta = et_delta
