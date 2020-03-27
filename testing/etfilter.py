@@ -4,24 +4,25 @@ from measurements import *
 from scipy.stats import norm as normal
 from copy import deepcopy
 from pdb import set_trace
+from scipy import integrate
 
 DEBUG=False
 
 class ETFilter(object):
 
-    def __init__(self, my_id, num_ownship_states, world_dim, x0, P0, predict_func):
+    def __init__(self, my_id, num_ownship_states, world_dim, x0, P0, linear_dynamics):
         self.my_id = my_id
         self.num_ownship_states = num_ownship_states
         self.world_dim = world_dim
         self.x_hat = deepcopy(x0)
         self.P = deepcopy(P0)
-        self.predict_func = deepcopy(predict_func)
+        self.linear_dynamics = linear_dynamics
         self.num_states = self.x_hat.size
-        if (self.num_states % num_ownship_states) != 0:
+        if (self.num_states % self.num_ownship_states) != 0:
             raise Exception("Dimensionality of state vector does not align with the number of ownship states.")
         elif num_ownship_states < world_dim:
             raise Exception("Number of ownship states does not make sense for world dimension")
-        self.num_assets = int( self.num_states / num_ownship_states )
+        self.num_assets = int( self.num_states / self.num_ownship_states )
         
         self.meas_queue = []
 
@@ -47,10 +48,18 @@ class ETFilter(object):
         self.meas_queue.append(meas)
     
     def predict(self, u, Q):
-        (self.x_hat, G) = self.predict_func( deepcopy(self.x_hat) , deepcopy(u), self.my_id) # Pass by value to function pointers
-        self.x_hat = self._normalize_all_angles(self.x_hat)
+        if u.shape[1] > u.shape[0]:
+            raise Exception("u must be column vector")
+        if Q.shape != self.P.shape:
+            raise Exception("Q must have state x state dimensions")
 
-        self.P = G.dot( self.P.dot( G.T )) + Q
+        if self.linear_dynamics:
+            A = self._linear_propagation(u)
+            self.P = A.dot( self.P.dot( A.T )) + Q
+        else: # nonlinear dynamics
+            G = self._nonlinear_propagation(u)
+            self.P = G.dot( self.P.dot( G.T )) + Q
+        self.x_hat = self._normalize_all_angles(self.x_hat)
 
     def correct(self):
         if not self.meas_queue:
@@ -74,8 +83,8 @@ class ETFilter(object):
                 C = self._get_measurement_jacobian(meas)
                 K = self._get_kalman_gain(C, R)
                 innovation = self._get_innovation(meas, C)
-                self.x_hat += K.dot(innovation)
-                self.P = ( np.eye(self.num_states) - K.dot(C) ).dot(self.P)
+                self.x_hat += np.dot( K, innovation)
+                self.P = ( np.eye(self.num_states) - np.dot(K, C) ).dot(self.P)
             else: # Implicit Update
                 C = self._get_measurement_jacobian(meas)
                 mu, Qe, alpha = self._get_implicit_predata(C, R, x_hat_start, P_start, meas)
@@ -83,7 +92,7 @@ class ETFilter(object):
                 K = self._get_kalman_gain(C, R)
                 if self._is_angle_meas(meas, check_implicit=True):
                     z_bar = self._normalize_angle(z_bar)
-                self.x_hat += K.dot(z_bar)
+                self.x_hat += np.dot(K, z_bar)
                 self.P = self.P - curly_theta * K.dot(C.dot(self.P))
             self.x_hat = self._normalize_all_angles( self.x_hat )
         # Clear measurement queue
@@ -103,7 +112,8 @@ class ETFilter(object):
 
     def _get_kalman_gain(self, C, R):
         tmp = np.dot( np.dot(C, self.P), C.T ) + R
-        return self.P.dot(C.T.dot( np.linalg.inv( tmp ) ))
+        tmp_inv = np.linalg.inv( tmp ) if tmp.size > 1 else tmp**(-1)
+        return self.P.dot(C.T.dot( tmp_inv ))
 
     def _get_implicit_data(self, delta, mu, Qe, alpha):
         Q_func = lambda x : 1 - normal.cdf(x)
@@ -172,6 +182,74 @@ class ETFilter(object):
             return True
         else:
             return False
+
+    def _linear_propagation(self, u):        
+        if self.world_dim == 1 and self.num_ownship_states == 1: # 1D not tracking velocity world
+            A = B = np.eye(1)
+            self.x_hat = A*self.x_hat + B*u
+            return A
+        if self.world_dim == 1 and self.num_ownship_states == 2: # 1D with velocity world
+            A = np.eye(self.num_states)
+            for i in range(self.num_assets):
+                if i == self.my_id:
+                    A[i*self.num_ownship_states+1,i*self.num_ownship_states+1] = 0 # set velocity to zero
+                else:
+                    A[i*self.num_ownship_states,i*self.num_ownship_states+1] = 1
+            
+            B = np.zeros((self.num_states,u.size))
+            B[self.my_id*self.num_ownship_states,0] = 1
+            B[self.my_id*self.num_ownship_states+1,0] = 1
+            self.x_hat = np.dot(A,self.x_hat) + np.dot(B,u)
+            # print(A)
+            # print(B)
+            # print(self.x_hat)
+            # print("---")
+            return A
+        else:
+            raise NotImplementedError("Linear Propagation Not defined for state configuration")
+
+    def _nonlinear_propagation(self, u):
+        ## Written for 2D
+
+        self.x_hat[self.my_id * self.num_ownship_states + 3] = u[0,0] # speed
+        self.x_hat[self.my_id * self.num_ownship_states + 5] = u[1,0] # angular velocity
+
+        G = np.zeros((self.num_states, self.num_states))
+        for a in range(self.num_assets):
+            start_index = a*self.num_ownship_states
+            s = self.x_hat[start_index + 3,0]
+            theta_dot = self.x_hat[start_index + 5,0]
+
+            theta_initial = self.x_hat[start_index+2,0]
+            def dynamics(t, z):
+                _x_dot = s * np.cos(z[2])
+                _y_dot = s * np.sin(z[2])
+                _theta_dot = theta_dot
+                return np.array([_x_dot, _y_dot, _theta_dot])
+
+            t_init, t_final = 0, 1
+            z_init = self.x_hat[start_index:start_index + 3,0]
+            r = integrate.RK45(dynamics, t_init, z_init, t_final)
+            while r.status == "running":
+                status = r.step()
+
+            self.x_hat[start_index: start_index+3,0] = r.y
+            
+            # Construct this asset's part of jacobian
+            G[start_index,start_index] = 1
+            G[start_index + 1,start_index + 1] = 1
+            G[start_index + 2, start_index + 2] = 1
+            G[start_index, start_index + 2] = -s * np.sin(theta_initial + theta_dot/2)
+            G[start_index + 1, start_index + 2] = s * np.cos(theta_initial + theta_dot/2)
+            G[start_index + 4, start_index + 4] = 1
+
+            if a != my_id:
+                G[start_index + 3, start_index + 3] = 1
+                G[start_index + 5, start_index + 5] = 1
+
+        # print("Output")
+        # print(self.x_hat)
+        return G
 
 """ Main filter
 differs slightly from an ETFilter in its implicit measurement update
