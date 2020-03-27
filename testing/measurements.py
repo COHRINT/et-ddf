@@ -86,7 +86,20 @@ class GPSx_Neighbor_Explicit(Explicit):
         self.data = data
         self.R = R
         self.et_delta = et_delta
+class GPSy_Neighbor_Explicit(Explicit):
+    def __init__(self, src_id, neighbor_id, data, R, et_delta):
+        self.src_id = src_id
+        self.neighbor_id = neighbor_id
+        self.data = data
+        self.R = R
+        self.et_delta = et_delta
 class GPSx_Neighbor_Implicit(Implicit):
+    def __init__(self, src_id, neighbor_id, R, et_delta):
+        self.src_id = src_id
+        self.neighbor_id = neighbor_id
+        self.R = R
+        self.et_delta = et_delta
+class GPSy_Neighbor_Implicit(Implicit):
     def __init__(self, src_id, neighbor_id, R, et_delta):
         self.src_id = src_id
         self.neighbor_id = neighbor_id

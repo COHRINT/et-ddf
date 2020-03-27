@@ -51,7 +51,7 @@ class ETFilter(object):
         if u.shape[1] > u.shape[0]:
             raise Exception("u must be column vector")
         if Q.shape != self.P.shape:
-            raise Exception("Q must have state x state dimensions")
+            raise Exception("Q must have (state x state) dimensions")
 
         if self.linear_dynamics:
             A = self._linear_propagation(u)
@@ -143,6 +143,8 @@ class ETFilter(object):
                 C[0, src_id*self.num_ownship_states + 5] = 1
         elif isinstance(meas, GPSx_Neighbor_Explicit) or isinstance(meas, GPSx_Neighbor_Implicit):
             C[0, meas.neighbor_id*self.num_ownship_states] = 1
+        elif isinstance(meas, GPSy_Neighbor_Explicit) or isinstance(meas, GPSy_Neighbor_Implicit):
+            C[0, meas.neighbor_id*self.num_ownship_states+1] = 1
         elif isinstance(meas, LinRelx_Explicit) or isinstance(meas, LinRelx_Implicit):
             C[0, src_id*self.num_ownship_states] = -1
             C[0, meas.measured_asset*self.num_ownship_states] = 1

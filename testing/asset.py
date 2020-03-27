@@ -8,12 +8,12 @@ class Asset:
     def __init__(self, my_id, num_ownship_states, world_dim, x0, P0, predict_func, red_team=[]):
         self.my_id = my_id
 
-        self.num_states = num_states = x0.size
-        self.num_assets = num_assets = int( num_states / num_ownship_states )
+        self.num_states = x0.size
+        self.num_assets = int( self.num_states / num_ownship_states )
         
         # Initialize common filters between other assets
         self.common_filters = {}
-        for i in range(num_assets):
+        for i in range(self.num_assets):
             if (i != my_id) and (i not in red_team):
                 self.common_filters[i] = ETFilter(my_id, num_ownship_states, world_dim, x0, P0, predict_func)
 
@@ -91,6 +91,8 @@ class Asset:
             return GPSyaw_Implicit(meas.src_id, meas.R, meas.et_delta)
         elif isinstance(meas, GPSx_Neighbor_Explicit):
             return GPSx_Neighbor_Implicit(meas.src_id, meas.neighbor_id, meas.R, meas.et_delta)
+        elif isinstance(meas, GPSy_Neighbor_Explicit):
+            return GPSy_Neighbor_Implicit(meas.src_id, meas.neighbor_id, meas.R, meas.et_delta)
         elif isinstance(meas, LinRelx_Explicit):
             return LinRelx_Implicit(meas.src_id, meas.measured_asset, meas.R, meas.et_delta)
         elif isinstance(meas, LinRely_Explicit):
