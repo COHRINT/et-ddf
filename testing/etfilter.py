@@ -13,9 +13,9 @@ class ETFilter(object):
         self.my_id = my_id
         self.num_ownship_states = num_ownship_states
         self.world_dim = world_dim
-        self.x_hat = x0
-        self.P = P0
-        self.predict_func = predict_func
+        self.x_hat = deepcopy(x0)
+        self.P = deepcopy(P0)
+        self.predict_func = deepcopy(predict_func)
         self.num_states = self.x_hat.size
         if (self.num_states % num_ownship_states) != 0:
             raise Exception("Dimensionality of state vector does not align with the number of ownship states.")
@@ -38,7 +38,7 @@ class ETFilter(object):
     def add_meas(self, meas):
         if DEBUG:
             print(str(self.my_id) + " receiving meas: " + meas.__class__.__name__ + "| data: " + str(meas.data))
-            
+
         if not isinstance(meas, Measurement):
             raise Exception("meas must of type Measurement")
         if self._is_angle_meas(meas):
@@ -56,13 +56,18 @@ class ETFilter(object):
         if not self.meas_queue:
             # print("meas_queue is empty!")
             return
-        # print("Msg queue:")
-        # for meas in self.meas_queue:
-        #     print(meas.data)
 
         x_hat_start = self.x_hat
         P_start = self.P
         for meas in self.meas_queue:
+            if DEBUG:
+                print("Fusing " + meas.__class__.__name__ + " w/ data: " + str(meas.data))
+                print("State of Filter:")
+                print("x_hat")
+                print(self.x_hat)
+                print("P")
+                print(self.P)
+                
             K, C = None, None
             R = meas.R
             if isinstance(meas, Explicit):
@@ -73,7 +78,7 @@ class ETFilter(object):
                 self.P = ( np.eye(self.num_states) - K.dot(C) ).dot(self.P)
             else: # Implicit Update
                 C = self._get_measurement_jacobian(meas)
-                mu, Qe, alpha = self._get_implicit_predata(C, R, x_hat_start, P_start, meas.src_id)
+                mu, Qe, alpha = self._get_implicit_predata(C, R, x_hat_start, P_start, meas)
                 z_bar, curly_theta = self._get_implicit_data(meas.et_delta, mu, Qe, alpha)
                 K = self._get_kalman_gain(C, R)
                 if self._is_angle_meas(meas, check_implicit=True):
@@ -85,7 +90,7 @@ class ETFilter(object):
         self.meas_queue = []
 
     # If ETFilter_Main, method is overridden
-    def _get_implicit_predata(self, C, R, x_hat_start, P_start, asset_id):
+    def _get_implicit_predata(self, C, R, x_hat_start, P_start, meas):
         mu = alpha = 0 # mu, alpha cancel out in the common information filter, not the case in main filter
         Qe = C.dot( P_start.dot( C.T )) + R
         return mu, Qe, alpha
@@ -93,7 +98,8 @@ class ETFilter(object):
     def _get_innovation(self, meas, C):
         if self._is_angle_meas(meas):
             return self._normalize_angle(meas.data - C.dot(self.x_hat))
-        return meas.data - C.dot(self.x_hat)
+        else:
+            return meas.data - C.dot(self.x_hat)
 
     def _get_kalman_gain(self, C, R):
         tmp = np.dot( np.dot(C, self.P), C.T ) + R
@@ -183,11 +189,14 @@ class ETFilter_Main( ETFilter ):
         super(ETFilter_Main, self).__init__(my_id, num_ownship_states, world_dim, x0, P0, predict_func)
         self.common_filters = common_filters
     
-    def _get_implicit_predata(self, C, R, x_hat_start, P_start, asset_id):
-        x_ref = self._get_common_filter_states(asset_id).x_hat
+    def _get_implicit_predata(self, C, R, x_hat_start, P_start, meas):
+        x_ref = self._get_common_filter_states(meas.src_id).x_hat
         mu = C.dot( self.x_hat - x_hat_start )
         Qe = C.dot( P_start.dot( C.T )) + R
         alpha = C.dot( x_ref - x_hat_start )
+        if self._is_angle_meas(meas, check_implicit=True):
+            mu = self._normalize_angle(mu)
+            alpha = self._normalize_angle(alpha)
         return mu, Qe, alpha
 
     def _get_common_filter_states(self, asset_id):

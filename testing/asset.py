@@ -8,8 +8,8 @@ class Asset:
     def __init__(self, my_id, num_ownship_states, world_dim, x0, P0, predict_func, red_team=[]):
         self.my_id = my_id
 
-        num_states = x0.size
-        num_assets = int( num_states / num_ownship_states )
+        self.num_states = num_states = x0.size
+        self.num_assets = num_assets = int( num_states / num_ownship_states )
         
         # Initialize common filters between other assets
         self.common_filters = {}
@@ -53,23 +53,33 @@ class Asset:
         for asset_id in self.common_filters.keys():
             self.common_filters[asset_id].correct()
 
-    def print_filters(self, main_only=False, mean_only=False):
-        x_hat = np.matrix.round( deepcopy(self.main_filter.x_hat), 2)
-        P = np.matrix.round( deepcopy(self.main_filter.P), 2)
+    def print_filters(self, main_only=False, mean_only=False, cov_sd_form=True, round_dec=2):
+        asset_ids = np.linspace(0, self.num_assets-1, self.num_assets).reshape(-1,1)
+        num_ownship_states = int(self.num_states / self.num_assets)
+        z = (np.zeros((self.num_assets, num_ownship_states)) + asset_ids).reshape(-1,1)
+
+        x_hat = np.matrix.round( deepcopy(self.main_filter.x_hat), round_dec)
+        P = deepcopy(self.main_filter.P)
         print(str(self.my_id)+"'s Main Filter")
-        print(x_hat)
+        print(np.concatenate((z,x_hat),axis=1))
         if not mean_only:
-            print(2*np.matrix.round(np.sqrt(P),2))
+            if cov_sd_form:
+                print(np.matrix.round( 2*np.sqrt(P), round_dec))
+            else:
+                print(np.matrix.round(P, round_dec))
 
         if not main_only:
             print("----------")
             for asset_id in self.common_filters.keys():
                 print(str(self.my_id) + "_" + str(asset_id) + " common filter")
-                x_hat = np.matrix.round( deepcopy(self.common_filters[asset_id].x_hat), 2)
-                P = np.matrix.round( deepcopy(self.common_filters[asset_id].P), 2)
+                x_hat = np.matrix.round( deepcopy(self.common_filters[asset_id].x_hat), round_dec)
+                P = deepcopy(self.common_filters[asset_id].P)
                 print(x_hat)
                 if not mean_only:
-                    print(np.matrix.round( 2*np.sqrt(self.common_filters[asset_id].P), 2))
+                    if cov_sd_form:
+                        print(np.matrix.round( 2*np.sqrt(P), round_dec))
+                    else:
+                        print(np.matrix.round(P, round_dec))
                 print("----------")
 
     def _get_implicit_msg_equivalent(self, meas):
