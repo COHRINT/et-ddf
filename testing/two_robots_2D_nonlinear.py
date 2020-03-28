@@ -17,55 +17,58 @@ from pdb import set_trace
 DEBUG = False
 
 # Simple simulation
-K = 100
+K = 1000
 world_dim = 2
-num_assets = 3
-num_ownship_states = 4
+num_assets = 2
+num_ownship_states = 6
 num_states = num_ownship_states * num_assets
 
 def main():
 
     ######## DEFINE STATE && UNCERTAINTY #############
-    x_truth = np.array([[0,0,0,0,5,5,0,0,2,2,0,0]], dtype=np.float64).T
+    x_truth = np.array([[0,0,0,0,0,0,
+                        5,5,np.pi,0,0,0]], dtype=np.float64).T
     P_initial = np.array([[1,0,0,0,0,0,0,0,0,0,0,0], \
                           [0,1,0,0,0,0,0,0,0,0,0,0], \
-                          [0,0,4,0,0,0,0,0,0,0,0,0], \
+                          [0,0,1,0,0,0,0,0,0,0,0,0], \
                           [0,0,0,4,0,0,0,0,0,0,0,0], \
-                          [0,0,0,0,1,0,0,0,0,0,0,0],
+                          [0,0,0,0,0,0,0,0,0,0,0,0],
                           [0,0,0,0,0,1,0,0,0,0,0,0],
-                          [0,0,0,0,0,0,4,0,0,0,0,0],
-                          [0,0,0,0,0,0,0,4,0,0,0,0],
+                          [0,0,0,0,0,0,1,0,0,0,0,0],
+                          [0,0,0,0,0,0,0,1,0,0,0,0],
                           [0,0,0,0,0,0,0,0,1,0,0,0],
-                          [0,0,0,0,0,0,0,0,0,1,0,0],
-                          [0,0,0,0,0,0,0,0,0,0,4,0],
-                          [0,0,0,0,0,0,0,0,0,0,0,4]], dtype=np.float64)
+                          [0,0,0,0,0,0,0,0,0,4,0,0],
+                          [0,0,0,0,0,0,0,0,0,0,0,0],
+                          [0,0,0,0,0,0,0,0,0,0,0,1]], dtype=np.float64)
 
     ####### DEFINE PROCESS NOISE #######
-    q = 0.1
+    q = 0.01
+    q_yaw = 0.05
 
     ####### DEFINE PERCEIVED PROCESS NOISE #######
     Q_perceived = np.array([[4,0,0,0,0,0,0,0,0,0,0,0], \
                           [0,4,0,0,0,0,0,0,0,0,0,0], \
-                          [0,0,0,0,0,0,0,0,0,0,0,0], \
-                          [0,0,0,0,0,0,0,0,0,0,0,0],
-                          [0,0,0,0,4,0,0,0,0,0,0,0],
-                          [0,0,0,0,0,4,0,0,0,0,0,0],
+                          [0,0,2,0,0,0,0,0,0,0,0,0], \
                           [0,0,0,0,0,0,0,0,0,0,0,0],
                           [0,0,0,0,0,0,0,0,0,0,0,0],
-                          [0,0,0,0,0,0,0,0,4,0,0,0],
-                          [0,0,0,0,0,0,0,0,0,4,0,0],
+                          [0,0,0,0,0,0,0,0,0,0,0,0],
+                          [0,0,0,0,0,0,4,0,0,0,0,0],
+                          [0,0,0,0,0,0,0,4,0,0,0,0],
+                          [0,0,0,0,0,0,0,0,2,0,0,0],
+                          [0,0,0,0,0,0,0,0,0,0,0,0],
                           [0,0,0,0,0,0,0,0,0,0,0,0],
                           [0,0,0,0,0,0,0,0,0,0,0,0]], dtype=np.float64)
 
     ###### DEFINE DYNAMICS #########
-    linear_dynamics_status = True
+    linear_dynamics_status = False
 
     ########## DEFINE MEAS NOISE ##########
-    r_gps = 0.1
-    r_gps_perceived = 1.0
+    r_gps = 0.5
+    r_gps_perceived = 2*r_gps
 
     ########## DEFINE ET DELTAS ##########
-    gps_xy_delta = 0.3
+    gps_yaw_delta = 0.5
+    gps_xy_delta = 1
 
     ########## INITIALIZE ASSETS ##########
     asset_list = []
@@ -86,29 +89,29 @@ def main():
 
     for k in range(K):
         ########## DEFINE CONTROL INPUT ##########
-        u0 = np.array([0.2, 0.2], dtype=np.float64).reshape(-1,1)
-        u1 = np.array([0.1, 0.1], dtype=np.float64).reshape(-1,1)
-        u2 = np.array([0.15,0.15], dtype=np.float64).reshape(-1,1)
+        u0 = np.array([[0.2, np.pi/20]], dtype=np.float64).T
+        u1 = np.array([[0.1, -np.pi/20]], dtype=np.float64).T
+        # u2 = np.array([0.15,0.15], dtype=np.float64).T
 
         ########## SIMULATE TRUTH MOTION ##########
-        x_truth0 = linear_propagation(x_truth, u0, world_dim, num_ownship_states, 0)
-        x_truth1 = linear_propagation(x_truth, u1, world_dim, num_ownship_states, 1)
-        x_truth2 = linear_propagation(x_truth, u2, world_dim, num_ownship_states, 2)
+        x_truth0 = nonlinear_propagation(x_truth, u0, world_dim, num_ownship_states, 0)
+        x_truth1 = nonlinear_propagation(x_truth, u1, world_dim, num_ownship_states, 1)
+        # x_truth2 = linear_propagation(x_truth, u2, world_dim, num_ownship_states, 2)
         x_truth[:num_ownship_states,0] = x_truth0[:num_ownship_states].ravel()
         x_truth[num_ownship_states:2*num_ownship_states,0] = x_truth1[num_ownship_states:2*num_ownship_states].ravel()
-        x_truth[2*num_ownship_states:3*num_ownship_states,0] = x_truth2[2*num_ownship_states:3*num_ownship_states].ravel()
+        # x_truth[2*num_ownship_states:3*num_ownship_states,0] = x_truth2[2*num_ownship_states:3*num_ownship_states].ravel()
 
         ########## BAG TRUTH DATA ##########
         x_truth_bag = np.concatenate((x_truth_bag, x_truth.reshape(-1,1)), axis=1)
 
         ########## ADD NOISE TO TRUTH MOTION ##########
         x_truth_no_noise = deepcopy(x_truth)
-        x_truth[0,0] += np.random.normal(0, np.sqrt(q))
-        x_truth[1,0] += np.random.normal(0, np.sqrt(q))
-        x_truth[num_ownship_states,0] += + np.random.normal(0, np.sqrt(q))
-        x_truth[num_ownship_states+1,0] += + np.random.normal(0, np.sqrt(q))
-        x_truth[2*num_ownship_states,0] += + np.random.normal(0, np.sqrt(q))
-        x_truth[2*num_ownship_states+1,0] += + np.random.normal(0, np.sqrt(q))
+        x_truth[0,0] += np.random.normal(0, q)
+        x_truth[1,0] += np.random.normal(0, q)
+        x_truth[2,0] += np.random.normal(0, q_yaw)
+        x_truth[num_ownship_states,0] += + np.random.normal(0, q)
+        x_truth[num_ownship_states+1,0] += + np.random.normal(0, q)
+        x_truth[num_ownship_states+2,0] += + np.random.normal(0, q_yaw)
 
         ########## PREDICTION STEP  ##########
         asset.predict(u0, Q_perceived)
@@ -122,28 +125,34 @@ def main():
         ########## GENERATE MEASUREMENTS VALUES ##########
         gpsx0 = x_truth[0,0]
         gpsy0 = x_truth[1,0]
+        gpsyaw0 = x_truth[2,0]
         gpsx1 = x_truth[num_ownship_states,0]
         gpsy1 = x_truth[num_ownship_states+1,0]
-        gpsx2 = x_truth[2*num_ownship_states,0]
-        gpsy2 = x_truth[2*num_ownship_states+1,0]
+        gpsyaw1 = x_truth[num_ownship_states+2,0]
+        # gpsx2 = x_truth[2*num_ownship_states,0]
+        # gpsy2 = x_truth[2*num_ownship_states+1,0]
 
         ########## ADD NOIES TO MEASUREMENTS ##########
         gpsx0 += np.random.normal(0, r_gps)
         gpsy0 += np.random.normal(0, r_gps)
+        gpsyaw0 += np.random.normal(0, r_gps)
         gpsx1 += np.random.normal(0, r_gps)
         gpsy1 += np.random.normal(0, r_gps)
-        gpsx2 += np.random.normal(0, r_gps)
-        gpsy2 += np.random.normal(0, r_gps)
+        gpsyaw1 += np.random.normal(0, r_gps)
+        # gpsx2 += np.random.normal(0, r_gps)
+        # gpsy2 += np.random.normal(0, r_gps)
 
         # STOP, CHECK PERFECT MEASUREMENTS
     
         ########## INITIALIZE MEASUREMENT TYPES ##########
         gpsx0_meas = GPSx_Explicit(0, gpsx0, r_gps_perceived**2, gps_xy_delta)
         gpsy0_meas = GPSy_Explicit(0, gpsy0, r_gps_perceived**2, gps_xy_delta)
+        gpsyaw0_meas = GPSyaw_Explicit(0, gpsyaw0, r_gps_perceived**2, gps_yaw_delta)
         gpsx1_meas = GPSx_Explicit(1, gpsx1, r_gps_perceived**2, gps_xy_delta)
         gpsy1_meas = GPSy_Explicit(1, gpsy1, r_gps_perceived**2, gps_xy_delta)
-        gpsx2_meas = GPSx_Neighbor_Explicit(0, 2, gpsx2, r_gps_perceived**2, gps_xy_delta)
-        gpsy2_meas = GPSy_Neighbor_Explicit(0, 2, gpsy2, r_gps_perceived**2, gps_xy_delta)
+        gpsyaw1_meas = GPSyaw_Explicit(1, gpsyaw1, r_gps_perceived**2, gps_yaw_delta)
+        # gpsx2_meas = GPSx_Neighbor_Explicit(0, 2, gpsx2, r_gps_perceived**2, gps_xy_delta)
+        # gpsy2_meas = GPSy_Neighbor_Explicit(0, 2, gpsy2, r_gps_perceived**2, gps_xy_delta)
 
         ########## ASSETS RECEIVE UNSHAREABLE MEASUREMNTS  ##########
         # asset.receive_meas(gpsx0_meas, shareable=False)
@@ -158,10 +167,12 @@ def main():
         sharing = []
         sharing.append(asset.receive_meas(gpsx0_meas, shareable=True))
         sharing.append(asset.receive_meas(gpsy0_meas, shareable=True))
+        sharing.append(asset.receive_meas(gpsyaw0_meas, shareable=True))
         sharing.append(asset1.receive_meas(gpsx1_meas, shareable=True))
         sharing.append(asset1.receive_meas(gpsy1_meas, shareable=True))
-        sharing.append(asset.receive_meas(gpsx2_meas, shareable=True))
-        sharing.append(asset.receive_meas(gpsy2_meas, shareable=True))
+        sharing.append(asset1.receive_meas(gpsyaw1_meas, shareable=True))
+        # sharing.append(asset.receive_meas(gpsx2_meas, shareable=True))
+        # sharing.append(asset.receive_meas(gpsy2_meas, shareable=True))
 
         # sharing.append(asset.receive_meas(diff_measx, shareable=True))
         # sharing.append(asset.receive_meas(diff_measy, shareable=True))
@@ -194,7 +205,7 @@ def main():
 
         ########## DEBUG FILTER INPUTS ##########
         if DEBUG:
-            print(asset.main_filter.P)
+            print(asset.main_filter.x_hat)
             print("---")
             # set_trace()
 

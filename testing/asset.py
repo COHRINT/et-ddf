@@ -46,7 +46,7 @@ class Asset:
     def predict(self, u, Q):
         self.main_filter.predict(u, Q)
         for asset_id in self.common_filters.keys():
-            self.common_filters[asset_id].predict(u, Q)
+            self.common_filters[asset_id].predict(np.zeros(u.shape), Q)
 
     def correct(self):
         self.main_filter.correct()

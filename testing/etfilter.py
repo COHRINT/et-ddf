@@ -23,7 +23,7 @@ class ETFilter(object):
         elif num_ownship_states < world_dim:
             raise Exception("Number of ownship states does not make sense for world dimension")
         self.num_assets = int( self.num_states / self.num_ownship_states )
-        
+        self.is_main_fitler = False
         self.meas_queue = []
 
     def check_implicit(self, meas):
@@ -197,7 +197,7 @@ class ETFilter(object):
         elif self.world_dim == 1 and self.num_ownship_states == 2:
             A = np.eye(self.num_states)
             for i in range(self.num_assets):
-                if i == self.my_id:
+                if i == self.my_id and self.is_main_fitler:
                     A[i*self.num_ownship_states+1,i*self.num_ownship_states+1] = 0 # set velocity to zero
                 else:
                     A[i*self.num_ownship_states,i*self.num_ownship_states+1] = 1
@@ -211,7 +211,7 @@ class ETFilter(object):
         elif self.world_dim == 2 and self.num_ownship_states == 4:
             A = np.eye(self.num_states)
             for i in range(self.num_assets):
-                if i == self.my_id:
+                if i == self.my_id and self.is_main_fitler:
                     A[i*self.num_ownship_states+2,i*self.num_ownship_states+2] = 0 # set velocity to zero
                     A[i*self.num_ownship_states+3,i*self.num_ownship_states+3] = 0 # set velocity to zero
                 else:
@@ -230,9 +230,9 @@ class ETFilter(object):
 
     def _nonlinear_propagation(self, u):
         ## Written for 2D
-
-        self.x_hat[self.my_id * self.num_ownship_states + 3] = u[0,0] # speed
-        self.x_hat[self.my_id * self.num_ownship_states + 5] = u[1,0] # angular velocity
+        if self.is_main_fitler:            
+            self.x_hat[self.my_id * self.num_ownship_states + 3] = u[0,0] # speed
+            self.x_hat[self.my_id * self.num_ownship_states + 5] = u[1,0] # angular velocity
 
         G = np.zeros((self.num_states, self.num_states))
         for a in range(self.num_assets):
@@ -259,13 +259,19 @@ class ETFilter(object):
             G[start_index,start_index] = 1
             G[start_index + 1,start_index + 1] = 1
             G[start_index + 2, start_index + 2] = 1
+            G[start_index + 3, start_index + 3] = 1
+            G[start_index + 4, start_index + 4] = 1
+            G[start_index + 5, start_index + 5] = 1
+            G[start_index + 2, start_index + 5] = 1
             G[start_index, start_index + 2] = -s * np.sin(theta_initial + theta_dot/2)
             G[start_index + 1, start_index + 2] = s * np.cos(theta_initial + theta_dot/2)
-            G[start_index + 4, start_index + 4] = 1
+            G[start_index, start_index + 3] = np.cos(theta_initial + theta_dot/2)
+            G[start_index+1, start_index + 3] = np.sin(theta_initial + theta_dot/2)
 
-            if a != my_id:
-                G[start_index + 3, start_index + 3] = 1
-                G[start_index + 5, start_index + 5] = 1
+            G[start_index, start_index + 5] = (-s * np.sin(theta_initial + theta_dot/2)) / 2
+            G[start_index+1, start_index + 5] =  (s*np.cos(theta_initial + theta_dot/2)) / 2
+            # if not self.is_main_fitler:
+                
 
         # print("Output")
         # print(self.x_hat)
@@ -285,6 +291,7 @@ class ETFilter_Main( ETFilter ):
                 common filter between both assets
         """
         super(ETFilter_Main, self).__init__(my_id, num_ownship_states, world_dim, x0, P0, predict_func)
+        self.is_main_fitler = True
         self.common_filters = common_filters
     
     def _get_implicit_predata(self, C, R, x_hat_start, P_start, meas):
