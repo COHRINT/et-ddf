@@ -145,6 +145,8 @@ class ETFilter(object):
             C[0, meas.neighbor_id*self.num_ownship_states] = 1
         elif isinstance(meas, GPSy_Neighbor_Explicit) or isinstance(meas, GPSy_Neighbor_Implicit):
             C[0, meas.neighbor_id*self.num_ownship_states+1] = 1
+        elif isinstance(meas, GPSyaw_Neighbor_Explicit) or isinstance(meas, GPSyaw_Neighbor_Implicit):
+            C[0, meas.neighbor_id*self.num_ownship_states+2] = 1
         elif isinstance(meas, LinRelx_Explicit) or isinstance(meas, LinRelx_Implicit):
             C[0, src_id*self.num_ownship_states] = -1
             C[0, meas.measured_asset*self.num_ownship_states] = 1
@@ -183,6 +185,8 @@ class ETFilter(object):
         if not check_implicit and isinstance(meas, Implicit):
             return False
         if isinstance(meas, GPSyaw_Explicit) or isinstance(meas, GPSyaw_Implicit):
+            return True
+        elif isinstance(meas, GPSyaw_Neighbor_Explicit) or isinstance(meas, GPSyaw_Neighbor_Implicit):
             return True
         else:
             return False
@@ -239,6 +243,9 @@ class ETFilter(object):
             start_index = a*self.num_ownship_states
             s = self.x_hat[start_index + 3,0]
             theta_dot = self.x_hat[start_index + 5,0]
+            # print("Propagating asset in estimate: " + str(a))
+            # print("s: " + str(s))
+            # print("theta_dot: " + str(theta_dot))
 
             theta_initial = self.x_hat[start_index+2,0]
             def dynamics(t, z):
@@ -273,7 +280,7 @@ class ETFilter(object):
             # if not self.is_main_fitler:
                 
 
-        # print("Output")
+        # print("Output for asset " + str(self.my_id))
         # print(self.x_hat)
         return G
 

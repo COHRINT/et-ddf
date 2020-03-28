@@ -73,7 +73,8 @@ def plot_error(x_truth, x_hat, P, num_ownship_states,asset_id):
                 estimate_data = x_hat[(i*num_ownship_states)+j,:]
                 error_data = truth_data - estimate_data
                 if "yaw" in title_correspondences[(i*num_ownship_states)+j]:
-                    error_data = np.mod( error_data + np.pi, 2*np.pi) - np.pi
+                    if "dot" not in title_correspondences[(i*num_ownship_states)+j]:
+                        error_data = np.mod( error_data + np.pi, 2*np.pi) - np.pi
                 uncertainty = P[(i*num_ownship_states)+j, range(i*num_ownship_states+j, error_data.size*num_states, num_states)]
                 error_bound_high = 2*np.sqrt(uncertainty)
                 error_bound_low = - 2*np.sqrt(uncertainty)

@@ -93,6 +93,8 @@ class Asset:
             return GPSx_Neighbor_Implicit(meas.src_id, meas.neighbor_id, meas.R, meas.et_delta)
         elif isinstance(meas, GPSy_Neighbor_Explicit):
             return GPSy_Neighbor_Implicit(meas.src_id, meas.neighbor_id, meas.R, meas.et_delta)
+        elif isinstance(meas, GPSyaw_Neighbor_Explicit):
+            return GPSyaw_Neighbor_Implicit(meas.src_id, meas.neighbor_id, meas.R, meas.et_delta)
         elif isinstance(meas, LinRelx_Explicit):
             return LinRelx_Implicit(meas.src_id, meas.measured_asset, meas.R, meas.et_delta)
         elif isinstance(meas, LinRely_Explicit):

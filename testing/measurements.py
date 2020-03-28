@@ -93,6 +93,13 @@ class GPSy_Neighbor_Explicit(Explicit):
         self.data = data
         self.R = R
         self.et_delta = et_delta
+class GPSyaw_Neighbor_Explicit(Explicit):
+    def __init__(self, src_id, neighbor_id, data, R, et_delta):
+        self.src_id = src_id
+        self.neighbor_id = neighbor_id
+        self.data = data
+        self.R = R
+        self.et_delta = et_delta
 class GPSx_Neighbor_Implicit(Implicit):
     def __init__(self, src_id, neighbor_id, R, et_delta):
         self.src_id = src_id
@@ -105,3 +112,17 @@ class GPSy_Neighbor_Implicit(Implicit):
         self.neighbor_id = neighbor_id
         self.R = R
         self.et_delta = et_delta
+class GPSyaw_Neighbor_Implicit(Implicit):
+    def __init__(self, src_id, neighbor_id, R, et_delta):
+        self.src_id = src_id
+        self.neighbor_id = neighbor_id
+        self.R = R
+        self.et_delta = et_delta
+
+""" Adding a new measurement Steps
+
+Add it above & its implicit counterpart
+Is it an angle? Add it to _is_angle_meas() in etfilter
+Add its jacobian in etfilter to _get_measurement_jacobian()
+Add its implicit conversion to asset.py
+"""
