@@ -38,7 +38,7 @@ class ETFilter(object):
 
     def add_meas(self, meas):
         if DEBUG:
-            print(str(self.my_id) + " receiving meas: " + meas.__class__.__name__ + "| data: " + str(meas.data))
+            print(str(self.my_id) + " receiving meas: " + meas.__class__.__name__ + " | data: " + str(meas.data))
 
         if not isinstance(meas, Measurement):
             raise Exception("meas must of type Measurement")
@@ -69,20 +69,20 @@ class ETFilter(object):
         x_hat_start = self.x_hat
         P_start = self.P
         for meas in self.meas_queue:
-            if DEBUG:
-                print("Fusing " + meas.__class__.__name__ + " w/ data: " + str(meas.data))
-                print("State of Filter:")
-                print("x_hat")
-                print(self.x_hat)
-                print("P")
-                print(self.P)
+            # if DEBUG:
+            #     print("Fusing " + meas.__class__.__name__ + " w/ data: " + str(meas.data))
+            #     print("State of Filter:")
+            #     print("x_hat")
+            #     print(self.x_hat)
+            #     print("P")
+            #     print(self.P)
                 
             K, C = None, None
             R = meas.R
             if isinstance(meas, Explicit):
                 C = self._get_measurement_jacobian(meas)
                 K = self._get_kalman_gain(C, R)
-                innovation = self._get_innovation(meas, C)
+                innovation = self._get_innovation(meas, C).reshape(1,1)
                 self.x_hat += np.dot( K, innovation)
                 self.P = ( np.eye(self.num_states) - np.dot(K, C) ).dot(self.P)
             else: # Implicit Update
@@ -105,10 +105,18 @@ class ETFilter(object):
         return mu, Qe, alpha
 
     def _get_innovation(self, meas, C):
-        if self._is_angle_meas(meas):
-            return self._normalize_angle(meas.data - C.dot(self.x_hat))
+        expected_meas = None
+        if meas.is_linear_meas:
+            expected_meas = C.dot(self.x_hat)
         else:
-            return meas.data - C.dot(self.x_hat)
+            expected_meas = self._get_nonlinear_expected_meas(meas, self.x_hat)
+        if DEBUG:
+            print("expected meas " + meas.__class__.__name__ + " : " + str(expected_meas))
+            print("---> actual meas: " + str(meas.data))
+        if self._is_angle_meas(meas):
+            return self._normalize_angle( meas.data - expected_meas)
+        else:
+            return meas.data - expected_meas
 
     def _get_kalman_gain(self, C, R):
         tmp = np.dot( np.dot(C, self.P), C.T ) + R
@@ -153,6 +161,72 @@ class ETFilter(object):
         elif isinstance(meas, LinRely_Explicit) or isinstance(meas, LinRely_Implicit):
             C[0, src_id*self.num_ownship_states + 1] = -1
             C[0, meas.measured_asset*self.num_ownship_states + 1] = 1
+        elif isinstance(meas, Azimuth_Explicit) or isinstance(meas, Azimuth_Implicit):
+            meas_id = meas.measured_asset
+            if self.world_dim == 2:
+                src_x = self.x_hat[src_id*self.num_ownship_states,0]
+                src_y = self.x_hat[src_id*self.num_ownship_states+1,0]
+                other_x = self.x_hat[meas_id*self.num_ownship_states,0]
+                other_y = self.x_hat[meas_id*self.num_ownship_states+1,0]
+                diff_x = other_x - src_x
+                diff_y = other_y - src_y
+
+                # Protect division by zero
+                diff_x = diff_x if abs(diff_x) > 0.01 else 0.01
+                diff_y = diff_y if abs(diff_y) > 0.01 else 0.01
+
+                C[0, src_id*self.num_ownship_states + 2] = -1
+                # Bearing jacobians...
+                C[0, src_id*self.num_ownship_states] = diff_y / ( diff_x**2 + diff_y**2 )
+                C[0, meas_id*self.num_ownship_states] = -diff_y / ( diff_x**2 + diff_y**2 )
+                C[0, src_id*self.num_ownship_states+1] = -diff_x / ( diff_x**2 + diff_y**2 )
+                C[0, meas_id*self.num_ownship_states+1] = diff_x / ( diff_x**2 + diff_y**2 )
+        elif isinstance(meas, AzimuthGlobal_Explicit) or isinstance(meas, AzimuthGlobal_Implicit):
+            if self.world_dim == 2:
+                src_x = self.x_hat[src_id*self.num_ownship_states,0]
+                src_y = self.x_hat[src_id*self.num_ownship_states+1,0]
+                other_x = meas.global_pos[0]
+                other_y = meas.global_pos[1]
+                diff_x = other_x - src_x
+                diff_y = other_y - src_y
+
+                # Protect division by zero
+                diff_x = diff_x if abs(diff_x) > 0.01 else 0.01
+                diff_y = diff_y if abs(diff_y) > 0.01 else 0.01
+
+                C[0, src_id*self.num_ownship_states + 2] = -1
+                # Bearing jacobians...
+                C[0, src_id*self.num_ownship_states] = diff_y / ( diff_x**2 + diff_y**2 )
+                C[0, src_id*self.num_ownship_states+1] = -diff_x / ( diff_x**2 + diff_y**2 )
+        elif isinstance(meas, Range_Explicit) or isinstance(meas, Range_Implicit):
+            meas_id = meas.measured_asset
+            if self.world_dim == 2:
+                src_x = self.x_hat[src_id*self.num_ownship_states,0]
+                src_y = self.x_hat[src_id*self.num_ownship_states+1,0]
+                other_x = self.x_hat[meas.measured_asset*self.num_ownship_states,0]
+                other_y = self.x_hat[meas.measured_asset*self.num_ownship_states+1,0]
+                diff_x = other_x - src_x
+                diff_y = other_y - src_y
+                r = np.sqrt( diff_x**2 + diff_y**2 )
+                r = r if r > 0.01 else 0.01 # Division by zero protection
+                C[0, src_id*self.num_ownship_states] = -diff_x / r
+                C[0, meas_id*self.num_ownship_states] = diff_x / r
+                C[0, src_id*self.num_ownship_states+1] = -diff_y / r
+                C[0, meas_id*self.num_ownship_states+1] = diff_y / r
+
+        elif isinstance(meas, RangeGlobal_Explicit) or isinstance(meas, RangeGlobal_Implicit):
+            if self.world_dim == 2:
+                src_x = self.x_hat[src_id*self.num_ownship_states,0]
+                src_y = self.x_hat[src_id*self.num_ownship_states+1,0]
+                other_x = meas.global_pos[0]
+                other_y = meas.global_pos[1]
+                diff_x = other_x - src_x
+                diff_y = other_y - src_y
+                r = np.sqrt( diff_x**2 + diff_y**2 )
+                r = r if r > 0.01 else 0.01 # Division by zero protection
+                C[0, src_id*self.num_ownship_states] = -diff_x / r
+                C[0, src_id*self.num_ownship_states+1] = -diff_y / r
+
         # elif isinstance(meas, LinRely_Explicit) or isinstance(meas, LinRely_Implicit):
         #     C = np.zeros((1, self.num_states))
         #     C[0, src_id*self.world_dim + 1] = -1
@@ -160,6 +234,58 @@ class ETFilter(object):
         else:
             raise NotImplementedError("Measurment Jacobian not implemented for: " + meas.__class__.__name__)
         return C
+
+    def _get_nonlinear_expected_meas(self, meas, x_hat):
+        if isinstance(meas, Azimuth_Explicit) or isinstance(meas, Azimuth_Implicit):
+            if self.world_dim == 2:
+                src_bearing = x_hat[meas.src_id*self.num_ownship_states + 2,0]
+                src_x = x_hat[meas.src_id*self.num_ownship_states,0]
+                src_y = x_hat[meas.src_id*self.num_ownship_states+1,0]
+                other_x = x_hat[meas.measured_asset*self.num_ownship_states,0]
+                other_y = x_hat[meas.measured_asset*self.num_ownship_states+1,0]
+                diff_x = other_x - src_x
+                diff_y = other_y - src_y
+
+                # Protect division by zero
+                diff_x = diff_x if abs(diff_x) > 0.01 else 0.01
+                diff_y = diff_y if abs(diff_y) > 0.01 else 0.01
+                expected_bearing = np.arctan2(diff_y, diff_x) - src_bearing
+                return self._normalize_angle( expected_bearing )
+        elif isinstance(meas, AzimuthGlobal_Explicit) or isinstance(meas, AzimuthGlobal_Implicit):
+            if self.world_dim == 2:
+                src_bearing = x_hat[meas.src_id*self.num_ownship_states + 2,0]
+                src_x = x_hat[meas.src_id*self.num_ownship_states,0]
+                src_y = x_hat[meas.src_id*self.num_ownship_states+1,0]
+                other_x = meas.global_pos[0]
+                other_y = meas.global_pos[1]
+                diff_x = other_x - src_x
+                diff_y = other_y - src_y
+
+                # Protect division by zero
+                diff_x = diff_x if abs(diff_x) > 0.01 else 0.01
+                diff_y = diff_y if abs(diff_y) > 0.01 else 0.01
+                expected_bearing = np.arctan2(diff_y, diff_x) - src_bearing
+                return self._normalize_angle( expected_bearing )
+        elif isinstance(meas, Range_Explicit) or isinstance(meas, Range_Implicit):
+            if self.world_dim == 2:
+                src_x = x_hat[meas.src_id*self.num_ownship_states,0]
+                src_y = x_hat[meas.src_id*self.num_ownship_states+1,0]
+                other_x = x_hat[meas.measured_asset*self.num_ownship_states,0]
+                other_y = x_hat[meas.measured_asset*self.num_ownship_states+1,0]
+                diff_x = other_x - src_x
+                diff_y = other_y - src_y
+                return np.sqrt( diff_x**2 + diff_y**2 )
+        elif isinstance(meas, RangeGlobal_Explicit) or isinstance(meas, RangeGlobal_Implicit):
+            if self.world_dim == 2:
+                src_x = x_hat[meas.src_id*self.num_ownship_states,0]
+                src_y = x_hat[meas.src_id*self.num_ownship_states+1,0]
+                other_x = meas.global_pos[0]
+                other_y = meas.global_pos[1]
+                diff_x = other_x - src_x
+                diff_y = other_y - src_y
+                return np.sqrt( diff_x**2 + diff_y**2 )
+        else:
+            raise NotImplementedError("Nonlinear Measurement Innovation not implemented for: " + meas.__class__.__name__)
     
     # Normalize Angle -pi to pi
     def _normalize_angle(self, angle):
@@ -187,6 +313,10 @@ class ETFilter(object):
         if isinstance(meas, GPSyaw_Explicit) or isinstance(meas, GPSyaw_Implicit):
             return True
         elif isinstance(meas, GPSyaw_Neighbor_Explicit) or isinstance(meas, GPSyaw_Neighbor_Implicit):
+            return True
+        elif isinstance(meas, Azimuth_Explicit) or isinstance(meas, Azimuth_Implicit):
+            return True
+        elif isinstance(meas, AzimuthGlobal_Explicit) or isinstance(meas, AzimuthGlobal_Implicit):
             return True
         else:
             return False
@@ -303,9 +433,18 @@ class ETFilter_Main( ETFilter ):
     
     def _get_implicit_predata(self, C, R, x_hat_start, P_start, meas):
         x_ref = self._get_common_filter_states(meas.src_id).x_hat
-        mu = C.dot( self.x_hat - x_hat_start )
-        Qe = C.dot( P_start.dot( C.T )) + R
-        alpha = C.dot( x_ref - x_hat_start )
+        if meas.is_linear_meas:
+            mu = C.dot(self.x_hat) - C.dot(x_hat_start )
+            Qe = C.dot( P_start.dot( C.T )) + R
+            alpha = C.dot( x_ref) - C.dot(x_hat_start )
+        else: # Nonlinear Measurement
+            mu0 = self._get_nonlinear_expected_meas(meas, self.x_hat) 
+            mu1 = self._get_nonlinear_expected_meas(meas, x_hat_start)
+            mu = mu0 - mu1
+            Qe = Qe = C.dot( P_start.dot( C.T )) + R
+            alpha0 = self._get_nonlinear_expected_meas(meas, x_ref)
+            alpha1 = self._get_nonlinear_expected_meas(meas, x_hat_start)
+            alpha = alpha0 - alpha1
         if self._is_angle_meas(meas, check_implicit=True):
             mu = self._normalize_angle(mu)
             alpha = self._normalize_angle(alpha)

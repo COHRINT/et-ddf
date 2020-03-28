@@ -99,6 +99,14 @@ class Asset:
             return LinRelx_Implicit(meas.src_id, meas.measured_asset, meas.R, meas.et_delta)
         elif isinstance(meas, LinRely_Explicit):
             return LinRely_Implicit(meas.src_id, meas.measured_asset, meas.R, meas.et_delta)
+        elif isinstance(meas, Azimuth_Explicit):
+            return Azimuth_Implicit(meas.src_id, meas.measured_asset, meas.R, meas.et_delta)
+        elif isinstance(meas, AzimuthGlobal_Explicit):
+            return AzimuthGlobal_Implicit(meas.src_id, meas.global_pos, meas.R, meas.et_delta)
+        elif isinstance(meas, Range_Explicit):
+            return Range_Implicit(meas.src_id, meas.measured_asset, meas.R, meas.et_delta)
+        elif isinstance(meas, RangeGlobal_Explicit):
+            return RangeGlobal_Implicit(meas.src_id, meas.global_pos, meas.R, meas.et_delta)
         else:
             raise NotImplementedError("Implicit equivalent not found: " + meas.__class__.__name__)
 
