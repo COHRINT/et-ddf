@@ -44,8 +44,14 @@ class ETFilter(object):
             raise Exception("meas must of type Measurement")
         if self._is_angle_meas(meas):
             meas.data = self._normalize_angle(meas.data)
-        
+
         self.meas_queue.append(meas)
+
+        # Check if this is our first meas of asset
+        # If the meas is a range/bearing, instantiate the asset at measurement mean
+        if isinstance(meas, Azimuth_Explicit) or isinstance(meas, Range_Explicit):
+            if self.P[meas.measured_asset*self.num_ownship_states, meas.measured_asset*self.num_ownship_states] > (100/2)**2:
+                self._instantiate_asset_range_bearing(meas.measured_asset)
     
     def predict(self, u, Q):
         if u.shape[1] > u.shape[0]:
@@ -69,20 +75,20 @@ class ETFilter(object):
         x_hat_start = self.x_hat
         P_start = self.P
         for meas in self.meas_queue:
-            # if DEBUG:
-            #     print("Fusing " + meas.__class__.__name__ + " w/ data: " + str(meas.data))
-            #     print("State of Filter:")
-            #     print("x_hat")
-            #     print(self.x_hat)
-            #     print("P")
-            #     print(self.P)
-                
+            if DEBUG:
+                print("Fusing " + meas.__class__.__name__ + " w/ data: " + str(meas.data))
+                print("State of Filter:")
+                print("x_hat")
+                print(self.x_hat)
+                print("P")
+                print(self.P)
+
             K, C = None, None
             R = meas.R
             if isinstance(meas, Explicit):
                 C = self._get_measurement_jacobian(meas)
                 K = self._get_kalman_gain(C, R)
-                innovation = self._get_innovation(meas, C).reshape(1,1)
+                innovation = self._get_innovation(meas, C).reshape(1,1)                
                 self.x_hat += np.dot( K, innovation)
                 self.P = ( np.eye(self.num_states) - np.dot(K, C) ).dot(self.P)
             else: # Implicit Update
@@ -95,13 +101,19 @@ class ETFilter(object):
                 self.x_hat += np.dot(K, z_bar)
                 self.P = self.P - curly_theta * K.dot(C.dot(self.P))
             self.x_hat = self._normalize_all_angles( self.x_hat )
+            # if isinstance(meas, Azimuth_Explicit) and self.my_id == 1 and meas.measured_asset == 2:
+            #     print("Just fused: " + meas.__class__.__name__)
+            #     print("new state: \n" + str(self.x_hat))
+            #     red_team_u = self.P[2*self.num_ownship_states:2*self.num_ownship_states+2, 2*self.num_ownship_states:2*self.num_ownship_states+2]
+            #     print("Red Team Uncertainty: \n" + str(2*np.sqrt(red_team_u)))
+            #     raise Exception("ya done!")
         # Clear measurement queue
         self.meas_queue = []
 
     # If ETFilter_Main, method is overridden
     def _get_implicit_predata(self, C, R, x_hat_start, P_start, meas):
         mu = alpha = 0 # mu, alpha cancel out in the common information filter, not the case in main filter
-        Qe = C.dot( P_start.dot( C.T )) + R
+        Qe = np.abs( C.dot( P_start.dot( C.T )) + R )
         return mu, Qe, alpha
 
     def _get_innovation(self, meas, C):
@@ -286,6 +298,51 @@ class ETFilter(object):
                 return np.sqrt( diff_x**2 + diff_y**2 )
         else:
             raise NotImplementedError("Nonlinear Measurement Innovation not implemented for: " + meas.__class__.__name__)
+
+    def _instantiate_asset_range_bearing(self, asset_id):
+        if self.world_dim == 2:
+            range_meas = [x for x in self.meas_queue if (isinstance(x, Range_Explicit) and x.measured_asset == asset_id)]
+            az_meas = [x for x in self.meas_queue if (isinstance(x, Azimuth_Explicit) and x.measured_asset == asset_id)]
+            if not range_meas or not az_meas: # still waiting on other meas
+                return
+            else: # instantiate gaussian of asset at measurement mean
+                r = range_meas[0].data
+                az = az_meas[0].data
+                # print("range: " + str(r))
+                # print("az: " + str(az))
+                src_id = range_meas[0].src_id
+                src_yaw = self.x_hat[ src_id * self.num_ownship_states + 2,0]
+                cov_ori = az + src_yaw
+                mean_x = r * np.cos(cov_ori) + self.x_hat[src_id*self.num_ownship_states,0]
+                mean_y = r * np.sin(cov_ori) + self.x_hat[src_id*self.num_ownship_states+1,0]
+                prev_state = deepcopy(self.x_hat)
+                # Find covariance from eigendata
+                r_var = range_meas[0].R
+                az_var = range_meas[0].R
+                eig_az = r * np.tan(az_var)
+                e_vec = np.array([[np.cos(cov_ori), np.sin(cov_ori)]]).T
+                e_vec2 = np.array([[np.cos(cov_ori + np.pi/2), np.sin(cov_ori + np.pi/2)]]).T
+                S = np.concatenate((e_vec, e_vec2), axis=1)
+                D = np.zeros((2,2)); D[0,0] = r_var; D[1,1] = eig_az
+                A = np.dot( np.dot(S,D), np.linalg.inv(S) )
+                self.x_hat[asset_id*self.num_ownship_states,0] = mean_x
+                self.x_hat[asset_id*self.num_ownship_states+1,0] = mean_y
+
+                # Zero out cov columns
+                for col in range(self.num_ownship_states):
+                    self.P[:, asset_id*self.num_ownship_states+col] = np.zeros(self.num_states)
+                for row in range(self.num_ownship_states):
+                    self.P[asset_id*self.num_ownship_states+row,:] = np.zeros(self.num_states)
+                self.P[asset_id*self.num_ownship_states:asset_id*self.num_ownship_states+2, asset_id*self.num_ownship_states:asset_id*self.num_ownship_states+2] = A
+                self.P[asset_id*self.num_ownship_states+2,asset_id*self.num_ownship_states+2] = 9
+                self.meas_queue.remove(range_meas[0])
+                self.meas_queue.remove(az_meas[0])
+
+                # print("instantiating asset at " + str(self.x_hat[asset_id*self.num_ownship_states:asset_id*self.num_ownship_states+2,0]))
+                # print("rel x: "+ str(r * np.cos(cov_ori)))
+                # print("rel y: " + str(r * np.sin(cov_ori)))
+                # print("prev state: \n" + str(prev_state))
+                # raise Exception("ya done")
     
     # Normalize Angle -pi to pi
     def _normalize_angle(self, angle):
@@ -441,7 +498,7 @@ class ETFilter_Main( ETFilter ):
             mu0 = self._get_nonlinear_expected_meas(meas, self.x_hat) 
             mu1 = self._get_nonlinear_expected_meas(meas, x_hat_start)
             mu = mu0 - mu1
-            Qe = Qe = C.dot( P_start.dot( C.T )) + R
+            Qe = np.abs(C.dot( P_start.dot( C.T )) + R)
             alpha0 = self._get_nonlinear_expected_meas(meas, x_ref)
             alpha1 = self._get_nonlinear_expected_meas(meas, x_hat_start)
             alpha = alpha0 - alpha1
