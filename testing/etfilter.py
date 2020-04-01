@@ -476,7 +476,7 @@ differs slightly from an ETFilter in its implicit measurement update
 If needs access to common filters for implicit measurement updates
 """
 class ETFilter_Main( ETFilter ):
-    def __init__(self, my_id, num_ownship_states, world_dim, x0, P0, predict_func, common_filters):
+    def __init__(self, my_id, num_ownship_states, world_dim, x0, P0, linear_dynamics, common_filters):
         """
         common_filters : dict
             key : int
@@ -484,7 +484,7 @@ class ETFilter_Main( ETFilter ):
             value : ETFiler
                 common filter between both assets
         """
-        super(ETFilter_Main, self).__init__(my_id, num_ownship_states, world_dim, x0, P0, predict_func)
+        super(ETFilter_Main, self).__init__(my_id, num_ownship_states, world_dim, x0, P0, linear_dynamics)
         self.is_main_fitler = True
         self.common_filters = common_filters
     

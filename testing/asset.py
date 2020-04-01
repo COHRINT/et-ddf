@@ -5,7 +5,7 @@ np.set_printoptions(suppress=True)
 
 class Asset:
 
-    def __init__(self, my_id, num_ownship_states, world_dim, x0, P0, predict_func, red_team=[]):
+    def __init__(self, my_id, num_ownship_states, world_dim, x0, P0, linear_dynamics, red_team=[]):
         self.my_id = my_id
 
         self.num_states = x0.size
@@ -15,10 +15,10 @@ class Asset:
         self.common_filters = {}
         for i in range(self.num_assets):
             if (i != my_id) and (i not in red_team):
-                self.common_filters[i] = ETFilter(my_id, num_ownship_states, world_dim, x0, P0, predict_func)
+                self.common_filters[i] = ETFilter(my_id, num_ownship_states, world_dim, x0, P0, linear_dynamics)
 
         # Initialize asset's primary filter
-        self.main_filter = ETFilter_Main(my_id, num_ownship_states, world_dim, x0, P0, predict_func, self.common_filters)
+        self.main_filter = ETFilter_Main(my_id, num_ownship_states, world_dim, x0, P0, linear_dynamics, self.common_filters)
     
     def receive_meas(self, meas, shareable=True):
         self.main_filter.add_meas(meas)
