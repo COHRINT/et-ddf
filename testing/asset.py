@@ -46,6 +46,7 @@ class Asset:
     def predict(self, u, Q):
         self.main_filter.predict(u, Q)
         for asset_id in self.common_filters.keys():
+            # Other assets don't have access to our control input, so they assume constant velocity
             self.common_filters[asset_id].predict(np.zeros(u.shape), Q)
 
     def correct(self):
@@ -53,56 +54,31 @@ class Asset:
         for asset_id in self.common_filters.keys():
             self.common_filters[asset_id].correct()
 
-    def print_filters(self, main_only=False, mean_only=False, cov_sd_form=True, round_dec=2):
-        asset_ids = np.linspace(0, self.num_assets-1, self.num_assets).reshape(-1,1)
-        num_ownship_states = int(self.num_states / self.num_assets)
-        z = (np.zeros((self.num_assets, num_ownship_states)) + asset_ids).reshape(-1,1)
-
-        x_hat = np.matrix.round( deepcopy(self.main_filter.x_hat), round_dec)
-        P = deepcopy(self.main_filter.P)
-        print(str(self.my_id)+"'s Main Filter")
-        print(np.concatenate((z,x_hat),axis=1))
-        if not mean_only:
-            if cov_sd_form:
-                print(np.matrix.round( 2*np.sqrt(P), round_dec))
-            else:
-                print(np.matrix.round(P, round_dec))
-
-        if not main_only:
-            print("----------")
-            for asset_id in self.common_filters.keys():
-                print(str(self.my_id) + "_" + str(asset_id) + " common filter")
-                x_hat = np.matrix.round( deepcopy(self.common_filters[asset_id].x_hat), round_dec)
-                P = deepcopy(self.common_filters[asset_id].P)
-                print(x_hat)
-                if not mean_only:
-                    if cov_sd_form:
-                        print(np.matrix.round( 2*np.sqrt(P), round_dec))
-                    else:
-                        print(np.matrix.round(P, round_dec))
-                print("----------")
-
     def _get_implicit_msg_equivalent(self, meas):
         if isinstance(meas, GPSx_Explicit):
             return GPSx_Implicit(meas.src_id, meas.R, meas.et_delta)
         elif isinstance(meas, GPSy_Explicit):
             return GPSy_Implicit(meas.src_id, meas.R, meas.et_delta)
+        elif isinstance(meas, GPSz_Explicit):
+            return GPSz_Implicit(meas.src_id, meas.R, meas.et_delta)
         elif isinstance(meas, GPSyaw_Explicit):
             return GPSyaw_Implicit(meas.src_id, meas.R, meas.et_delta)
         elif isinstance(meas, GPSx_Neighbor_Explicit):
             return GPSx_Neighbor_Implicit(meas.src_id, meas.neighbor_id, meas.R, meas.et_delta)
         elif isinstance(meas, GPSy_Neighbor_Explicit):
             return GPSy_Neighbor_Implicit(meas.src_id, meas.neighbor_id, meas.R, meas.et_delta)
+        elif isinstance(meas, GPSz_Neighbor_Explicit):
+            return GPSz_Neighbor_Implicit(meas.src_id, meas.neighbor_id, meas.R, meas.et_delta)
         elif isinstance(meas, GPSyaw_Neighbor_Explicit):
             return GPSyaw_Neighbor_Implicit(meas.src_id, meas.neighbor_id, meas.R, meas.et_delta)
-        elif isinstance(meas, LinRelx_Explicit):
-            return LinRelx_Implicit(meas.src_id, meas.measured_asset, meas.R, meas.et_delta)
-        elif isinstance(meas, LinRely_Explicit):
-            return LinRely_Implicit(meas.src_id, meas.measured_asset, meas.R, meas.et_delta)
         elif isinstance(meas, Azimuth_Explicit):
             return Azimuth_Implicit(meas.src_id, meas.measured_asset, meas.R, meas.et_delta)
         elif isinstance(meas, AzimuthGlobal_Explicit):
             return AzimuthGlobal_Implicit(meas.src_id, meas.global_pos, meas.R, meas.et_delta)
+        elif isinstance(meas, Elevation_Explicit):
+            return Elevation_Implicit(meas.src_id, meas.measured_asset, meas.R, meas.et_delta)
+        elif isinstance(meas, ElevationGlobal_Explicit):
+            return ElevationGlobal_Implicit(meas.src_id, meas.global_pos, meas.R, meas.et_delta)
         elif isinstance(meas, Range_Explicit):
             return Range_Implicit(meas.src_id, meas.measured_asset, meas.R, meas.et_delta)
         elif isinstance(meas, RangeGlobal_Explicit):

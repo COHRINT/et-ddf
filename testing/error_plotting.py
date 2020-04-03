@@ -42,6 +42,23 @@ def get_plot_labels(num_states, num_ownship_states, asset_id):
                     final_title = title + "y_dot"
                 elif j == 5:
                     final_title = title + "yaw_dot"
+            elif num_ownship_states == 8:
+                if j == 0:
+                    final_title = title + "x"
+                elif j == 1:
+                    final_title = title + "y"
+                elif j == 2:
+                    final_title = title + "z"
+                elif j == 3:
+                    final_title = title + "yaw"
+                elif j == 4:
+                    final_title = title + "x_dot"
+                elif j == 5:
+                    final_title = title + "y_dot"
+                elif j == 7:
+                    final_title = title + "z_dot"
+                elif j == 6:
+                    final_title = title + "yaw_dot"
             state_correspondence[(i*num_ownship_states)+j] = final_title
     return state_correspondence
 

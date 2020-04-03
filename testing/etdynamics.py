@@ -9,18 +9,19 @@ from copy import deepcopy
 def nonlinear_propagation(x, u, world_dim, num_ownship_states, my_id):
     x_state = deepcopy(x)
     u_input = deepcopy(u)
-    x_state[my_id * num_ownship_states + 3,0] = u_input[0,0] # speed
-    x_state[my_id * num_ownship_states + 5,0] = u_input[1,0] # angular velocity
+    x_state[my_id * num_ownship_states + 4,0] = u_input[0,0] # speed
+    x_state[my_id * num_ownship_states + 6,0] = u_input[1,0] # z_dot
+    x_state[my_id * num_ownship_states + 7,0] = u_input[2,0] # angular velocity
 
     num_states = x_state.size
     num_assets = int( num_states / num_ownship_states)
     G = np.zeros((num_states, num_states))
     for a in range(num_assets):
         start_index = a*num_ownship_states
-        s = x_state[start_index + 3,0]
-        theta_dot = x_state[start_index + 5,0]
+        s = x_state[start_index + 4,0]
+        theta_dot = x_state[start_index + 7,0]
 
-        theta_initial = x_state[start_index+2,0]
+        theta_initial = x_state[start_index+3,0]
         def dynamics(t, z):
             _x_dot = s * np.cos(z[2])
             _y_dot = s * np.sin(z[2])
@@ -28,12 +29,16 @@ def nonlinear_propagation(x, u, world_dim, num_ownship_states, my_id):
             return np.array([_x_dot, _y_dot, _theta_dot])
 
         t_init, t_final = 0, 1
-        z_init = x_state[start_index:start_index + 3,0]
+        z_init = np.concatenate( (x_state[start_index:start_index + 2,0], np.array([theta_initial])) )
         r = integrate.RK45(dynamics, t_init, z_init, t_final)
         while r.status == "running":
             status = r.step()
 
-        x_state[start_index: start_index+3,0] = r.y
+        x_state[start_index:start_index+2,0] = r.y[:2]
+        x_state[start_index+3,0] = r.y[2]
+
+        # Depth state change
+        x_state[start_index+2,0] = x_state[start_index+2,0] + x_state[start_index+6,0]
 
     return x_state
 
