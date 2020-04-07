@@ -52,7 +52,7 @@ class ETFilter(object):
 
         # Check if this is our first meas of asset
         # If the meas is a range/bearing, instantiate the asset at measurement mean
-        if isinstance(meas, Azimuth_Explicit) or isinstance(meas, Range_Explicit):
+        if isinstance(meas, Azimuth_Explicit) or isinstance(meas, Range_Explicit) or isinstance(meas, Elevation_Explicit):
             if self.P[meas.measured_asset*self.num_ownship_states, meas.measured_asset*self.num_ownship_states] > NO_ASSET_INFORMATION:
                 self._instantiate_asset_range_bearing(meas.measured_asset)
     
@@ -280,6 +280,7 @@ class ETFilter(object):
             diff_z = other_z - src_z
 
             all_diff = diff_x**2 + diff_y**2 + diff_z**2
+            all_diff = all_diff if all_diff > 0.01 else 0.01 # Division by zero protection
             
             ## Own asset part of jacobian
             # d_el / dx_src
@@ -291,11 +292,11 @@ class ETFilter(object):
 
             ## Other Asset part of jacobian
             # d_el / dx_other
-            C[0, meas_id*self.num_ownship_states] = -C[0, src_id*self.num_ownship_states,0]
+            C[0, meas_id*self.num_ownship_states] = -C[0, src_id*self.num_ownship_states]
             # d_el / dy_other
-            C[0, meas_id*self.num_ownship_states+1] = -C[0, src_id*self.num_ownship_states,0]
+            C[0, meas_id*self.num_ownship_states+1] = -C[0, src_id*self.num_ownship_states]
             # d_el / dz_other
-            C[0, meas_id*self.num_ownship_states+2] = -C[0, src_id*self.num_ownship_states+2,0]
+            C[0, meas_id*self.num_ownship_states+2] = -C[0, src_id*self.num_ownship_states+2]
         elif isinstance(meas, ElevationGlobal_Explicit) or isinstance(meas, ElevationGlobal_Implicit):
             src_x = self.x_hat[meas.src_id*self.num_ownship_states,0]
             src_y = self.x_hat[meas.src_id*self.num_ownship_states+1,0]
@@ -507,6 +508,10 @@ class ETFilter(object):
                 self.meas_queue.remove(range_meas[0])
                 self.meas_queue.remove(az_meas[0])
                 self.meas_queue.remove(el_meas[0])
+
+                # print("spawning other asset at: ")
+                # print(self.x_hat[asset_id*self.num_ownship_states:(asset_id+1)*self.num_ownship_states,0])
+                # raise Exception("ya done")
     
     # Normalize Angle -pi to pi
     def _normalize_angle(self, angle):
@@ -615,12 +620,6 @@ class ETFilter(object):
             
             # Construct this asset's part of jacobian
             if self.world_dim == 2:
-                G[start_index,start_index] = 1
-                G[start_index + 1,start_index + 1] = 1
-                G[start_index + 2, start_index + 2] = 1
-                G[start_index + 3, start_index + 3] = 1
-                G[start_index + 4, start_index + 4] = 1
-                G[start_index + 5, start_index + 5] = 1
                 G[start_index + 2, start_index + 5] = 1
                 G[start_index, start_index + 2] = -s * np.sin(theta_initial + theta_dot/2)
                 G[start_index + 1, start_index + 2] = s * np.cos(theta_initial + theta_dot/2)

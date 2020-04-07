@@ -55,9 +55,9 @@ def get_plot_labels(num_states, num_ownship_states, asset_id):
                     final_title = title + "x_dot"
                 elif j == 5:
                     final_title = title + "y_dot"
-                elif j == 7:
-                    final_title = title + "z_dot"
                 elif j == 6:
+                    final_title = title + "z_dot"
+                elif j == 7:
                     final_title = title + "yaw_dot"
             state_correspondence[(i*num_ownship_states)+j] = final_title
     return state_correspondence
@@ -119,6 +119,9 @@ def plot_truth_data(bag, num_ownship_states):
     # plt.close()
 
 def plot_data(bag, num_ownship_states, num_assets, global_gps_src):
+
+    # TODO Was last used for 2D, may need to be updated for 3D
+
     num_points = 500
     pts = np.linspace(0, 2*np.pi, num_points)
     x_pts = 2*np.cos(pts)
@@ -131,7 +134,7 @@ def plot_data(bag, num_ownship_states, num_assets, global_gps_src):
     y_lim_pos = 12
     y_lim_neg = -12
     seq = 0
-    for [x_truth, x_hat0, P0, x_hat1, P1, asset0_comms, msg_names] in bag:
+    for [x_truth, x_hat0, P0, x_hat1, P1] in bag:
         #### ASSET 0 ####
         ax = plt.subplot(1, 2, 1, aspect="equal", adjustable="box-forced")
         ax.yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
@@ -140,9 +143,6 @@ def plot_data(bag, num_ownship_states, num_assets, global_gps_src):
 
         penetration_rect = mpatches.Rectangle((-10,-5), 20,10, ls="--", color="black", fill=False)
         ax.add_patch(penetration_rect)
-
-        if asset0_comms:
-            ax.text(-16,-11, msg_names)
 
         color_array = ["b","g","r"]
         for i in range(num_assets):
@@ -187,9 +187,6 @@ def plot_data(bag, num_ownship_states, num_assets, global_gps_src):
         ax1.scatter(global_gps_src[0,0], global_gps_src[1,0], c="k", label="truth", s=20, marker="s")
         penetration_rect = mpatches.Rectangle((-10,-5), 20,10, ls="--", color="black", fill=False)
         ax1.add_patch(penetration_rect)
-
-        if not asset0_comms:
-            ax1.text(-16,-11, msg_names)
 
         color_array = ["b","g","r"]
         for i in range(num_assets):

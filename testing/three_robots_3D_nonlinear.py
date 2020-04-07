@@ -16,9 +16,10 @@ from pdb import set_trace
 # np.random.seed(1)
 
 DEBUG = False
+NO_ASSET_INFORMATION = 100**2
 
 # Simple simulation
-K = 1000
+K = 500
 world_dim = 3
 num_assets = 2
 num_ownship_states = 8
@@ -32,66 +33,88 @@ def main():
 
     ######## DEFINE STATE && UNCERTAINTY #############
 
-    # GOOD SIM: Red team 7.5, -25
-    # x_truth = np.array([[10,5,np.pi,0,0,0,
-    #                     -10,-5,0,0,0,0,
-    #                     7.5,-25,np.pi/2,0,0,0]], dtype=np.float64).T
     x_truth = np.array([[0,0,0,0,0,0,0,0,
-                        -10,-5,-2,0,0,0,0,0]], dtype=np.float64).T
-    P_initial = np.array([[.5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-                          [0,.5,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-                          [0,0,.5,0,0,0,0,0,0,0,0,0,0,0,0,0],
-                          [0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0],
-                          [0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0],
-                          [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-                          [0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0],
-                          [0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0],
-                          [0,0,0,0,0,0,0,0,.5,0,0,0,0,0,0,0],
-                          [0,0,0,0,0,0,0,0,0,.5,0,0,0,0,0,0],
-                          [0,0,0,0,0,0,0,0,0,0,.5,0,0,0,0,0],
-                          [0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0],
-                          [0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0],
-                          [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-                          [0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0],
-                          [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1]], dtype=np.float64).T
+                        -10,-5,-2,0,0,0,0,0,
+                        7,-25,np.pi/2,0,0,0,0,0]], dtype=np.float64).T
+    P_initial = np.array([[.5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                          [0,.5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                          [0,0,.5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                          [0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                          [0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                          [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                          [0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                          [0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                          [0,0,0,0,0,0,0,0,.5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                          [0,0,0,0,0,0,0,0,0,.5,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                          [0,0,0,0,0,0,0,0,0,0,.5,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                          [0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0],
+                          [0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0],
+                          [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                          [0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0],
+                          [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0],
+                          [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,NO_ASSET_INFORMATION,0,0,0,0,0,0,0],
+                          [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,NO_ASSET_INFORMATION,0,0,0,0,0,0],
+                          [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,NO_ASSET_INFORMATION,0,0,0,0,0],
+                          [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,0,0,0,0],
+                          [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,0,0,0],
+                          [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,0,0],
+                          [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,0],
+                          [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9]], dtype=np.float64).T
 
     ####### DEFINE PROCESS NOISE #######
     q = 0.01
     q_yaw = 0.01
 
     ####### DEFINE PERCEIVED PROCESS NOISE #######
-    Q_perceived0 = np.array([[.001,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-                          [0,.001,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-                          [0,0,.01,0,0,0,0,0,0,0,0,0,0,0,0,0],
-                          [0,0,0,.01,0,0,0,0,0,0,0,0,0,0,0,0],
-                          [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-                          [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-                          [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-                          [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-                          [0,0,0,0,0,0,0,0,.01,0,0,0,0,0,0,0],
-                          [0,0,0,0,0,0,0,0,0,.01,0,0,0,0,0,0],
-                          [0,0,0,0,0,0,0,0,0,0,.01,0,0,0,0,0],
-                          [0,0,0,0,0,0,0,0,0,0,0,.01,0,0,0,0],
-                          [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-                          [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-                          [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-                          [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]], dtype=np.float64).T
-    Q_perceived1 = np.array([[.01,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-                          [0,.01,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-                          [0,0,.01,0,0,0,0,0,0,0,0,0,0,0,0,0],
-                          [0,0,0,.01,0,0,0,0,0,0,0,0,0,0,0,0],
-                          [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-                          [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-                          [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-                          [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-                          [0,0,0,0,0,0,0,0,.001,0,0,0,0,0,0,0],
-                          [0,0,0,0,0,0,0,0,0,.001,0,0,0,0,0,0],
-                          [0,0,0,0,0,0,0,0,0,0,.01,0,0,0,0,0],
-                          [0,0,0,0,0,0,0,0,0,0,0,.01,0,0,0,0],
-                          [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-                          [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-                          [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-                          [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]], dtype=np.float64).T
+    Q_perceived0 = np.array([[.001,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                            [0,.001,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                            [0,0,.001,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                            [0,0,0,.01,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                            [0,0,0,0,0,0,0,0,.1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                            [0,0,0,0,0,0,0,0,0,.1,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                            [0,0,0,0,0,0,0,0,0,0,.1,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                            [0,0,0,0,0,0,0,0,0,0,0,.1,0,0,0,0,0,0,0,0,0,0,0,0],
+                            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,.1,0,0,0,0,0,0,0],
+                            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,.1,0,0,0,0,0,0],
+                            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,.1,0,0,0,0,0],
+                            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,.1,0,0,0,0],
+                            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,.01,0,0,0],
+                            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]], dtype=np.float64).T
+    Q_perceived1 = np.array([[.1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                            [0,.1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                            [0,0,.1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                            [0,0,0,.1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                            [0,0,0,0,0,0,0,0,.001,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                            [0,0,0,0,0,0,0,0,0,.001,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                            [0,0,0,0,0,0,0,0,0,0,.001,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                            [0,0,0,0,0,0,0,0,0,0,0,.01,0,0,0,0,0,0,0,0,0,0,0,0],
+                            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,.1,0,0,0,0,0,0,0],
+                            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,.1,0,0,0,0,0,0],
+                            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,.1,0,0,0,0,0],
+                            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,.1,0,0,0,0],
+                            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,.01,0,0,0],
+                            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]], dtype=np.float64).T
+
     ###### DEFINE DYNAMICS #########
     linear_dynamics_status = False
 
@@ -118,8 +141,10 @@ def main():
 
     ########## INITIALIZE ASSETS ##########
     asset_starting = deepcopy(x_truth)
-    # asset_starting[2*num_ownship_states,0] = RED_ASSET_START
-    # asset_starting[2*num_ownship_states+1,0] = RED_ASSET_START
+    asset_starting[2*num_ownship_states,0] = RED_ASSET_START
+    asset_starting[2*num_ownship_states+1,0] = RED_ASSET_START
+    asset_starting[2*num_ownship_states+2,0] = RED_ASSET_START
+
     asset_list = []
     asset = Asset(0, num_ownship_states, world_dim, asset_starting, P_initial, linear_dynamics_status, red_team=[2])
     asset1 = Asset(1, num_ownship_states, world_dim, asset_starting, P_initial, linear_dynamics_status, red_team=[2])
@@ -147,22 +172,18 @@ def main():
         ########## DEFINE CONTROL INPUT ##########
         u0 = np.array([[0.1, -0.0, np.pi/50]], dtype=np.float64).T # Speed, depth speed, ang velocity
         u1 = np.array([[0.1, 0.0, -np.pi/50]], dtype=np.float64).T
-        # u0 = get_control(asset.main_filter.x_hat, 0)
-        # u1 = get_control(asset1.main_filter.x_hat, 1)
-        # u0 = get_control(x_truth, 0)
-        # u1 = get_control(x_truth, 1)
-        # u2 = np.array([[0.1, 0]], dtype=np.float64).T
+        u2 = np.array([[0.2, 0.0, np.pi/30]], dtype=np.float64).T
 
         ########## SIMULATE TRUTH MOTION ##########
         x_truth0 = nonlinear_propagation(x_truth, u0, world_dim, num_ownship_states, 0)
         x_truth0[3,0] = normalize_angle(x_truth0[3,0])
         x_truth1 = nonlinear_propagation(x_truth, u1, world_dim, num_ownship_states, 1)
         x_truth1[num_ownship_states+3,0] = normalize_angle(x_truth1[num_ownship_states+3,0])
-        # x_truth2 = nonlinear_propagation(x_truth, u2, world_dim, num_ownship_states, 2)
-        # x_truth2[2,0] = normalize_angle(x_truth2[2,0])
+        x_truth2 = nonlinear_propagation(x_truth, u2, world_dim, num_ownship_states, 2)
+        x_truth2[num_ownship_states+3,0] = normalize_angle(x_truth2[num_ownship_states+3,0])
         x_truth[:num_ownship_states,0] = x_truth0[:num_ownship_states].ravel()
         x_truth[num_ownship_states:2*num_ownship_states,0] = x_truth1[num_ownship_states:2*num_ownship_states].ravel()
-        # x_truth[2*num_ownship_states:3*num_ownship_states,0] = x_truth2[2*num_ownship_states:3*num_ownship_states].ravel()
+        x_truth[2*num_ownship_states:3*num_ownship_states,0] = x_truth2[2*num_ownship_states:3*num_ownship_states].ravel()
 
         
         ########## BAG TRUTH DATA ##########
@@ -179,9 +200,11 @@ def main():
         x_truth[num_ownship_states+1,0] += + np.random.normal(0, q)
         x_truth[num_ownship_states+2,0] += + np.random.normal(0, q)
         x_truth[num_ownship_states+3,0] = normalize_angle(x_truth[num_ownship_states+3,0] + np.random.normal(0, q_yaw) )
-        # x_truth[2*num_ownship_states,0] += + np.random.normal(0, q)
-        # x_truth[2*num_ownship_states+1,0] += + np.random.normal(0, q)
-        # x_truth[2*num_ownship_states+2,0] += + np.random.normal(0, q_yaw)
+
+        x_truth[2*num_ownship_states,0] += + np.random.normal(0, q)
+        x_truth[2*num_ownship_states+1,0] += + np.random.normal(0, q)
+        x_truth[2*num_ownship_states+2,0] += + np.random.normal(0, q)
+        x_truth[num_ownship_states+3,0] = normalize_angle(x_truth[num_ownship_states+3,0] + np.random.normal(0, q_yaw) )
 
         ########## PREDICTION STEP  ##########
         asset.predict(u0, Q_perceived0)
@@ -203,28 +226,38 @@ def main():
         gpsy1 = x_truth[num_ownship_states+1,0]
         gpsz1 = x_truth[num_ownship_states+2,0]
         gpsyaw1 = x_truth[num_ownship_states+3,0]
-        # gpsx2 = x_truth[2*num_ownship_states,0]
-        # gpsy2 = x_truth[2*num_ownship_states+1,0]
-        # gpsyaw2 = x_truth[2*num_ownship_states+2,0]
+        gpsx2 = x_truth[2*num_ownship_states,0]
+        gpsy2 = x_truth[2*num_ownship_states+1,0]
+        gpsz2 = x_truth[2*num_ownship_states+2,0]
+        gpsyaw2 = x_truth[2*num_ownship_states+3,0]
 
-        # Relative 01 bearing
-        # src_x = x_truth[0,0]
-        # src_y = x_truth[1,0]
-        # src_yaw = x_truth[2,0]
-        # other_x = x_truth[num_ownship_states,0]
-        # other_y = x_truth[num_ownship_states+1,0]
-        # diff_x = other_x - src_x
-        # diff_y = other_y - src_y
-        # bearing01 = np.arctan2(diff_y, diff_x) - src_yaw
+        # Relative 02 Range
+        src_x = x_truth[0,0]
+        src_y = x_truth[1,0]
+        src_z = x_truth[2,0]
+        other_x = x_truth[2*num_ownship_states,0]
+        other_y = x_truth[2*num_ownship_states+1,0]
+        other_z = x_truth[2*num_ownship_states+2,0]
+        diff_x = other_x - src_x
+        diff_y = other_y - src_y
+        diff_z = other_z - src_z
+        relRange02 = np.linalg.norm([diff_x, diff_y, diff_z])
 
-        # # Relative 01 Range
-        # src_x = x_truth[0,0]
-        # src_y = x_truth[1,0]
-        # other_x = x_truth[num_ownship_states,0]
-        # other_y = x_truth[num_ownship_states+1,0]
-        # diff_x = other_x - src_x
-        # diff_y = other_y - src_y
-        # range01 = np.sqrt(diff_x**2 + diff_y**2)
+        # Relative 02 Azimuth
+        src_x = x_truth[0,0]
+        src_y = x_truth[1,0]
+        src_yaw = x_truth[3,0]
+        other_x = x_truth[2*num_ownship_states,0]
+        other_y = x_truth[2*num_ownship_states+1,0]
+        diff_x = other_x - src_x
+        diff_y = other_y - src_y
+        relAzimuth02 = np.arctan2(diff_y, diff_x) - src_yaw
+
+        # Relative 02 Elevation
+        src_z = x_truth[2,0]
+        other_z = x_truth[2*num_ownship_states+2,0]
+        diff_z = other_z - src_z
+        relElevation02 = np.arcsin(diff_z / relRange02)
 
         # 01 Relative Range
         src_x = x_truth[0,0]
@@ -333,10 +366,10 @@ def main():
         gpsy1 += np.random.normal(0, r_gps)
         gpsz1 += np.random.normal(0, r_gps)
         gpsyaw1 += np.random.normal(0, r_gps_yaw)
-        # gpsx2 += np.random.normal(0, r_gps)
-        # gpsy2 += np.random.normal(0, r_gps)
-        # gpsyaw2 += np.random.normal(0, r_gps_yaw)
-        # gpsyaw2 += np.random.normal(0, r_bearing)
+        gpsx2 += np.random.normal(0, r_gps)
+        gpsy2 += np.random.normal(0, r_gps)
+        gpsz2 += np.random.normal(0, r_gps)
+        gpsyaw2 += np.random.normal(0, r_gps_yaw)
         # bearing01 += np.random.normal(0, r_bearing)
         relRange01 += np.random.normal(0, r_range)
         globalazimuth0 += np.random.normal(0, r_bearing)
@@ -346,12 +379,12 @@ def main():
         globalelevation1 += np.random.normal(0, r_bearing)
         globalrange1 += np.random.normal(0, r_range)
 
-        # relBearing02 += np.random.normal(0, r_bearing)
-        # relRange02 += np.random.normal(0, r_range)
+        relAzimuth02 += np.random.normal(0, r_bearing)
+        relRange02 += np.random.normal(0, r_range)
+        relElevation02 += np.random.normal(0, r_bearing)
+
         # relBearing12 += np.random.normal(0, r_bearing)
         # relRange12 += np.random.normal(0, r_range)
-
-        # STOP, CHECK PERFECT MEASUREMENTS
 
         ########## INITIALIZE MEASUREMENT TYPES ##########
         gpsx0_meas = GPSx_Explicit(0, gpsx0, r_gps_perceived, gps_xy_delta)
@@ -362,9 +395,11 @@ def main():
         gpsy1_meas = GPSy_Explicit(1, gpsy1, r_gps_perceived, gps_xy_delta)
         gpsz1_meas = GPSz_Explicit(1, gpsz1, r_gps_perceived, gps_xy_delta)
         gpsyaw1_meas = GPSyaw_Explicit(1, gpsyaw1, r_gps_yaw_perceived, gps_yaw_delta)
-        # gpsx2_meas0 = GPSx_Neighbor_Explicit(0, 2, gpsx2, r_gps_perceived, gps_xy_delta)
-        # gpsy2_meas0 = GPSy_Neighbor_Explicit(0, 2, gpsy2, r_gps_perceived, gps_xy_delta)
-        # gpsyaw2_meas0 = GPSyaw_Neighbor_Explicit(0,2, gpsyaw2, r_gps_yaw_perceived, gps_yaw_delta)
+        gpsx2_meas0 = GPSx_Neighbor_Explicit(0, 2, gpsx2, r_gps_perceived, gps_xy_delta)
+        gpsy2_meas0 = GPSy_Neighbor_Explicit(0, 2, gpsy2, r_gps_perceived, gps_xy_delta)
+        gpsz2_meas0 = GPSz_Neighbor_Explicit(0, 2, gpsz2, r_gps_perceived, gps_xy_delta)
+        gpsyaw2_meas0 = GPSyaw_Neighbor_Explicit(0,2, gpsyaw2, r_gps_yaw_perceived, gps_yaw_delta)
+
         # gpsx2_meas1 = GPSx_Neighbor_Explicit(1, 2, gpsx2, r_gps_perceived, gps_xy_delta)
         # gpsy2_meas1 = GPSy_Neighbor_Explicit(1, 2, gpsy2, r_gps_perceived, gps_xy_delta)
         # gpsyaw2_meas1 = GPSyaw_Neighbor_Explicit(1,2, gpsyaw2, r_gps_yaw_perceived, gps_yaw_delta)
@@ -376,6 +411,11 @@ def main():
         # bearing01_meas = Azimuth_Explicit(0,1, bearing01, r_bearing_perceived, bearing_delta)
         relRange01_meas = Range_Explicit(0, 1, relRange01, r_range_perceived, range_delta)
 
+
+        relRange02_meas = Range_Explicit(0, 2, relRange02, r_range_perceived, range_delta)
+        relAzimuth02_meas = Azimuth_Explicit(0,2, relAzimuth02, r_bearing_perceived, bearing_delta)
+        relElevation02_meas = Elevation_Explicit(0, 2, relElevation02, r_bearing_perceived, bearing_delta)
+
         globalazimuth0_meas = AzimuthGlobal_Explicit(0, global_gps_src, globalazimuth0, r_bearing_perceived, 0)
         globalelevation0_meas = ElevationGlobal_Explicit(0, global_gps_src, globalelevation0, r_bearing_perceived, 0)
         globalrange0_meas = RangeGlobal_Explicit(0, global_gps_src, globalrange0, r_range_perceived, 0)
@@ -383,42 +423,14 @@ def main():
         globalelevation1_meas = ElevationGlobal_Explicit(1, global_gps_src, globalelevation1, r_bearing_perceived, 0)
         globalrange1_meas = RangeGlobal_Explicit(1, global_gps_src, globalrange1, r_range_perceived, 0)
 
-        ########## ASSETS RECEIVE UNSHAREABLE MEASUREMNTS  ##########
-        # asset.receive_meas(gpsx0_meas, shareable=False)
-        # asset1.receive_meas(gpsx0_meas, shareable=False)
-        # asset1.receive_meas(gpsx1_meas, shareable=False)
-        # asset.receive_meas(gpsx2_meas, shareable=False)
-        # asset1.receive_meas(gpsx2_measp2, shareable=False)
-
-        # STOP, CHECK Improved estimation of asset by sharing
-
 
         ########## ASSETS SHARE MEASUREMENTS  ##########
-
-        # comms_successful = np.random.binomial(1, 1-comms_drop_prob)
-        # comms_success_cnt += comms_successful
-
-        # global0_comms = not (k % 3)
-        # global1_comms = not ((k+1) % 3)
-        # rel01_comms = not ((k+2) % 3)
-
-        # asset0_comms = (global0_comms or rel01_comms) and comms_successful
-        # asset1_comms = global1_comms and comms_successful
-
-        # print("asset0 comms: " + str(asset0_comms))
-        # print("asset1 comms: " + str(asset1_comms))
-        # print("global0 comms: " + str(global0_comms))
-        # print("global1 comms: " + str(global1_comms))
-        # print("rel01 comms: " + str(rel01_comms))
-        asset0_comms = True
-        asset1_comms = True
-
         shared_msgs = ""
         sharing = []
         # sharing.append(asset.receive_meas(gpsx0_meas, shareable=True))
         # sharing.append(asset.receive_meas(gpsy0_meas, shareable=True))
         sharing.append(asset.receive_meas(gpsz0_meas, shareable=True))
-        sharing.append(asset.receive_meas(gpsyaw0_meas, shareable=asset0_comms))
+        sharing.append(asset.receive_meas(gpsyaw0_meas, shareable=True))
 
         sharing.append(asset.receive_meas(globalelevation0_meas, shareable=True))
         sharing.append(asset.receive_meas(globalrange0_meas, shareable=True))
@@ -426,7 +438,7 @@ def main():
         # sharing.append(asset1.receive_meas(gpsx1_meas, shareable=True))
         # sharing.append(asset1.receive_meas(gpsy1_meas, shareable=True))
         sharing.append(asset1.receive_meas(gpsz1_meas, shareable=True))
-        sharing.append(asset1.receive_meas(gpsyaw1_meas, shareable=asset1_comms))
+        sharing.append(asset1.receive_meas(gpsyaw1_meas, shareable=True))
 
         sharing.append(asset1.receive_meas(globalelevation1_meas, shareable=True))
         sharing.append(asset1.receive_meas(globalrange1_meas, shareable=True))
@@ -434,30 +446,13 @@ def main():
 
         sharing.append(asset.receive_meas(relRange01_meas, shareable=True))
 
-        # diff02_x = x_truth[2*num_ownship_states,0] - x_truth[0,0]
-        # diff02_y = x_truth[2*num_ownship_states+1,0] - x_truth[1,0]
-        # ang_diff =normalize_angle( np.arctan2(diff02_y, diff02_x) - x_truth[2,0] )
-        # if np.linalg.norm([diff02_x, diff02_y]) < 10 and np.abs(ang_diff) < (65 * np.pi/180):
-        #     sharing.append(asset.receive_meas(bearing02_meas, shareable=asset0_comms))
-        #     sharing.append(asset.receive_meas(range02_meas, shareable=asset0_comms))
-
-        # diff12_x = x_truth[2*num_ownship_states,0] - x_truth[num_ownship_states,0]
-        # diff12_y = x_truth[2*num_ownship_states+1,0] - x_truth[num_ownship_states + 1,0]
-        # ang_diff =normalize_angle( np.arctan2(diff12_y, diff12_x) - x_truth[num_ownship_states + 2,0] )
-        # if np.linalg.norm([diff12_x, diff12_y]) < 10 and np.abs(ang_diff) < (65 * np.pi/180):
-        #     sharing.append(asset1.receive_meas(bearing12_meas, shareable=asset1_comms))
-        #     sharing.append(asset1.receive_meas(range12_meas, shareable=asset1_comms))
-        
-        # # Asset 0 passing gps to asset 1
-        # if rel01_comms and comms_successful:
-        #     sharing.append(asset.receive_meas(bearing01_meas, shareable=True))
-        #     sharing.append(asset.receive_meas(range01_meas, shareable=True))
-        # elif global0_comms and comms_successful:
-        #     sharing.append(asset.receive_meas(globalbearing0_meas, shareable=True))
-        #     sharing.append(asset.receive_meas(globalrange0_meas, shareable=True))
-        # elif global1_comms and comms_successful:
-        #     sharing.append(asset1.receive_meas(globalbearing1_meas, shareable=True))
-        #     sharing.append(asset1.receive_meas(globalrange1_meas, shareable=True))
+        sharing.append(asset.receive_meas(relRange02_meas, shareable=True))
+        sharing.append(asset.receive_meas(relAzimuth02_meas, shareable=True))
+        sharing.append(asset.receive_meas(relElevation02_meas, shareable=True))
+        # sharing.append(asset.receive_meas(gpsx2_meas0, shareable=True))
+        # sharing.append(asset.receive_meas(gpsy2_meas0, shareable=True))
+        # sharing.append(asset.receive_meas(gpsz2_meas0, shareable=True))
+        # sharing.append(asset.receive_meas(gpsyaw2_meas0, shareable=True))
 
         # Share measurements
         for s in sharing:
@@ -538,10 +533,10 @@ def main():
         mf0_P = deepcopy(asset.main_filter.P)
         mf1_xhat = deepcopy(asset1.main_filter.x_hat)
         mf1_P = deepcopy(asset1.main_filter.P)
-        plotting_bag.append([deepcopy(x_truth), mf0_xhat, mf0_P, mf1_xhat, mf1_P, asset0_comms, shared_msgs])
+        plotting_bag.append([deepcopy(x_truth), mf0_xhat, mf0_P, mf1_xhat, mf1_P])
         # set_trace()
 
-    # STEP CHECK MEAN ESTIMATES ARE DECENT
+    # 2D Movie Creating Scenario
     # print(x_truth)
     # print(asset.main_filter.x_hat)
     # print(asset1.main_filter.x_hat)
@@ -552,9 +547,6 @@ def main():
     # PLOT ERROR BOUNDS
     plot_error(x_truth_bag, x_hat_bag0, p_bag0, num_ownship_states, 0)
     plot_error(x_truth_bag, x_hat_bag1, p_bag1, num_ownship_states, 1)
-    print(x_truth)
-    print("x_hat0: \n" + str(asset.main_filter.x_hat))
-    print("x_hat1: \n" + str(asset1.main_filter.x_hat))
 
 asset_goal_indices = [1,3]
 goal_thresh = 1

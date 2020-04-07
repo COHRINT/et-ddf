@@ -1,7 +1,6 @@
 from __future__ import division
 from etfilter import *
 import numpy as np
-np.set_printoptions(suppress=True)
 
 class Asset:
 
