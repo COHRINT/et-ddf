@@ -13,7 +13,7 @@ from copy import deepcopy
 
 from pdb import set_trace
 
-# np.random.seed(1)
+np.random.seed(1)
 
 DEBUG = False
 NO_ASSET_INFORMATION = 100**2
@@ -21,7 +21,7 @@ NO_ASSET_INFORMATION = 100**2
 # Simple simulation
 K = 500
 world_dim = 3
-num_assets = 2
+num_assets = 3
 num_ownship_states = 8
 num_states = num_ownship_states * num_assets
 
