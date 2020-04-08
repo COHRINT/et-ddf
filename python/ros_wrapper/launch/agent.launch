@@ -7,6 +7,7 @@
     <arg name="sensors" default="false" />
     <arg name="config_path" default="$(find etddf_ros)/config/ros_agent_config.yaml" />
     <arg name="sensor_config_path" default="$(find etddf_ros)/config/sensor_sim_config.yaml" />
+    <arg name="simulate_comms" default="true"/>
 
     <!-- Load parameters from config -->
     <rosparam command="load" file="$(arg config_path)" />
@@ -15,7 +16,9 @@
     <param name="log_level" type="string" value="$(arg log_level)" />
 
     <!-- ET-DDF nodes -->
-    <node name="comms_module" pkg="etddf_ros" type="comms.py" />
+    <group if="$(arg simulate_comms)">
+        <node name="comms_module" pkg="etddf_ros" type="comms.py" />
+    </group>
     <node name="agent" pkg="etddf_ros" type="agent_wrapper.py" output="screen" />
 
     <!-- Simulation-related nodes -->
