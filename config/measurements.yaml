@@ -1,0 +1,3 @@
+measurement:
+  et_delta: 1.0
+  default_variance: 0.5

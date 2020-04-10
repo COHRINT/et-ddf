@@ -70,7 +70,7 @@ def plot_error(x_truth, x_hat, P, num_ownship_states,asset_id):
         truth_data = x_truth[0,:]
         estimate_data = x_hat[0,:]
         error_data = truth_data - estimate_data
-        unqqcertainty = P[0, range(0, error_data.size*num_ownship_states, num_ownship_states)]
+        uncertainty = P[0, range(0, error_data.size*num_ownship_states, num_ownship_states)]
         error_bound_high = 2*np.sqrt(uncertainty)
         error_bound_low = - 2*np.sqrt(uncertainty)
         ax.plot(error_data, c="r")

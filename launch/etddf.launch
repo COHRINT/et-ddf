@@ -1,0 +1,13 @@
+<launch>
+    <arg name="my_name" default="bluerov2_0" />
+    <arg name="blue_team_names" default="[]" />
+    <arg name="red_team_names" default="[]" />
+    <arg name="config_file" default="$(find etddf)/config/etddf.yaml" />
+
+    <node name="etddf_node" pkg="etddf" type="etddf_node.py" output="screen">
+        <param name="my_name" value="$(arg my_name)" />
+        <rosparam param="blue_team_names" subst_value="True">$(arg blue_team_names)</rosparam> 
+        <rosparam param="red_team_names" subst_value="True">$(arg red_team_names)</rosparam> 
+    </node>
+
+</launch>
