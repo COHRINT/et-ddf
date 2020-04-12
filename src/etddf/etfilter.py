@@ -1,6 +1,6 @@
 from __future__ import division
 import numpy as np
-from measurements import *
+from etddf.measurements import *
 from scipy.stats import norm as normal
 from copy import deepcopy
 from pdb import set_trace

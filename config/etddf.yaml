@@ -1,1 +1,79 @@
 update_rate: 4
+
+num_delta_tiers: 4
+
+buffer_size: 6
+
+# for ownship, blueteam and redteam if unspecified in roslaunch file
+default_starting_pose:
+  x: 0.0
+  y: 0.0
+  z: 1.0
+  yaw: 0.0
+  body_forward_vel: 0.0
+  body_strafe_vel: 0.0
+  body_depth_vel: 0.0
+  body_yaw_vel: 0.0
+
+
+### Process Noise Configurations ###
+process_noise:
+  ownship:
+    x: 0.01
+    y: 0.01
+    z: 0.01
+    yaw: 0.01
+    body_forward_vel: 0.0
+    body_strafe_vel: 0.0
+    body_depth_vel: 0.0
+    body_yaw_vel: 0.0
+  blueteam:
+    x: 0.01
+    y: 0.01
+    z: 0.01
+    yaw: 0.01
+    body_forward_vel: 0.0
+    body_strafe_vel: 0.0
+    body_depth_vel: 0.0
+    body_yaw_vel: 0.0
+  redteam:
+    x: 0.1
+    y: 0.1
+    z: 0.1
+    yaw: 0.1
+    body_forward_vel: 0.0
+    body_strafe_vel: 0.0
+    body_depth_vel: 0.0
+    body_yaw_vel: 0.0
+
+### Initial Estimate Configurations ###
+initial_uncertainty:
+  ownship:
+    x: 1.0
+    y: 1.0
+    z: 1.0
+    yaw: 9 # radians
+    body_forward_vel: 1
+    body_strafe_vel: 1
+    body_depth_vel: 1
+    body_yaw_vel: 1
+  # for asset poses provided to us through roslaunch params
+  known_starting_pose: 
+    x: 1.0
+    y: 1.0
+    z: 1.0
+    yaw: 3
+    body_forward_vel: 1
+    body_strafe_vel: 1
+    body_depth_vel: 1
+    body_yaw_vel: 1
+  # asset poses not provided in roslaunch, including redteam
+  unknown_starting_pose: 
+    x: 1000
+    y: 1000
+    z: 8
+    yaw: 9
+    body_forward_vel: 1
+    body_strafe_vel: 1
+    body_depth_vel: 1
+    body_yaw_vel: 1

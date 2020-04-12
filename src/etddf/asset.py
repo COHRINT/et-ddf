@@ -1,5 +1,6 @@
 from __future__ import division
-from etfilter import *
+from etddf.etfilter import *
+from etddf.measurements import *
 import numpy as np
 
 class Asset:
@@ -28,7 +29,7 @@ class Asset:
             for asset_id in self.common_filters.keys():
                 common_filter = self.common_filters[asset_id]
                 if common_filter.check_implicit(meas):
-                    sharing[asset_id] = self._get_implicit_msg_equivalent(meas)
+                    sharing[asset_id] = self.get_implicit_msg_equivalent(meas)
                 else: # share as explicit
                     sharing[asset_id] = meas
                     
@@ -53,7 +54,8 @@ class Asset:
         for asset_id in self.common_filters.keys():
             self.common_filters[asset_id].correct()
 
-    def _get_implicit_msg_equivalent(self, meas):
+    @staticmethod
+    def get_implicit_msg_equivalent(meas):
         if isinstance(meas, GPSx_Explicit):
             return GPSx_Implicit(meas.src_id, meas.R, meas.et_delta)
         elif isinstance(meas, GPSy_Explicit):
