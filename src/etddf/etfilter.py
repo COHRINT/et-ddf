@@ -53,8 +53,8 @@ class ETFilter(object):
         # Check if this is our first meas of asset
         # If the meas is a range/bearing, instantiate the asset at measurement mean
         if isinstance(meas, Azimuth_Explicit) or isinstance(meas, Range_Explicit) or isinstance(meas, Elevation_Explicit):
-            if self.P[meas.measured_asset*self.num_ownship_states, meas.measured_asset*self.num_ownship_states] > NO_ASSET_INFORMATION:
-                self._instantiate_asset_range_bearing(meas.measured_asset)
+            if self.P[meas.measured_asset_id*self.num_ownship_states, meas.measured_asset_id*self.num_ownship_states] > NO_ASSET_INFORMATION:
+                self._instantiate_asset_range_bearing(meas.measured_asset_id)
     
     def predict(self, u, Q):
         if u.shape[1] > u.shape[0]:
@@ -173,7 +173,7 @@ class ETFilter(object):
             else: # world dim 3
                 C[0, meas.neighbor_id*self.num_ownship_states + 3] = 1
         elif isinstance(meas, Azimuth_Explicit) or isinstance(meas, Azimuth_Implicit):
-            meas_id = meas.measured_asset
+            meas_id = meas.measured_asset_id
             src_x = self.x_hat[src_id*self.num_ownship_states,0]
             src_y = self.x_hat[src_id*self.num_ownship_states+1,0]
             other_x = self.x_hat[meas_id*self.num_ownship_states,0]
@@ -198,8 +198,8 @@ class ETFilter(object):
         elif isinstance(meas, AzimuthGlobal_Explicit) or isinstance(meas, AzimuthGlobal_Implicit):
             src_x = self.x_hat[src_id*self.num_ownship_states,0]
             src_y = self.x_hat[src_id*self.num_ownship_states+1,0]
-            other_x = meas.global_pos[0]
-            other_y = meas.global_pos[1]
+            other_x = meas.global_pose[0]
+            other_y = meas.global_pose[1]
             diff_x = other_x - src_x
             diff_y = other_y - src_y
 
@@ -215,8 +215,27 @@ class ETFilter(object):
                 C[0, src_id*self.num_ownship_states + 2] = -1
             else: # 3D World
                 C[0, src_id*self.num_ownship_states + 3] = -1
+        elif isinstance(meas, AzimuthFromGlobal_Explicit) or isinstance(meas, AzimuthFromGlobal_Implicit):
+            meas_id = meas.measured_asset_id
+            src_x = meas.global_pose[0]
+            src_y = meas.global_pose[1]
+
+            other_x = self.x_hat[meas_id*self.num_ownship_states,0]
+            other_y = self.x_hat[meas_id*self.num_ownship_states+1,0]
+            
+            diff_x = other_x - src_x
+            diff_y = other_y - src_y
+
+            # Protect division by zero
+            diff_x = diff_x if abs(diff_x) > 0.01 else 0.01
+            diff_y = diff_y if abs(diff_y) > 0.01 else 0.01
+
+            # Azimuth jacobians
+            C[0, meas_id*self.num_ownship_states] = -diff_y / ( diff_x**2 + diff_y**2 )
+            C[0, meas_id*self.num_ownship_states+1] = diff_x / ( diff_x**2 + diff_y**2 )
+
         elif isinstance(meas, Range_Explicit) or isinstance(meas, Range_Implicit):
-            meas_id = meas.measured_asset
+            meas_id = meas.measured_asset_id
             src_x = self.x_hat[src_id*self.num_ownship_states,0]
             src_y = self.x_hat[src_id*self.num_ownship_states+1,0]
             other_x = self.x_hat[meas_id*self.num_ownship_states,0]
@@ -247,8 +266,8 @@ class ETFilter(object):
         elif isinstance(meas, RangeGlobal_Explicit) or isinstance(meas, RangeGlobal_Implicit):
             src_x = self.x_hat[src_id*self.num_ownship_states,0]
             src_y = self.x_hat[src_id*self.num_ownship_states+1,0]
-            other_x = meas.global_pos[0]
-            other_y = meas.global_pos[1]
+            other_x = meas.global_pose[0]
+            other_y = meas.global_pose[1]
             diff_x = other_x - src_x
             diff_y = other_y - src_y
             
@@ -259,13 +278,40 @@ class ETFilter(object):
                 C[0, src_id*self.num_ownship_states+1] = -diff_y / r
             else: # World Dim 3D
                 src_z = self.x_hat[src_id*self.num_ownship_states+2,0]
-                other_z = meas.global_pos[2]
+                other_z = meas.global_pose[2]
                 diff_z = other_z - src_z
                 r = np.sqrt( diff_x**2 + diff_y**2 + diff_z**2 )
                 r = r if r > 0.01 else 0.01 # Division by zero protection
                 C[0, src_id*self.num_ownship_states] = -diff_x / r
                 C[0, src_id*self.num_ownship_states+1] = -diff_y / r
                 C[0, src_id*self.num_ownship_states+2] = -diff_z / r
+
+        elif isinstance(meas, RangeFromGlobal_Explicit) or isinstance(meas, RangeFromGlobal_Implicit):
+            meas_id = meas.measured_asset_id
+            src_x = meas.global_pose[0]
+            src_y = meas.global_pose[1]
+
+            other_x = self.x_hat[meas_id*self.num_ownship_states,0]
+            other_y = self.x_hat[meas_id*self.num_ownship_states+1,0]
+            
+            diff_x = other_x - src_x
+            diff_y = other_y - src_y
+            
+            if self.world_dim == 2:
+                r = np.sqrt( diff_x**2 + diff_y**2 )
+                r = r if r > 0.01 else 0.01 # Division by zero protection
+                C[0, meas_id*self.num_ownship_states] = diff_x / r
+                C[0, meas_id*self.num_ownship_states+1] = diff_y / r
+            else: # World Dim 3D
+                src_z = meas.global_pose[2]
+                other_z = self.x_hat[meas_id*self.num_ownship_states+2,0]
+                
+                diff_z = other_z - src_z
+                r = np.sqrt( diff_x**2 + diff_y**2 + diff_z**2 )
+                r = r if r > 0.01 else 0.01 # Division by zero protection
+                C[0, meas_id*self.num_ownship_states] = diff_x / r
+                C[0, meas_id*self.num_ownship_states+1] = diff_y / r
+                C[0, meas_id*self.num_ownship_states+2] = diff_z / r
 
         elif isinstance(meas, Elevation_Explicit) or isinstance(meas, Elevation_Implicit):
             meas_id = meas.measured_asset
@@ -301,9 +347,9 @@ class ETFilter(object):
             src_x = self.x_hat[meas.src_id*self.num_ownship_states,0]
             src_y = self.x_hat[meas.src_id*self.num_ownship_states+1,0]
             src_z = self.x_hat[meas.src_id*self.num_ownship_states+2,0]
-            other_x = meas.global_pos[0]
-            other_y = meas.global_pos[1]
-            other_z = meas.global_pos[2]
+            other_x = meas.global_pose[0]
+            other_y = meas.global_pose[1]
+            other_z = meas.global_pose[2]
             diff_x = other_x - src_x
             diff_y = other_y - src_y
             diff_z = other_z - src_z
@@ -317,6 +363,28 @@ class ETFilter(object):
             C[0, src_id*self.num_ownship_states+1] = (diff_z*diff_y) / (np.sqrt(1-(diff_z**2)/all_diff) * np.power(all_diff, 3/2) )
             # d_el / dz_src
             C[0, src_id*self.num_ownship_states+2] = - np.sqrt(diff_x**2 + diff_y**2) / all_diff
+        elif isinstance(meas, ElevationFromGlobal_Explicit) or isinstance(meas, ElevationFromGlobal_Implicit):
+            meas_id = meas.measured_asset
+            src_x = meas.global_pose[0]
+            src_y = meas.global_pose[1]
+            src_z = meas.global_pose[2]
+            other_x = self.x_hat[meas_id*self.num_ownship_states,0]
+            other_y = self.x_hat[meas_id*self.num_ownship_states+1,0]
+            other_z = self.x_hat[meas_id*self.num_ownship_states+2,0]
+            
+            diff_x = other_x - src_x
+            diff_y = other_y - src_y
+            diff_z = other_z - src_z
+
+            all_diff = diff_x**2 + diff_y**2 + diff_z**2
+            
+            ## Own asset
+            # d_el / dx_src
+            C[0, meas_id*self.num_ownship_states] = -(diff_z*diff_x) / (np.sqrt(1-(diff_z**2)/all_diff) * np.power(all_diff, 3/2) )
+            # d_el / dy_src
+            C[0, meas_id*self.num_ownship_states+1] = -(diff_z*diff_y) / (np.sqrt(1-(diff_z**2)/all_diff) * np.power(all_diff, 3/2) )
+            # d_el / dz_src
+            C[0, meas_id*self.num_ownship_states+2] = np.sqrt(diff_x**2 + diff_y**2) / all_diff
         else:
             raise NotImplementedError("Measurment Jacobian not implemented for: " + meas.__class__.__name__)
         return C
@@ -346,8 +414,27 @@ class ETFilter(object):
                 src_bearing = x_hat[meas.src_id*self.num_ownship_states + 3,0]
             src_x = x_hat[meas.src_id*self.num_ownship_states,0]
             src_y = x_hat[meas.src_id*self.num_ownship_states+1,0]
-            other_x = meas.global_pos[0]
-            other_y = meas.global_pos[1]
+            other_x = meas.global_pose[0]
+            other_y = meas.global_pose[1]
+            diff_x = other_x - src_x
+            diff_y = other_y - src_y
+
+            # Protect division by zero
+            diff_x = diff_x if abs(diff_x) > 0.01 else 0.01
+            diff_y = diff_y if abs(diff_y) > 0.01 else 0.01
+            expected_bearing = np.arctan2(diff_y, diff_x) - src_bearing
+            return self._normalize_angle( expected_bearing )
+        elif isinstance(meas, AzimuthFromGlobal_Explicit) or isinstance(meas, AzimuthFromGlobal_Implicit):
+            meas_id = meas.measured_asset_id            
+            if self.world_dim == 2:
+                src_bearing = meas.global_pose[2]
+            else:
+                src_bearing = meas.global_pose[3]
+            src_x = meas.global_pose[0]
+            src_y = meas.global_pose[1]
+            other_x = x_hat[meas_id*self.num_ownship_states,0]
+            other_y = x_hat[meas_id*self.num_ownship_states+1,0]
+            
             diff_x = other_x - src_x
             diff_y = other_y - src_y
 
@@ -374,15 +461,30 @@ class ETFilter(object):
         elif isinstance(meas, RangeGlobal_Explicit) or isinstance(meas, RangeGlobal_Implicit):
             src_x = x_hat[meas.src_id*self.num_ownship_states,0]
             src_y = x_hat[meas.src_id*self.num_ownship_states+1,0]
-            other_x = meas.global_pos[0]
-            other_y = meas.global_pos[1]
+            other_x = meas.global_pose[0]
+            other_y = meas.global_pose[1]
             diff_x = other_x - src_x
             diff_y = other_y - src_y
             if self.world_dim == 2:
                 return np.sqrt( diff_x**2 + diff_y**2 )
             else: # 3D World
                 src_z = x_hat[meas.src_id*self.num_ownship_states+2,0]
-                other_z = meas.global_pos[2]
+                other_z = meas.global_pose[2]
+                diff_z = other_z - src_z
+                return np.sqrt( diff_x**2 + diff_y**2 + diff_z**2 )
+        elif isinstance(meas, RangeFromGlobal_Explicit) or isinstance(meas, RangeFromGlobal_Implicit):
+            meas_id = meas.measured_asset_id
+            src_x = meas.global_pose[0]
+            src_y = meas.global_pose[1]
+            other_x = x_hat[meas_id*self.num_ownship_states,0]
+            other_y = x_hat[meas_id*self.num_ownship_states+1,0]
+            diff_x = other_x - src_x
+            diff_y = other_y - src_y
+            if self.world_dim == 2:
+                return np.sqrt( diff_x**2 + diff_y**2 )
+            else: # 3D World
+                src_z = meas.global_pose[2]
+                other_z = x_hat[meas_id*self.num_ownship_states+2,0]
                 diff_z = other_z - src_z
                 return np.sqrt( diff_x**2 + diff_y**2 + diff_z**2 )
         elif isinstance(meas, Elevation_Explicit) or isinstance(meas, Elevation_Implicit):
@@ -407,9 +509,30 @@ class ETFilter(object):
             src_x = x_hat[meas.src_id*self.num_ownship_states,0]
             src_y = x_hat[meas.src_id*self.num_ownship_states+1,0]
             src_z = x_hat[meas.src_id*self.num_ownship_states+2,0]
-            other_x = meas.global_pos[0]
-            other_y = meas.global_pos[1]
-            other_z = meas.global_pos[2]
+            other_x = meas.global_pose[0]
+            other_y = meas.global_pose[1]
+            other_z = meas.global_pose[2]
+            diff_x = other_x - src_x
+            diff_y = other_y - src_y
+            diff_z = other_z - src_z
+
+            # Protect division by zero
+            diff_x = diff_x if abs(diff_x) > 0.01 else 0.01
+            diff_y = diff_y if abs(diff_y) > 0.01 else 0.01
+            diff_z = diff_z if abs(diff_z) > 0.01 else 0.01
+
+            expected_elevation = np.arcsin(diff_z / np.linalg.norm([diff_x, diff_y, diff_z]))
+            return self._normalize_angle( expected_elevation )
+        elif isinstance(meas, ElevationFromGlobal_Explicit) or isinstance(meas, ElevationFromGlobal_Implicit):
+            meas_id = meas.measured_asset_id
+            src_x = meas.global_pose[0]
+            src_y = meas.global_pose[1]
+            src_z = meas.global_pose[2]
+
+            other_x = x_hat[meas_id*self.num_ownship_states,0]
+            other_y = x_hat[meas_id*self.num_ownship_states+1,0]
+            other_z = x_hat[meas_id*self.num_ownship_states+2,0]
+            
             diff_x = other_x - src_x
             diff_y = other_y - src_y
             diff_z = other_z - src_z
@@ -424,10 +547,11 @@ class ETFilter(object):
         else:
             raise NotImplementedError("Nonlinear Measurement Innovation not implemented for: " + meas.__class__.__name__)
 
+    # TODO instantinate on FromGlobalRange/Azimuth!!
     def _instantiate_asset_range_bearing(self, asset_id):
         if self.world_dim == 2:
-            range_meas = [x for x in self.meas_queue if (isinstance(x, Range_Explicit) and x.measured_asset == asset_id)]
-            az_meas = [x for x in self.meas_queue if (isinstance(x, Azimuth_Explicit) and x.measured_asset == asset_id)]
+            range_meas = [x for x in self.meas_queue if (isinstance(x, Range_Explicit) and x.measured_asset_id == asset_id)]
+            az_meas = [x for x in self.meas_queue if (isinstance(x, Azimuth_Explicit) and x.measured_asset_id == asset_id)]
             if not range_meas or not az_meas: # still waiting on other meas
                 return
             else: # instantiate gaussian of asset at measurement mean
@@ -461,9 +585,9 @@ class ETFilter(object):
                 self.meas_queue.remove(range_meas[0])
                 self.meas_queue.remove(az_meas[0])
         else: # 3D
-            range_meas = [x for x in self.meas_queue if (isinstance(x, Range_Explicit) and x.measured_asset == asset_id)]
-            az_meas = [x for x in self.meas_queue if (isinstance(x, Azimuth_Explicit) and x.measured_asset == asset_id)]
-            el_meas = [x for x in self.meas_queue if (isinstance(x, Elevation_Explicit) and x.measured_asset == asset_id)]
+            range_meas = [x for x in self.meas_queue if (isinstance(x, Range_Explicit) and x.measured_asset_id == asset_id)]
+            az_meas = [x for x in self.meas_queue if (isinstance(x, Azimuth_Explicit) and x.measured_asset_id == asset_id)]
+            el_meas = [x for x in self.meas_queue if (isinstance(x, Elevation_Explicit) and x.measured_asset_id == asset_id)]
             if not range_meas or not az_meas or not el_meas: # still waiting on other meas
                 return
             else:

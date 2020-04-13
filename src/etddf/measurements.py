@@ -65,9 +65,9 @@ class GPSyaw_Implicit(Implicit):
 
 ########## Azimuth ##########
 class Azimuth_Explicit(Explicit): # Relative
-    def __init__(self, src_id, measured_asset, data, R, et_delta):
+    def __init__(self, src_id, measured_asset_id, data, R, et_delta):
         self.src_id = src_id
-        self.measured_asset = measured_asset
+        self.measured_asset_id = measured_asset_id
         self.data = data # radians
         self.R = R
         self.et_delta = et_delta
@@ -84,19 +84,38 @@ class AzimuthGlobal_Explicit(Explicit):
         self.is_linear_meas = False
         self.is_angle_meas = True
 
+class AzimuthFromGlobal_Explicit(Explicit):
+    def __init__(self, measured_asset_id, global_pose, data, R, et_delta):
+        self.measured_asset_id = measured_asset_id
+        self.global_pose = global_pose # 3D [x,y,z,yaw] or 2D [x,y,yaw]
+        self.data = data # radians
+        self.R = R
+        self.et_delta = et_delta
+        self.is_linear_meas = False
+        self.is_angle_meas = True
+
 class Azimuth_Implicit(Implicit): # Relative
-    def __init__(self, src_id, measured_asset, R, et_delta):
+    def __init__(self, src_id, measured_asset_id, R, et_delta):
         self.src_id = src_id
-        self.measured_asset = measured_asset
+        self.measured_asset_id = measured_asset_id
         self.R = R
         self.et_delta = et_delta
         self.is_linear_meas = False
         self.is_angle_meas = True
 
 class AzimuthGlobal_Implicit(Implicit):
-    def __init__(self, src_id, global_pos, R, et_delta):
+    def __init__(self, src_id, global_pose, R, et_delta):
         self.src_id = src_id
-        self.global_pos = global_pos # 2D or 3D array
+        self.global_pose = global_pose # 3D [x,y,z,yaw] or 2D [x,y,yaw] (yaw isn't used)
+        self.R = R
+        self.et_delta = et_delta
+        self.is_linear_meas = False
+        self.is_angle_meas = True
+
+class AzimuthFromGlobal_Implicit(Implicit):
+    def __init__(self, measured_asset_id, global_pose, R, et_delta):
+        self.measured_asset_id = measured_asset_id
+        self.global_pose = global_pose # 3D [x,y,z,yaw] or 2D [x,y,yaw]
         self.R = R
         self.et_delta = et_delta
         self.is_linear_meas = False
@@ -104,9 +123,9 @@ class AzimuthGlobal_Implicit(Implicit):
 
 ########## Elevation ##########
 class Elevation_Explicit(Explicit): # Relative
-    def __init__(self, src_id, measured_asset, data, R, et_delta):
+    def __init__(self, src_id, measured_asset_id, data, R, et_delta):
         self.src_id = src_id
-        self.measured_asset = measured_asset
+        self.measured_asset_id = measured_asset_id
         self.data = data # radians
         self.R = R
         self.et_delta = et_delta
@@ -114,27 +133,47 @@ class Elevation_Explicit(Explicit): # Relative
         self.is_angle_meas = True
 
 class ElevationGlobal_Explicit(Explicit):
-    def __init__(self, src_id, global_pos, data, R, et_delta):
+    def __init__(self, src_id, global_pose, data, R, et_delta):
         self.src_id = src_id
-        self.global_pos = global_pos # 3D numpy array
+        self.global_pose = global_pose # 3D [x,y,z,yaw]
         self.data = data # radians
         self.R = R
         self.et_delta = et_delta
         self.is_linear_meas = False
         self.is_angle_meas = True
+
+class ElevationFromGlobal_Explicit(Explicit):
+    def __init__(self, measured_asset_id, global_pose, data, R, et_delta):
+        self.measured_asset_id = measured_asset_id
+        self.global_pose = global_pose # np array [x,y,z,yaw]
+        self.data = data # radians
+        self.R = R
+        self.et_delta = et_delta
+        self.is_linear_meas = False
+        self.is_angle_meas = True
+
 class Elevation_Implicit(Implicit): # Relative
-    def __init__(self, src_id, measured_asset, R, et_delta):
+    def __init__(self, src_id, measured_asset_id, R, et_delta):
         self.src_id = src_id
-        self.measured_asset = measured_asset
+        self.measured_asset_id = measured_asset_id
         self.R = R
         self.et_delta = et_delta
         self.is_linear_meas = False
         self.is_angle_meas = True
 
 class ElevationGlobal_Implicit(Implicit):
-    def __init__(self, src_id, global_pos, R, et_delta):
+    def __init__(self, src_id, global_pose, R, et_delta):
         self.src_id = src_id
-        self.global_pos = global_pos # 3D array
+        self.global_pose = global_pose # 3D [x,y,z,yaw]
+        self.R = R
+        self.et_delta = et_delta
+        self.is_linear_meas = False
+        self.is_angle_meas = True
+
+class ElevationFromGlobal_Implicit(Implicit):
+    def __init__(self, measured_asset_id, global_pose, R, et_delta):
+        self.measured_asset_id = measured_asset_id
+        self.global_pose = global_pose # 3D [x,y,z,yaw]
         self.R = R
         self.et_delta = et_delta
         self.is_linear_meas = False
@@ -142,42 +181,60 @@ class ElevationGlobal_Implicit(Implicit):
 
 ########## Range ##########
 class Range_Explicit(Explicit): # Relative
-    def __init__(self, src_id, measured_asset, data, R, et_delta):
+    def __init__(self, src_id, measured_asset_id, data, R, et_delta):
         self.src_id = src_id
-        self.measured_asset = measured_asset
+        self.measured_asset_id = measured_asset_id
         self.data = data
         self.R = R
         self.et_delta = et_delta
         self.is_linear_meas = False
 
 class RangeGlobal_Explicit(Explicit):
-    def __init__(self, src_id, global_pos, data, R, et_delta):
+    def __init__(self, src_id, global_pose, data, R, et_delta):
         self.src_id = src_id
-        self.global_pos = global_pos # numpy 2D or 3D array
+        self.global_pose = global_pose # 3D [x,y,z,yaw] or 2D [x,y,yaw] (yaw isn't used)
+        self.data = data
+        self.R = R
+        self.et_delta = et_delta
+        self.is_linear_meas = False
+
+class RangeFromGlobal_Explicit(Explicit):
+    def __init__(self, measured_asset_id, global_pose, data, R, et_delta):
+        self.measured_asset_id = measured_asset_id
+        self.global_pose = global_pose # 3D [x,y,z,yaw] or 2D [x,y,yaw] (yaw isn't used)
         self.data = data
         self.R = R
         self.et_delta = et_delta
         self.is_linear_meas = False
 
 class Range_Implicit(Implicit): # Relative
-    def __init__(self, src_id, measured_asset, R, et_delta):
+    def __init__(self, src_id, measured_asset_id, R, et_delta):
         self.src_id = src_id
-        self.measured_asset = measured_asset
+        self.measured_asset_id = measured_asset_id
         self.R = R
         self.et_delta = et_delta
         self.is_linear_meas = False
 
 class RangeGlobal_Implicit(Implicit):
-    def __init__(self, src_id, global_pos, R, et_delta):
+    def __init__(self, src_id, global_pose, R, et_delta):
         self.src_id = src_id
-        self.global_pos = global_pos # numpy 2D or 3D array
+        self.global_pose = global_pose # 3D [x,y,z,yaw] or 2D [x,y,yaw] (yaw isn't used)
+        self.R = R
+        self.et_delta = et_delta
+        self.is_linear_meas = False
+
+class RangeFromGlobal_Implicit(Implicit):
+    def __init__(self, src_id, global_pose, data, R, et_delta):
+        self.measured_asset_id = measured_asset_id
+        self.global_pose = global_pose # 3D [x,y,z,yaw] or 2D [x,y,yaw] (yaw isn't used)
+        self.data = data
         self.R = R
         self.et_delta = et_delta
         self.is_linear_meas = False
 
 ########## Debug GPS of Neighbors ##########
 # These measurements are impossible in reality but useful in debugging
-# They represent "src took a gps measurement of neighbor" (as in I went to my neighbor's exact location and took a gps measurement for them)
+# They represent "src took a gps measurement of neighbor" (e.g. I went to my neighbor's exact location and took a gps measurement for them)
 class GPSx_Neighbor_Explicit(Explicit):
     def __init__(self, src_id, neighbor_id, data, R, et_delta):
         self.src_id = src_id

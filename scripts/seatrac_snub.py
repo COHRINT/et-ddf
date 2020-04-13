@@ -38,7 +38,7 @@ if __name__ == "__main__":
     assets = ["bluerov2_3"]
     meas_pkg_pub_dict = {}
     for a in assets:
-        meas_pkg_pub_dict[a] = rospy.Publisher(a + "/etddf/meas_pkgs_in", MeasurementPackage, queue_size=10)
+        meas_pkg_pub_dict[a] = rospy.Publisher(a + "/etddf/packages_in", MeasurementPackage, queue_size=10)
     seasnub = SeatracSnub(["bluerov2_3"])
 
     curr_index = 0

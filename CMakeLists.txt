@@ -5,6 +5,7 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   message_generation
   geometry_msgs
+  nav_msgs
 )
 
 catkin_python_setup()
@@ -13,6 +14,8 @@ add_message_files(
    FILES
    Measurement.msg
    MeasurementPackage.msg
+   AssetEstimate.msg
+   NetworkEstimate.msg
 )
 
 add_service_files(
@@ -20,7 +23,10 @@ add_service_files(
   GetMeasurementPackage.srv
 )
 
-generate_messages()
+generate_messages(
+  DEPENDENCIES
+  nav_msgs
+)
 
 catkin_package(
   CATKIN_DEPENDS rospy message_runtime
