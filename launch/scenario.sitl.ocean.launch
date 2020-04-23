@@ -68,6 +68,10 @@
   
   <!-- Spawn BlueROV2 model in the simulated environment -->
   <include file="$(find etddf)/launch/vehicle.bluerov2.sitl.launch">
+  </include>
+
+  <!-- Spawn BlueROV2 model in the simulated environment -->
+  <include file="$(find minau)/launch/vehicle.bluerov2.sitl.launch">
     <arg name="asset_id" value="3"/>
     <arg name="ardusub_instance" value="0"/>
     <arg name="ardusub_params" value="$(arg ardusub_params)"/>
