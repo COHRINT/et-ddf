@@ -3,9 +3,10 @@ project(etddf)
 
 find_package(catkin REQUIRED COMPONENTS
   rospy
-  message_generation
   geometry_msgs
   nav_msgs
+  std_msgs
+  message_generation
 )
 
 catkin_python_setup()
@@ -16,7 +17,11 @@ add_message_files(
    MeasurementPackage.msg
    AssetEstimate.msg
    NetworkEstimate.msg
+<<<<<<< HEAD
    EtddfStatistics.msg
+=======
+   Sonar.msg
+>>>>>>> Added node to simulate sonar
 )
 
 add_service_files(
@@ -27,6 +32,7 @@ add_service_files(
 generate_messages(
   DEPENDENCIES
   nav_msgs
+  std_msgs
 )
 
 catkin_package(
