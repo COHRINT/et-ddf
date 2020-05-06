@@ -41,32 +41,18 @@ def checkZone(blue,red):
     #calculate distance in 3d and just in xy
     dist = np.linalg.norm([normX,normY,normZ])
     distXY = np.linalg.norm([normX,normY])
-
     #in this new coordinate system find 'yaw' so we can compare it to yaw of blue rov
-    estYaw =  np.arctan(normY/normX)
-    #have to add pi because of how arctan works if angle in 2nd quadrant
-    if normX<0 and normY > 0:
-        estYaw += np.pi
-    #have to subtract pi if angle in 3rd quadrant
-    elif normX<0 and normY < 0:
-        estYaw -= np.pi
-    # print(blue.yaw)
-    # print(estYaw)
+    estYaw =  np.arctan2(normY,normX)
     normYaw = blue.yaw - estYaw
     #want to make sure angle is between -pi and pi
     if normYaw > np.pi:
         normYaw-=2*np.pi
     elif normYaw < -np.pi:
         normYaw+=2*np.pi
-    #since we only care about small values of elevation we can use this
-    #it will only mess up for angles we don't care about
-    normElev = np.arctan(normZ/distXY)
+    normElev = np.arctan2(normZ,distXY)
     # the sensor can see 70 degrees horizontally(35 each way) and 12 vertically(6 each way)
     horzAng = 35 * np.pi /180
     vertAng = 6 * np.pi /180
-    # print(dist)
-    # print(normYaw)
-    # print(normElev)
     #Check if in range, in horizontal range, and in vertical range
     if dist <= 40 and np.abs(normYaw) <= horzAng and np.abs(normElev) <= vertAng:
         pub = rospy.Publisher('sonarData',Sonar,queue_size=10)

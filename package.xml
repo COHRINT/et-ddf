@@ -12,6 +12,7 @@
   <build_depend>message_generation</build_depend>
   <depend>nav_msgs</depend>
   <depend>std_msgs</depend>
+  <depend>geometry_msgs</depend>
   <exec_depend>message_runtime</exec_depend>
   <exec_depend>minau</exec_depend> <!-- sonar_processing_node -->
   <depend>rospy</depend>
