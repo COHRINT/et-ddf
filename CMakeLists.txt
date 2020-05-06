@@ -7,6 +7,7 @@ find_package(catkin REQUIRED COMPONENTS
   nav_msgs
   std_msgs
   message_generation
+  uuv_control_msgs
 )
 
 catkin_python_setup()
@@ -18,6 +19,8 @@ add_message_files(
    AssetEstimate.msg
    NetworkEstimate.msg
    Sonar.msg
+   Waypoint.msg
+   WaypointSet.msg
 )
 
 add_service_files(
@@ -29,6 +32,7 @@ generate_messages(
   DEPENDENCIES
   nav_msgs
   std_msgs
+  geometry_msgs
 )
 
 catkin_package(
