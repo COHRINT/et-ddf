@@ -1,3 +1,4 @@
 etddf/Measurement[] measurements
 time first_implicit_meas
 string src_asset
+float32 delta_multiplier

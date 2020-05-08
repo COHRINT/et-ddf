@@ -169,7 +169,7 @@ def get_measurement_jacobian(meas, x_hat, num_states, world_dim, num_ownship_sta
             C[0, meas_id*num_ownship_states+2] = diff_z / r
 
     elif isinstance(meas, Elevation_Explicit) or isinstance(meas, Elevation_Implicit):
-        meas_id = meas.measured_asset
+        meas_id = meas.measured_asset_id
         src_x = x_hat[meas.src_id*num_ownship_states,0]
         src_y = x_hat[meas.src_id*num_ownship_states+1,0]
         src_z = x_hat[meas.src_id*num_ownship_states+2,0]
@@ -219,7 +219,7 @@ def get_measurement_jacobian(meas, x_hat, num_states, world_dim, num_ownship_sta
         # d_el / dz_src
         C[0, src_id*num_ownship_states+2] = - np.sqrt(diff_x**2 + diff_y**2) / all_diff
     elif isinstance(meas, ElevationFromGlobal_Explicit) or isinstance(meas, ElevationFromGlobal_Implicit):
-        meas_id = meas.measured_asset
+        meas_id = meas.measured_asset_id
         src_x = meas.global_pose[0]
         src_y = meas.global_pose[1]
         src_z = meas.global_pose[2]
@@ -240,6 +240,33 @@ def get_measurement_jacobian(meas, x_hat, num_states, world_dim, num_ownship_sta
         C[0, meas_id*num_ownship_states+1] = -(diff_z*diff_y) / (np.sqrt(1-(diff_z**2)/all_diff) * np.power(all_diff, 3/2) )
         # d_el / dz_src
         C[0, meas_id*num_ownship_states+2] = np.sqrt(diff_x**2 + diff_y**2) / all_diff
+    elif isinstance(meas, LinRelx_Explicit) or isinstance(meas, LinRelx_Implicit):
+        src_id = meas.src_id
+        meas_id = meas.measured_asset_id
+        C[0,src_id*num_ownship_states] = -1
+        C[0,meas_id*num_ownship_states] = 1
+    elif isinstance(meas, LinRely_Explicit) or isinstance(meas, LinRely_Implicit):
+        src_id = meas.src_id
+        meas_id = meas.measured_asset_id
+        C[0,src_id*num_ownship_states+1] = -1
+        C[0,meas_id*num_ownship_states+1] = 1
+    elif isinstance(meas, LinRelz_Explicit) or isinstance(meas, LinRelz_Implicit):
+        src_id = meas.src_id
+        meas_id = meas.measured_asset_id
+        C[0,src_id*num_ownship_states+2] = -1
+        C[0,meas_id*num_ownship_states+2] = 1
+    elif isinstance(meas, Velocityx_Explicit) or isinstance(meas, Velocityx_Implicit):
+        src_id = meas.src_id
+        num_base_states = int(num_ownship_states / 2)
+        C[0,src_id*num_ownship_states + num_base_states] = 1
+    elif isinstance(meas, Velocityy_Explicit) or isinstance(meas, Velocityy_Implicit):
+        src_id = meas.src_id
+        num_base_states = int(num_ownship_states / 2)
+        C[0,src_id*num_ownship_states + num_base_states + 1] = 1
+    elif isinstance(meas, Velocityz_Explicit) or isinstance(meas, Velocityz_Implicit):
+        src_id = meas.src_id
+        num_base_states = int(num_ownship_states / 2)
+        C[0,src_id*num_ownship_states + num_base_states + 2] = 1
     else:
         raise NotImplementedError("Measurment Jacobian not implemented for: " + meas.__class__.__name__)
     return C

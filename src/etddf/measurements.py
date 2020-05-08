@@ -232,6 +232,87 @@ class RangeFromGlobal_Implicit(Implicit):
         self.et_delta = et_delta
         self.is_linear_meas = False
 
+########## Linear Relation ##########
+class LinRelx_Explicit(Explicit):
+    def __init__(self, src_id, measured_asset_id, data, R, et_delta):
+        self.src_id = src_id
+        self.measured_asset_id = measured_asset_id
+        self.data = data
+        self.R = R
+        self.et_delta = et_delta
+
+class LinRely_Explicit(Explicit):
+    def __init__(self, src_id, measured_asset_id, data, R, et_delta):
+        self.src_id = src_id
+        self.measured_asset_id = measured_asset_id
+        self.data = data
+        self.R = R
+        self.et_delta = et_delta
+
+class LinRelz_Explicit(Explicit):
+    def __init__(self, src_id, measured_asset_id, data, R, et_delta):
+        self.src_id = src_id
+        self.measured_asset_id = measured_asset_id
+        self.data = data
+        self.R = R
+        self.et_delta = et_delta
+
+class LinRelx_Implicit(Implicit):
+    def __init__(self, src_id, measured_asset_id, R, et_delta):
+        self.src_id = src_id
+        self.measured_asset_id = measured_asset_id
+        self.R = R
+        self.et_delta = et_delta
+
+class LinRely_Implicit(Implicit):
+    def __init__(self, src_id, measured_asset_id, R, et_delta):
+        self.src_id = src_id
+        self.measured_asset_id = measured_asset_id
+        self.R = R
+        self.et_delta = et_delta
+
+class LinRelz_Implicit(Implicit):
+    def __init__(self, src_id, measured_asset_id, R, et_delta):
+        self.src_id = src_id
+        self.measured_asset_id = measured_asset_id
+        self.R = R
+        self.et_delta = et_delta
+
+########## Velocity ##########
+class Velocityx_Explicit(Explicit):
+    def __init__(self, src_id, data, R, et_delta):
+        self.src_id = src_id
+        self.data = data
+        self.R = R
+        self.et_delta = et_delta
+class Velocityy_Explicit(Explicit):
+    def __init__(self, src_id, data, R, et_delta):
+        self.src_id = src_id
+        self.data = data
+        self.R = R
+        self.et_delta = et_delta
+class Velocityz_Explicit(Explicit):
+    def __init__(self, src_id, data, R, et_delta):
+        self.src_id = src_id
+        self.data = data
+        self.R = R
+        self.et_delta = et_delta
+class Velocityx_Implicit(Implicit):
+    def __init__(self, src_id, R, et_delta):
+        self.src_id = src_id
+        self.R = R
+        self.et_delta = et_delta
+class Velocityy_Implicit(Implicit):
+    def __init__(self, src_id, R, et_delta):
+        self.src_id = src_id
+        self.R = R
+        self.et_delta = et_delta
+class Velocityz_Implicit(Implicit):
+    def __init__(self, src_id, R, et_delta):
+        self.src_id = src_id
+        self.R = R
+        self.et_delta = et_delta
+
 ########## Debug GPS of Neighbors ##########
 # These measurements are impossible in reality but useful in debugging
 # They represent "src took a gps measurement of neighbor" (e.g. I went to my neighbor's exact location and took a gps measurement for them)
@@ -294,7 +375,7 @@ class GPSyaw_Neighbor_Implicit(Implicit):
 
 Add it above & its implicit counterpart
 Is it an angle? Add self.is_angle_meas = True to its constructor
-If it has a nonlinear measurement function add it to _get_nonlinear_expected_meas()
-Add its jacobian in etfilter to _get_measurement_jacobian()
+Add its jacobian to get_measurement_jacobian() in measurement_jacobians.py
+If it has a nonlinear measurement function, add it to get_nonlinear_expected_meas() in measurement_expected.py
 Add its implicit conversion to asset.py
 """

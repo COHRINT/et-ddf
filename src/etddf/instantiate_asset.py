@@ -1,5 +1,54 @@
 from __future__ import division
-from etddf.measurement import *
+from etddf.measurements import *
+from copy import deepcopy
+import numpy as np
+import pdb
+
+# Assumes world dim is 3D
+def instantiate_asset_linrel(asset_id, x_hat, P, meas_queue, num_ownship_states):
+    meas_queue = deepcopy(meas_queue)
+    x_hat = deepcopy(x_hat)
+    P = deepcopy(P)
+    x_meas = [x for x in meas_queue if (isinstance(x, LinRelx_Explicit) and x.measured_asset_id == asset_id)]
+    y_meas = [x for x in meas_queue if (isinstance(x, LinRely_Explicit) and x.measured_asset_id == asset_id)]
+    z_meas = [x for x in meas_queue if (isinstance(x, LinRelz_Explicit) and x.measured_asset_id == asset_id)]
+    src_id = x_meas[0].src_id
+    meas_id = x_meas[0].measured_asset_id
+    # Compute the asset's position
+    asset_x = x_hat[src_id*num_ownship_states,0] + x_meas[0].data
+    asset_y = x_hat[src_id*num_ownship_states+1,0] + y_meas[0].data
+    asset_z = x_hat[src_id*num_ownship_states+2,0] + z_meas[0].data
+    # Update the asset's position
+    x_hat[meas_id*num_ownship_states,0] = asset_x
+    x_hat[meas_id*num_ownship_states+1,0] = asset_y
+    x_hat[meas_id*num_ownship_states+2,0] = asset_z
+    # Update asset's covariance
+    P[:,meas_id*num_ownship_states:(meas_id+1)*num_ownship_states] = np.zeros((x_hat.size,num_ownship_states))
+    P[meas_id*num_ownship_states:(meas_id+1)*num_ownship_states,:] = np.zeros((num_ownship_states, x_hat.size))
+    P[meas_id*num_ownship_states, meas_id*num_ownship_states] = x_meas[0].R
+    P[meas_id*num_ownship_states+1, meas_id*num_ownship_states+1] = y_meas[0].R
+    P[meas_id*num_ownship_states+2, meas_id*num_ownship_states+2] = z_meas[0].R
+
+    # TODO set correlations with src_id's position
+
+    # Remove measurements used to instantiate the asset
+    meas_queue.remove(x_meas[0])
+    meas_queue.remove(y_meas[0])
+    meas_queue.remove(z_meas[0])
+    return x_hat, P, meas_queue
+
+def check_instantiate_asset_linrel(meas, P, meas_queue, threshold, num_ownship_states):
+    if isinstance(meas, LinRelx_Explicit) or isinstance(meas, LinRely_Explicit) or isinstance(meas, LinRelz_Explicit):
+        meas_id = meas.measured_asset_id
+        # Are we uncertain enough to instantiate this asset?
+        if P[meas_id*num_ownship_states, meas_id*num_ownship_states] > threshold:
+            # Check we have all of the needed measurements LinRelx, LinRely, LinRelz of the asset
+            x_meas = [x for x in meas_queue if (isinstance(x, LinRelx_Explicit) and x.measured_asset_id == meas_id)]
+            y_meas = [x for x in meas_queue if (isinstance(x, LinRely_Explicit) and x.measured_asset_id == meas_id)]
+            z_meas = [x for x in meas_queue if (isinstance(x, LinRelz_Explicit) and x.measured_asset_id == meas_id)]
+            if (x_meas and y_meas) and z_meas:
+                return True
+    return False
 
 # TODO instantinate on FromGlobalRange/Azimuth!!
 # def instantiate_asset_range_bearing(self, asset_id):

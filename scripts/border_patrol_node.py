@@ -43,7 +43,8 @@ except rospy.ServiceException, e:
 
 bp = BorderPatrol()
 
-waypt_index = rospy.get_param("waypt_i", 0)
+waypt_index = rospy.get_param("~waypt_i", 0)
+rospy.loginfo("waypt_index: " + str(waypt_index))
 
 rate = rospy.Rate(1)
 while not rospy.is_shutdown():

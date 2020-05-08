@@ -73,17 +73,29 @@ class Asset:
         elif isinstance(meas, GPSyaw_Neighbor_Explicit):
             return GPSyaw_Neighbor_Implicit(meas.src_id, meas.neighbor_id, meas.R, meas.et_delta)
         elif isinstance(meas, Azimuth_Explicit):
-            return Azimuth_Implicit(meas.src_id, meas.measured_asset, meas.R, meas.et_delta)
+            return Azimuth_Implicit(meas.src_id, meas.measured_asset_id, meas.R, meas.et_delta)
         elif isinstance(meas, AzimuthGlobal_Explicit):
             return AzimuthGlobal_Implicit(meas.src_id, meas.global_pos, meas.R, meas.et_delta)
         elif isinstance(meas, Elevation_Explicit):
-            return Elevation_Implicit(meas.src_id, meas.measured_asset, meas.R, meas.et_delta)
+            return Elevation_Implicit(meas.src_id, meas.measured_asset_id, meas.R, meas.et_delta)
         elif isinstance(meas, ElevationGlobal_Explicit):
             return ElevationGlobal_Implicit(meas.src_id, meas.global_pos, meas.R, meas.et_delta)
         elif isinstance(meas, Range_Explicit):
-            return Range_Implicit(meas.src_id, meas.measured_asset, meas.R, meas.et_delta)
+            return Range_Implicit(meas.src_id, meas.measured_asset_id, meas.R, meas.et_delta)
         elif isinstance(meas, RangeGlobal_Explicit):
             return RangeGlobal_Implicit(meas.src_id, meas.global_pos, meas.R, meas.et_delta)
+        elif isinstance(meas, LinRelx_Explicit):
+            return LinRelx_Implicit(meas.src_id, meas.measured_asset_id, meas.R, meas.et_delta)
+        elif isinstance(meas, LinRely_Explicit):
+            return LinRely_Implicit(meas.src_id, meas.measured_asset_id, meas.R, meas.et_delta)
+        elif isinstance(meas, LinRelz_Explicit):
+            return LinRelz_Implicit(meas.src_id, meas.measured_asset_id, meas.R, meas.et_delta)
+        elif isinstance(meas, Velocityx_Explicit):
+            return Velocityx_Implicit(meas.src_id, meas.R, meas.et_delta)
+        elif isinstance(meas, Velocityy_Explicit):
+            return Velocityy_Implicit(meas.src_id, meas.R, meas.et_delta)
+        elif isinstance(meas, Velocityz_Explicit):
+            return Velocityz_Implicit(meas.src_id, meas.R, meas.et_delta)
         else:
             raise NotImplementedError("Implicit equivalent not found: " + meas.__class__.__name__)
 

@@ -5,7 +5,7 @@ from etddf.dynamics import linear_propagation
 from etddf.normalize_angle import *
 from etddf.measurement_expected import get_nonlinear_expected_meas
 from etddf.measurement_jacobians import get_measurement_jacobian
-# from etddf.instantiate_asset import instantiate_asset_range_bearing
+from etddf.instantiate_asset import instantiate_asset_linrel, check_instantiate_asset_linrel
 from scipy.stats import norm as normal
 from copy import deepcopy
 from pdb import set_trace
@@ -27,16 +27,26 @@ class ETFilter(object):
         self.linear_dynamics = linear_dynamics
         self.num_states = self.x_hat.size
         if (self.num_states % self.num_ownship_states) != 0:
-            raise Exception("Dimensionality of state vector does not align with the number of ownship states.")
+            raise ValueError("Dimensionality of state vector does not align with the number of ownship states.")
         elif num_ownship_states < world_dim:
-            raise Exception("Number of ownship states does not make sense for world dimension")
+            raise ValueError("Number of ownship states does not make sense for world dimension")
         self.num_assets = int( self.num_states / self.num_ownship_states )
-        self.is_main_fitler = False
         self.meas_queue = []
 
     def check_implicit(self, meas):
-        if not isinstance(meas, Measurement):
-            raise Exception("meas must of type Measurement")
+        """Checks if a measurement can be fused implicitly
+
+        Arguments:
+            meas {etddf.measurements.Explicit} -- Measurement to be checked
+
+        Raises:
+            TypeError: meas is not of type Explicit
+
+        Returns:
+            bool -- True for implicit / False for explicit
+        """
+        if not isinstance(meas, Explicit):
+            raise TypeError("meas must of type Explicit")
         if meas.is_angle_meas:
             meas.data = normalize_angle(meas.data)
 
@@ -45,38 +55,61 @@ class ETFilter(object):
         return np.abs(innovation) <= meas.et_delta
 
     def add_meas(self, meas):
+        """Adds a measurement to the filter
+
+        Arguments:
+            meas {etddf.measurements.Measurement} -- Measurement to be fused
+
+        Raises:
+            TypeError: meas is not of type Measurement
+        """
         if DEBUG:
             print(str(self.my_id) + " receiving meas: " + meas.__class__.__name__ + " | data: " + str(meas.data))
 
         if not isinstance(meas, Measurement):
-            raise Exception("meas must of type Measurement")
+            raise TypeError("meas must of type Measurement")
         if meas.is_angle_meas and not isinstance(meas, Implicit):
             meas.data = normalize_angle(meas.data)
 
         self.meas_queue.append(meas)
 
-        # Check if this is our first meas of asset
-        # If the meas is a range/bearing, instantiate the asset at measurement mean
-        if isinstance(meas, Azimuth_Explicit) or isinstance(meas, Range_Explicit) or isinstance(meas, Elevation_Explicit):
-            if self.P[meas.measured_asset_id*self.num_ownship_states, meas.measured_asset_id*self.num_ownship_states] > NO_ASSET_INFORMATION:
-                raise NotImplementedError("Instantiating assets based off of range/bearing")
-                # instantiate_asset_range_bearing(meas.measured_asset_id)
-    
-    def predict(self, u, Q):
+        # Check if we should instantiate this asset based off of the meas LinRel information
+        if check_instantiate_asset_linrel(meas, self.P, self.meas_queue, NO_ASSET_INFORMATION, self.num_ownship_states):
+            self.x_hat, self.P, self.meas_queue = instantiate_asset_linrel(meas.measured_asset_id, deepcopy(self.x_hat), deepcopy(self.P), deepcopy(self.meas_queue), self.num_ownship_states)
+        
+    def predict(self, u, Q, time_delta=1.0, use_control_input=False):
+        """Runs predicion step on the filter
+
+        Arguments:
+            u {np.ndarray} -- control input (num_ownship_states / 2, 1)
+            Q {np.ndarray} -- motion/process noise (nstates, nstates)
+
+        Keyword Arguments:
+            time_delta {float} -- Amount of time to predict in future (default: {1.0})
+            use_control_input {bool} -- Whether to use control input or assume constant velocity (default: {False})
+
+        Raises:
+            ValueError: Incorrect u dimensions
+            ValueError: Incorrect Q dimensions
+            NotImplementedError: Nonlinear Propagation
+        """
         if u.shape[1] > u.shape[0]:
-            raise Exception("u must be column vector")
+            raise ValueError("u must be column vector")
         if Q.shape != self.P.shape:
-            raise Exception("Q must have (state x state) dimensions")
+            raise ValueError("Q must have (state x state) dimensions")
 
         if self.linear_dynamics:
-            self.x_hat, A = linear_propagation(self.x_hat, u, self.num_ownship_states, self.my_id, is_main_fitler=self.is_main_fitler)
+            self.x_hat, A = linear_propagation(self.x_hat, u, self.num_ownship_states, self.my_id, use_control_input=use_control_input)
             self.P = A.dot( self.P.dot( A.T )) + Q
         else: # nonlinear dynamics
-            G = nonlinear_propagation(u)
-            self.P = G.dot( self.P.dot( G.T )) + Q
-            self.x_hat = normalize_all_angles(self.x_hat, self.num_ownship_states, self.num_assets, self.world_dim)
+            # G = nonlinear_propagation(u)
+            # self.P = G.dot( self.P.dot( G.T )) + Q
+            # self.x_hat = normalize_all_angles(self.x_hat, self.num_ownship_states, self.num_assets, self.world_dim)
+            raise NotImplementedError("nonlinear propagation requested")
 
     def correct(self):
+        """Runs correction step on the filter
+        """
         if not self.meas_queue:
             # print("meas_queue is empty!")
             return
@@ -98,8 +131,9 @@ class ETFilter(object):
                 K = self._get_kalman_gain(C, R)
                 innovation = self._get_innovation(meas, C).reshape(1,1)
                 self.x_hat += np.dot( K, innovation)
-                # TODO replace with joseph form of measurement update
-                self.P = ( np.eye(self.num_states) - np.dot(K, C) ).dot(self.P)
+                tmp = np.eye(self.num_states) - np.dot(K, C)
+                self.P = tmp.dot(self.P)
+                # self.P = np.dot( np.dot(tmp, self.P), tmp.T) + K.dot(R_mat.dot(K.T))
             else: # Implicit Update
                 C = get_measurement_jacobian(meas, self.x_hat, self.num_states, self.world_dim, self.num_ownship_states)
                 mu, Qe, alpha = self._get_implicit_predata(C, R, x_hat_start, P_start, meas)
@@ -166,14 +200,13 @@ class ETFilter_Main( ETFilter ):
                 common filter between both assets
         """
         super(ETFilter_Main, self).__init__(my_id, num_ownship_states, world_dim, x0, P0, linear_dynamics)
-        self.is_main_fitler = True
         self.common_filters = common_filters
     
     def _get_implicit_predata(self, C, R, x_hat_start, P_start, meas):
         x_ref = self._get_common_filter_states(meas.src_id).x_hat
         if meas.is_linear_meas:
             mu = C.dot(self.x_hat) - C.dot(x_hat_start )
-            Qe = C.dot( P_start.dot( C.T )) + R
+            Qe = np.abs(C.dot( P_start.dot( C.T )) + R)
             alpha = C.dot( x_ref) - C.dot(x_hat_start )
         else: # Nonlinear Measurement
             mu0 = get_nonlinear_expected_meas(meas, self.x_hat, self.world_dim, self.num_ownship_states) 

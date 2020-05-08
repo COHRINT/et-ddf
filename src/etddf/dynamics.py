@@ -2,7 +2,7 @@ from __future__ import division
 import numpy as np
 from copy import deepcopy
 
-def linear_propagation(x_hat, u, num_ownship_states, my_id, is_main_fitler=False):
+def linear_propagation(x_hat, u, num_ownship_states, my_id, time_delta=1.0, use_control_input=False):
     num_states = x_hat.size
     num_assets = int(num_states / num_ownship_states)
     x_hat = deepcopy(x_hat)
@@ -12,14 +12,14 @@ def linear_propagation(x_hat, u, num_ownship_states, my_id, is_main_fitler=False
     for i in range(num_assets):
         if i != my_id:
             for d in range(num_base_states):
-                A[i*num_ownship_states+d, i*num_ownship_states + num_base_states + d] = 1
+                A[i*num_ownship_states+d, i*num_ownship_states + num_base_states + d] = time_delta
 
     x_new = None
-    if is_main_fitler:
+    if use_control_input:
         B = np.zeros((num_states,1))
-        B[my_id*num_ownship_states,0] = u[0,0]
-        B[my_id*num_ownship_states+1,0] = u[1,0]
-        B[my_id*num_ownship_states+2,0] = u[2,0]
+        B[my_id*num_ownship_states,0] = u[0,0] * time_delta
+        B[my_id*num_ownship_states+1,0] = u[1,0] * time_delta
+        B[my_id*num_ownship_states+2,0] = u[2,0] * time_delta
         x_new = A.dot(x_hat) + B
         x_new[my_id*num_ownship_states+num_base_states:(my_id+1)*num_ownship_states] = u[:]
         A[my_id*num_ownship_states,my_id*num_ownship_states + num_base_states] = 1
