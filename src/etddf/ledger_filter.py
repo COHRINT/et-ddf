@@ -1,25 +1,33 @@
-#!/usr/bin/env python
-"""Contains class that records filter inputs and makes available an event triggered buffer.
+from __future__ import division
+"""@package etddf
 
-LedgerFilter
+Contains class that records filter inputs and makes available an event triggered buffer.
+
 """
+__author__ = "Luke Barbier"
+__copyright__ = "Copyright 2020, COHRINT Lab"
+__email__ = "luke.barbier@colorado.edu"
+__status__ = "Development"
+__license__ = "MIT"
+__maintainer__ = "Luke Barbier"
+__version__ = "1.0.0"
+
 from copy import deepcopy
 from etddf.etfilter import ETFilter, ETFilter_Main
 from etddf.measurements import *
 from etddf.asset import Asset
 import numpy as np
+from pdb import set_trace as st
 
-MEASUREMENTS_TYPES_NOT_SHARED=["modem"]
-FUSE_MEAS_NEXT_UPDATE = -1
+## Lists all measurement substrings to not send implicitly
+MEASUREMENT_TYPES_NOT_SHARED =     ["modem"]
+## Indicates meas should be fused on upcoming update step
+FUSE_MEAS_NEXT_UPDATE =             -1
+## Indicates to use this filters delta multiplier (Won't be used when fusing a buffer from another asset)
+THIS_FILTERS_DELTA =                -1
 
 class LedgerFilter:
-    """Records filter inputs and makes available an event triggered buffer. """
-    
-    ledger_meas = [] # In internal measurement form
-    ledger_control = [] ## elements with [u, Q, time_delta, use_control_input]
-    ledger_ci = [] ## Covariance Intersection ledger, each element is of form [x, P]
-    ledger_update_times = [] ## Update times of when correction step executed
-    expected_measurements = {} # When we don't receive an expected measurement we need to insert a "bookend" into the measurement buffer
+    """Records filter inputs and makes available an event triggered buffer. """    
 
     def __init__(self, num_ownship_states, x0, P0, buffer_capacity, meas_space_table, delta_codebook_table, delta_multiplier, is_main_filter, my_id):
         """Constructor
@@ -30,6 +38,7 @@ class LedgerFilter:
             P0 {np.ndarray} -- initial uncertainty
             buffer_capacity {int} -- capacity of measurement buffer
             meas_space_table {dict} -- Hash that stores how much buffer space a measurement takes up. Str (meas type) -> int (buffer space)
+                Must have key entries "bookend", "bookstart" to indicate space needed for measurement implicitness filling in
             delta_codebook_table {dict} -- Hash that stores delta trigger for each measurement type. Str(meas type) -> float (delta trigger)
             delta_multiplier {float} -- Delta trigger constant multiplier for this filter
             is_main_filter {bool} -- Is this filter a common or main filter (if main the meas buffer does not matter)
@@ -42,16 +51,22 @@ class LedgerFilter:
         self.is_main_filter = is_main_filter
         self.filter = ETFilter(my_id, num_ownship_states, 3, x0, P0, True)
 
+        self.ledger_meas = [] # In internal measurement form
+        self.ledger_control = [] ## elements with [u, Q, time_delta, use_control_input]
+        self.ledger_ci = [] ## Covariance Intersection ledger, each element is of form [x, P]
+        self.ledger_update_times = [] ## Update times of when correction step executed
+        self.expected_measurements = {} # When we don't receive an expected measurement we need to insert a "bookend" into the measurement buffer
+
         # Initialize first element of ledgers
         self.ledger_meas.append([])
         self.ledger_control.append([])
         self.ledger_ci.append([])
-        self.ledger_update_times.append([])
 
-    def add_meas(self, ros_meas, src_id, measured_id, time_index=FUSE_MEAS_NEXT_UPDATE):        
-        """Adds and records a measurement to the filter at the specified time
+    def add_meas(self, ros_meas, src_id, measured_id, delta_multiplier=THIS_FILTERS_DELTA):
+        """Adds and records a measurement to the filter
 
-        Will not attempt to track measurements
+        Measurements after last correction step time will be fused at next correction step
+            measurements before will be recorded and fused in catch_up()
 
         Arguments:
             ros_meas {etddf.Measurement.msg} -- The measurement in ROS form
@@ -59,11 +74,17 @@ class LedgerFilter:
             measured_id {int} -- asset ID that was measured (can be any value for ownship measurement)
 
         Keyword Arguments:
-            time_index {int} -- time of the ros measurement taken (default: {FUSE_MEAS_NEXT_UPDATE})
-                measurements for times not now will be recorded on the ledger but not fused
+            delta_multiplier {int} -- Delta multiplier to use for this measurement (default: {THIS_FILTERS_DELTA})
         """
         # Get the delta trigger for this measurement
-        et_delta = self._get_meas_et_delta(ros_meas.meas_type)
+        et_delta = self._get_meas_et_delta(ros_meas)
+
+        # Check if we're not using a standard delta_multiplier
+        if delta_multiplier != THIS_FILTERS_DELTA:
+            et_delta = (et_delta / self.delta_multiplier) * delta_multiplier # Undo delta multiplication and scale et_delta by new multiplier
+
+        # Get the update time index of the measurement
+        time_index = self._get_time_index(ros_meas.stamp)
 
         # Convert ros_meas to an implicit or explicit internal measurement
         meas = self._get_internal_meas_from_ros_meas(ros_meas, src_id, measured_id, et_delta)
@@ -72,18 +93,27 @@ class LedgerFilter:
         # Common filter with delta tiering
         if not self.is_main_filter and time_index==FUSE_MEAS_NEXT_UPDATE:
 
-            # Check for Implicit Update
-            if self.filter.check_implicit(meas):
-                meas = Asset.get_implicit_msg_equivalent(meas)
-            else:
-                # TODO Check for overflow
-                self.buffer.add_meas(ros_meas)
-            
-            # Implicit Bookend Logic
-            # Check if we should be expecting more of these measurements
-            l = [x for x in MEASUREMENTS_TYPES_NOT_SHARED if x in ros_meas.meas_type]
-            if not l and not isinstance(orig_meas, Implicit):
-                self.expected_measurements[type(orig_meas)] = [True, ros_meas]
+            # Check if this measurement is allowed to be sent implicitly
+            l = [x for x in MEASUREMENT_TYPES_NOT_SHARED if x in ros_meas.meas_type]
+            if not l:
+                # Check for Implicit Update
+                if self.filter.check_implicit(meas):
+
+                    # Check if this is the first of the measurement stream, if so, insert a bookstart
+                    bookstart = meas.__class__.__name__ not in self.expected_measurements.keys()
+                    
+                    if bookstart:
+                        self.buffer.insert_marker(ros_meas, ros_meas.stamp, bookstart=True)
+
+                    meas = Asset.get_implicit_msg_equivalent(meas)
+                    
+                # Fuse explicitly
+                else:
+                    # TODO Check for overflow
+                    self.buffer.add_meas(ros_meas)
+                
+                # Indicate we receieved our expected measurement
+                self.expected_measurements[orig_meas.__class__.__name__] = [True, ros_meas]
 
         # Append to the ledger
         self.ledger_meas[time_index].append(meas)
@@ -92,7 +122,7 @@ class LedgerFilter:
         if time_index == FUSE_MEAS_NEXT_UPDATE:
             self.filter.add_meas(meas)
         else:
-            pass # Measurement will be fused on catch up
+            pass # Measurement will be fused on delta_tier's catch_up()
 
     def predict(self, u, Q, time_delta=1.0, use_control_input=False):
         """Executes filter's prediction step
@@ -121,8 +151,8 @@ class LedgerFilter:
 
             # Did not receive our expected measurement
             if not rx:
-                print("Did not receive expected measurement: " + str(emeas))
-                self.buffer.insert_bookend(ros_meas, update_time)
+                print("Did not receive expected measurement: " + emeas)
+                self.buffer.insert_marker(ros_meas, update_time, bookstart=False)
                 del self.expected_measurements[emeas]
             # Received our expected measurement
             else:
@@ -130,13 +160,12 @@ class LedgerFilter:
 
         # Run correction step on filter
         self.filter.correct()
-        self.ledger_update_times[-1] = update_time
+        self.ledger_update_times.append(update_time)
 
         # Initialize next element of ledgers
         self.ledger_meas.append([])
         self.ledger_control.append([])
         self.ledger_ci.append([])
-        self.ledger_update_times.append([])
 
     def convert(self, delta_multiplier):
         """Converts the filter to have a new delta multiplier
@@ -219,15 +248,30 @@ class LedgerFilter:
                 return Velocityy_Implicit(src_id, ros_meas.variance, et_delta)
             else:
                 raise NotImplementedError(str(ros_meas))
+    
+    def _get_time_index(self, time_):
+        """Converts a time to an update time index
+
+        Uses the ledger of correction step times
+
+        Arguments:
+            time_ {time} -- Time to convert
+
+        Returns:
+            int -- corresponding index in the measurement,ci and control ledger
+                if time_ > last update time --> returns FUSE_MEAS_NEXT_UPDATE
+        """
+        # Check if we're fusing at next measurement time
+        if len(self.ledger_update_times) == 0 or time_ > self.ledger_update_times[-1]:
+            return FUSE_MEAS_NEXT_UPDATE
+        
+        for ind in reversed(range(len(self.ledger_update_times))):
+            if time_ > self.ledger_update_times[ind]:
+                return ind
+        return 0
 
 class MeasurementBuffer:
     """ Manages a delta tier buffer for windowed commmunication """
-
-    buffer = []
-    size = 0
-    meas_space_table = None
-    overflown = False
-    capacity = 0
 
     def __init__(self, meas_space_table, capacity):
         """Constructor
@@ -238,6 +282,10 @@ class MeasurementBuffer:
         """
         self.meas_space_table = meas_space_table
         self.capacity = capacity
+
+        self.buffer = []
+        self.size = 0
+        self.overflown = False
 
     def check_overflown(self):
         """Checks whether the filter's buffer has overflown
@@ -257,7 +305,12 @@ class MeasurementBuffer:
             overflown {bool} -- whether the buffer has overflown
         """
         self.buffer.append(ros_meas)
-        meas_space = self.meas_space_table[ros_meas.meas_type]
+        if "bookstart" in ros_meas.meas_type:
+            meas_space = self.meas_space_table["bookstart"]
+        elif "bookend" in ros_meas.meas_type:
+            meas_space = self.meas_space_table["bookend"]
+        else:
+            meas_space = self.meas_space_table[ros_meas.meas_type]
         self.size += meas_space
         if self.size > self.capacity:
             self.overflown = True
@@ -275,8 +328,14 @@ class MeasurementBuffer:
         self.size = 0
         return old_buffer
 
-    def insert_bookend(self, ros_meas, timestamp):
-        """Inserts a bookend to the buffer
+    def insert_marker(self, ros_meas, timestamp, bookstart=True):
+        """Inserts a bookstart/bookend to the buffer
+
+        A bookstart indicates the start of a measurement stream. This lets the other asset
+        receiving the buffer know to generate implicit measurments until the bookend (or end of buffer). 
+        Measurement streams are usually started by an explicit measurement, but can be started by
+        bookstarts if the bookstart type takes less space.
+
         A bookend indicates the halt of a measurement stream. This lets the other asset
         receiving the buffer know to stop generating implicit measurments in between explicit ones
 
@@ -284,10 +343,16 @@ class MeasurementBuffer:
             ros_meas {etddf.Measurement.msg} -- A ros measurement of the type to be halted
             timestamp {time} -- Timestamp to indicate halt of implicit measurements
 
+        Keyword Arguments:
+            bookstart {bool} -- whether to generate a bookstart or bookend (default: {True})
+
         Returns:
             bool -- buffer overflow indicator
         """
-        bookend = deepcopy(ros_meas)
-        bookend.meas_type += "_bookend"
-        bookend.stamp = timestamp
-        return self.add_meas(bookend)
+        marker = deepcopy(ros_meas)
+        if bookstart:
+            marker.meas_type += "_bookstart"
+        else:
+            marker.meas_type += "_bookend"
+        marker.stamp = timestamp
+        return self.add_meas(marker)

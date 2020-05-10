@@ -1,10 +1,15 @@
 class Measurement:
     src_id = None
+    measured_id = None
     data = None
     R = None
     et_delta = None
     is_linear_meas=True
     is_angle_meas=False
+
+    def _print(self):
+        """ Prints out member variables of a Measurement """
+        print(self.__class__.__name__ + " : " + str(self.__dict__))
 
 """ All Measurements are either explicit or implicit """
 class Implicit(Measurement):
@@ -225,7 +230,6 @@ class RangeGlobal_Implicit(Implicit):
 
 class RangeFromGlobal_Implicit(Implicit):
     def __init__(self, src_id, global_pose, data, R, et_delta):
-        self.measured_asset_id = measured_asset_id
         self.global_pose = global_pose # 3D [x,y,z,yaw] or 2D [x,y,yaw] (yaw isn't used)
         self.data = data
         self.R = R

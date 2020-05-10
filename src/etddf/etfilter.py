@@ -1,4 +1,29 @@
 from __future__ import division
+"""@package etddf
+
+Filter class for event triggering.
+
+Primary filter class is ETFilter but an asset's main filter differs slightly. The main filter needs access
+to common filter's (ETFilter) estimate in order to fuse implicit measurements. Therefore another class exists,
+ETFilter_Main, that also takes in a dictionary with common filters to other assets.
+
+Supports following dynamics, dimensions and states
+ - Linear 1D (x, x_dot)
+ - Linear 2D (x, y, x_dot, y_dot)
+ - Nonlinear 2D (x, y, yaw, x_dot, y_dot, yaw_dot)
+ - Linear 3D (x, y, z, x_dot, y_dot, z_dot)
+ - Nonlinear 3D (x, y, z, yaw, x_dot, y_dot, z_dot, yaw_dot)
+
+Supports fusing all Explicit and Implicit measurements defined in etddf/measurements.py
+"""
+__author__ = "Luke Barbier"
+__copyright__ = "Copyright 2020, COHRINT Lab"
+__email__ = "luke.barbier@colorado.edu"
+__status__ = "Development"
+__license__ = "MIT"
+__maintainer__ = "Luke Barbier"
+__version__ = "1.1.0"
+
 import numpy as np
 from etddf.measurements import *
 from etddf.dynamics import linear_propagation
@@ -45,6 +70,7 @@ class ETFilter(object):
         Returns:
             bool -- True for implicit / False for explicit
         """
+        # TODO add support for scaling innovation check by the uncertainty
         if not isinstance(meas, Explicit):
             raise TypeError("meas must of type Explicit")
         if meas.is_angle_meas:
@@ -186,11 +212,11 @@ class ETFilter(object):
 
         return z_bar, curly_theta
 
-""" Main filter
-differs slightly from an ETFilter in its implicit measurement update
-Needs access to common filters for implicit measurement updates
-"""
 class ETFilter_Main( ETFilter ):
+    """Main filter for an asset
+    Differs slightly from an ETFilter in its implicit measurement update because it 
+    needs access to common filters with other assets to fuse implicit measurements
+    """
     def __init__(self, my_id, num_ownship_states, world_dim, x0, P0, linear_dynamics, common_filters):
         """
         common_filters : dict
