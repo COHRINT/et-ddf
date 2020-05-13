@@ -18,6 +18,7 @@ from etddf.measurements import *
 from etddf.asset import Asset
 import numpy as np
 from pdb import set_trace as st
+from etddf.msg import Measurement
 
 ## Lists all measurement substrings to not send implicitly
 MEASUREMENT_TYPES_NOT_SHARED =     ["modem"]
@@ -51,6 +52,7 @@ class LedgerFilter:
         self.is_main_filter = is_main_filter
         self.filter = ETFilter(my_id, num_ownship_states, 3, x0, P0, True)
 
+        # Initialize Ledgers
         self.ledger_meas = [] # In internal measurement form
         self.ledger_control = [] ## elements with [u, Q, time_delta, use_control_input]
         self.ledger_ci = [] ## Covariance Intersection ledger, each element is of form [x, P]
@@ -110,7 +112,7 @@ class LedgerFilter:
                 # Fuse explicitly
                 else:
                     # TODO Check for overflow
-                    self.buffer.add_meas(ros_meas)
+                    self.buffer.add_meas(deepcopy(ros_meas))
                 
                 # Indicate we receieved our expected measurement
                 self.expected_measurements[orig_meas.__class__.__name__] = [True, ros_meas]
@@ -183,6 +185,17 @@ class LedgerFilter:
         """
         return self.buffer.check_overflown()
 
+    def flush_buffer(self, final_time):
+        """Returns the event triggered buffer
+
+        Arguments:
+            final_time {time} -- the last time measurements were considered to be added to the buffer 
+
+        Returns:
+            list -- the flushed buffer of measurements
+        """
+        return self.buffer.flush(final_time)
+
     def _get_meas_et_delta(self, ros_meas):
         """Gets the delta trigger for the measurement
 
@@ -196,11 +209,10 @@ class LedgerFilter:
             float -- the delta trigger scaled by the filter's delta multiplier
         """
         # Match root measurement type e.g. "modem_range" with "modem_range_implicit"
-        found = [x for x in self.delta_codebook_table.keys() if x in ros_meas.meas_type]
-        if not found:
-            raise KeyError("Unrecognized Measurement Type " + ros_meas.meas_type + ". Please add to etddf/measurements.py")
-        else:
-            return self.delta_codebook_table[ros_meas.meas_type] * self.delta_multiplier
+        for meas_type in self.delta_codebook_table.keys():
+            if meas_type in ros_meas.meas_type:
+                return self.delta_codebook_table[meas_type] * self.delta_multiplier
+        raise KeyError("Measurement Type " + ros_meas.meas_type + " not found in self.delta_codebook_table")
     
     def _get_internal_meas_from_ros_meas(self, ros_meas, src_id, measured_id, et_delta):
         """Converts etddf/Measurement.msg (implicit or explicit) to a class in etddf/measurements.py
@@ -265,9 +277,15 @@ class LedgerFilter:
         if len(self.ledger_update_times) == 0 or time_ > self.ledger_update_times[-1]:
             return FUSE_MEAS_NEXT_UPDATE
         
-        for ind in reversed(range(len(self.ledger_update_times))):
+        # Lookup on what index this corresponds to in the ledger_update_times
+        # Note: len(ledger_meas/control/ci) is always 1 greater than len(ledger_update_times)
+        # Therefore, the first if statement in this fxn is for filling that last/newest slot
+        # This for loop then has a 1 to 1 correspondence: ledger_update_times[i] corresponds to ledger_meas/control/ci[i]
+        # The subtraction and addition below of indices is for zero order holding all measurements between times
+        # t1 and t2 to be associated with time t2
+        for ind in reversed(range(len(self.ledger_update_times) - 1)):
             if time_ > self.ledger_update_times[ind]:
-                return ind
+                return ind + 1
         return 0
 
 class MeasurementBuffer:
@@ -281,7 +299,9 @@ class MeasurementBuffer:
             capacity {int} -- capacity of the buffer
         """
         self.meas_space_table = meas_space_table
-        self.capacity = capacity
+
+        # Make room for the final time marker
+        self.capacity = capacity - meas_space_table["final_time"]
 
         self.buffer = []
         self.size = 0
@@ -316,16 +336,26 @@ class MeasurementBuffer:
             self.overflown = True
         return self.overflown
 
-    def flush(self):
+    def flush(self, final_time):
         """Returns and clears the buffer
+
+        Arguments:
+            final_time {time} -- the last time measurements were considered to be added to the buffer 
         
         Returns:
             buffer {list} -- the flushed buffer
         """
+        # Insert the "final_time" marker at the end of the buffer
+        final_time_marker = Measurement("final_time", final_time, "","",0.0,0.0,[])
+        self.buffer.append(final_time_marker)
+
         old_buffer = deepcopy(self.buffer)
+
+        # Clear buffer
         self.buffer = []
         self.overflown = False
         self.size = 0
+
         return old_buffer
 
     def insert_marker(self, ros_meas, timestamp, bookstart=True):

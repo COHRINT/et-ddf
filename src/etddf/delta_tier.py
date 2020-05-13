@@ -15,7 +15,9 @@ from copy import deepcopy
 from etddf.ledger_filter import LedgerFilter, MEASUREMENT_TYPES_NOT_SHARED
 from etddf.msg import Measurement
 import time
+from pdb import set_trace as st
 
+# TODO add threading protection between functions
 class DeltaTier:
     """Windowed Communication Event Triggered Communication
 
@@ -90,41 +92,62 @@ class DeltaTier:
         """
         pass
 
-    def catch_up(self, shared_buffer, delta_multiplier):
+    def catch_up(self, delta_multiplier, shared_buffer):
         """Updates main estimate and common estimate using the shared buffer
 
         Arguments:
-            shared_buffer {list} -- buffer shared from another asset
             delta_multiplier {float} -- multiplier to scale et_delta's with
+            shared_buffer {list} -- buffer shared from another asset
         """
         # Fill in implicit measurements in the buffer and align the meas timestamps with our own
-        new_buffer, time_indices = self._fillin_align_buffer(shared_buffer)
-        # Add all measurements in buffer to ledgers of all ledger_filters
+        new_buffer = self._fillin_align_buffer(shared_buffer)
 
-        # for meas in new_buffer:
-        #     self.main_filter.add_meas()
+        # Add all measurements in buffer to ledgers of all ledger_filters
+        for meas in new_buffer:
+            self.add_meas(meas)
+
 
         # Grab lock, no updates for right now
         # Initialize a new main and common filters (all are etfilters) using original estimate
         # Pair the main filter with the etfilter the other asset chose and use to update the main filter
         # Loop through all ledger_update_times
+        # -- for each filter
+        # ---- for each meas in measurements add it to
         # update new common etfilter
         # update new main etfilter
+
         # reset the ledger filters
 
     def pull_buffer(self):
         """Pulls lowest delta multiplier's buffer that hasn't overflown
 
         Returns:
+            multiplier {float} -- the delta multiplier that was chosen
             buffer {list} -- the buffer of ros measurements
         """
-        # loop through delta_multipliers, find lowest one that hasn't overflown
-        # buffer = flush that buffer
-        # delete the other ledgerfilters
-        # deepcopy the chosen filter for however many filters were deleted
-        # convert the filters using delta_multiplier
-        # return 
-        pass
+        # Find lowest delta tier that hasn't overflown
+        not_overflown_list = []
+        for key in self.delta_tiers:
+            if not self.delta_tiers[key].check_overflown():
+                not_overflown_list.append(key)
+            
+        # TODO add overflow support -> possibly at runtime rather than extend this callback
+        if not not_overflown_list:
+            raise NotImplementedError("All deltatier buffers have overflown")
+        else:
+            lowest_multiplier = min(not_overflown_list)
+
+        last_time = self.main_filter.ledger_update_times[-1]
+        buffer = self.delta_tiers[lowest_multiplier].flush_buffer(last_time)
+        
+        # Change old delta tiers to be copies of the selected one
+        for key in self.delta_tiers:
+            if key != lowest_multiplier:
+                del self.delta_tiers[key]
+                self.delta_tiers[key] = deepcopy(self.delta_tiers[lowest_multiplier])
+                self.delta_tiers[key].convert(key) # Change the delta multiplier to the new one
+                
+        return lowest_multiplier, buffer
 
     def predict(self, u, Q, time_delta=1.0):
         """Executes prediction step on all filters
@@ -145,7 +168,14 @@ class DeltaTier:
 
         Arguments:
             update_time {time} -- Update time to record on the ledger update times
+
+        Raises:
+            ValueError: Update time is before the previous update time
+
         """
+        if (len(self.main_filter.ledger_update_times) > 1) and (update_time <= self.main_filter.ledger_update_times[-1]):
+            raise ValueError("update time must be later in time than last update time")
+
         self.main_filter.correct(update_time)
         for key in self.delta_tiers.keys():
             self.delta_tiers[key].correct(update_time)
@@ -174,25 +204,90 @@ class DeltaTier:
         Arguments:
             shared_buffer {list} -- List of measurements received from other asset
         """
+        # Sort the buffer cronologically
+        fxn = lambda x : x.stamp
+        shared_buffer.sort(key=fxn)
+
         new_buffer = []
         expected_meas = {}
-        current_time = shared_buffer[0].stamp
-        for meas in shared_buffer:
-            if "bookstart" in meas.meas_type:
-                expected_meas[meas.meas_type[:-len("_bookstart")]] = meas
-            elif "bookend" in meas.meas_type:
-                del expected_meas[meas.meas_type[:-len("_bookend")]]
-            
-            if current_time > meas.stamp:
-                # Fill in all implicit measurements
-                for emeas in expected_meas.keys():
-                    new_implicit = deepcopy(expected_meas[emeas])
-                    new_implicit.meas_type = meas.meas_type[:-len("_bookstart")] + "_implicit"
-                    new_implicit.stamp = current_time
-                    new_buffer.append(new_implicit)
-                current_time = meas.stamp
+        ledger_update_times = self.main_filter.ledger_update_times
 
-    def debug_print_deltatiers(self):
+        for t in ledger_update_times:
+            to_delete = []
+            for i in range(len(shared_buffer)):
+                meas = shared_buffer[i]
+
+                # Process now if measurment was before ledger time
+                if meas.stamp <= t:
+                    if "bookstart" in meas.meas_type:
+                        meas.meas_type = meas.meas_type[:-len("_bookstart")]
+                        expected_meas[meas.meas_type] = [False, meas]
+                    # Bookend means stop generating implicit measurments
+                    elif "bookend" in meas.meas_type:
+                        meas_type = meas.meas_type[:-len("_bookend")]
+                        del expected_meas[meas_type]
+                    # Final time, no more implicit measurement generation after this
+                    elif "final_time" == meas.meas_type:
+                        pass
+                    # We received a normal explicit measurement
+                    else:
+                        meas.stamp = t
+                        new_buffer.append(meas)
+                        expected_meas[meas.meas_type] = [True, meas]
+
+                    # Msg has been processed, add it to be deleted
+                    to_delete.append(i)
+
+                # Since buffer is sorted, all following measurements must be at later times
+                # so we don't need to search through them at this timestep
+                else:
+                    break
+
+            # Delete measurements already added to the new buffer
+            # Reverse so our indices don't change as we delete elements
+            for i in reversed(to_delete):
+                shared_buffer.pop(i)
+                
+            # Fill in implicit measurements at this timestep
+            for emeas in expected_meas.keys():
+                received, ros_meas = expected_meas[emeas]
+                # Generate an implicit measurement
+                if not received:
+                    new_meas = deepcopy(ros_meas)
+                    new_meas.meas_type = emeas + "_implicit"
+                    new_meas.stamp = t
+                    new_buffer.append(deepcopy(new_meas))
+                expected_meas[emeas][0] = False
+            
+            # If we're out of measurements (including the "final_time"), our buffer is ready
+            if len(shared_buffer) == 0:
+                break
+
+        return new_buffer
+
+    def debug_print_meas_ledgers(self, multiplier):
+        """Prints the measurement ledger of the multiplier's filter
+
+        Arguments:
+            multiplier {float} -- Must be a key in self.delta_tiers
+        """
+        for entry in self.delta_tiers[multiplier].ledger_meas:
+            measurements = [x.__class__.__name__ for x in entry]
+            print(measurements)
+
+    def debug_common_estimate(self, multiplier):
+        """Returns the estimate of the deltatier filter
+
+        Arguments:
+            multiplier {float} -- Must be a key in self.delta_tiers
+
+        Returns:
+            np.array -- Mean of estimate of the filter
+            np.array -- Covariance of estimate of the filter
+        """
+        return deepcopy(self.delta_tiers[multiplier].x_hat), deepcopy(self.delta_tiers[multiplier].P)
+
+    def debug_print_buffers(self):
         """Prints the contents of all of the delta tier buffers
         """
         for dt_key in self.delta_tiers.keys():
@@ -206,80 +301,126 @@ if __name__ == "__main__":
     import numpy as np
     x0 = np.zeros((6,1))
     P = np.ones((6,6)) * 10
-    meas_space_table = {"depth":2, "dvl_x":2,"dvl_y":2, "bookend":1,"bookstart":1}
+    meas_space_table = {"depth":2, "dvl_x":2,"dvl_y":2, "bookend":1,"bookstart":1, "final_time":0}
     delta_codebook_table = {"depth":1.0, "dvl_x":1, "dvl_y":1}
     asset2id = {"my_name":0}
     buffer_cap = 10
     dt = DeltaTier(6, x0, P, buffer_cap, meas_space_table, delta_codebook_table, [0.5,1.5], asset2id, "my_name")
 
-    # Test regular update
-    ## Init process noise & contol input
     Q = np.eye(6); Q[3:,3:] = np.zeros(Q[3:,3:].shape)
     u = np.array([[0.1,0.1,-0.1]]).T
-    t = time.time()
-    z = Measurement("depth", t, "my_name","", -1, 0.1, [])
-    dvl_x = Measurement("dvl_x", t, "my_name","", 1, 0.1, [])
-    dvl_y = Measurement("dvl_y", t, "my_name","", 1, 0.1, [])
+    t1 = time.time()
+    z = Measurement("depth", t1, "my_name","", -1, 0.1, [])
+    dvl_x = Measurement("dvl_x", t1, "my_name","", 1, 0.1, [])
+    dvl_y = Measurement("dvl_y", t1, "my_name","", 1, 0.1, [])
 
-    # First loop should add fill up first buffer but not second
-    print("0.5 should have depth,dvl_x,dvl_y")
-    print("1.5 should have bookstarts for depth,dvl_x,dvl_y")
+    test_normal, test_buffer_pull, test_catch_up = False, False, True
+
+    ##### Test Normal Delta Tiering: bookstarts, bookends
     dt.add_meas(z)
     dt.add_meas(dvl_x)
     dt.add_meas(dvl_y)
     dt.predict(u,Q)
-    dt.correct(t)
-    dt.debug_print_deltatiers()
-    print("---")
+    dt.correct(t1)
+    if test_normal:
+        print("0.5 should have depth,dvl_x,dvl_y")
+        print("1.5 should have bookstarts for depth,dvl_x,dvl_y")
+        dt.debug_print_buffers()
+        print("---")
 
-    print("0.5 should have depth,dvl_x,dvl_y, dvl_x, dvl_y")
-    print("1.5 should have bookstarts{depth,dvl_x,dvl_y}, dvl_x, dvl_y")
-    t = time.time()
-    z.stamp = t
-    dvl_x.stamp = t
-    dvl_y.stamp = t
+    t2 = time.time()
+    z.stamp = t2
+    dvl_x.stamp = t2
+    dvl_y.stamp = t2
     dvl_x.data = 2
     dvl_y.data = 2
     dt.add_meas(z)
     dt.add_meas(dvl_x)
     dt.add_meas(dvl_y)
     dt.predict(u,Q)
-    dt.correct(t)
-    dt.debug_print_deltatiers()
-    print("---")
+    dt.correct(t2)
+    if test_normal:
+        print("0.5 should have depth,dvl_x,dvl_y, dvl_x, dvl_y")
+        print("1.5 should have bookstarts{depth,dvl_x,dvl_y}, dvl_x, dvl_y")
+        dt.debug_print_buffers()
+        print("---")
 
-    print("0.5 should be overflown")
-    print("1.5 should have bookstarts{depth,dvl_x,dvl_y}, dvl_x, dvl_y, depth")
-    t = time.time()
-    z.stamp = t
-    dvl_x.stamp = t
-    dvl_y.stamp = t
+    t3 = time.time()
+    z.stamp = t3
+    dvl_x.stamp = t3
+    dvl_y.stamp = t3
     z.data = -3
     dt.add_meas(z)
-    dt.add_meas(dvl_x)
+    # dt.add_meas(dvl_x)
     dt.add_meas(dvl_y)
     dt.predict(u,Q)
-    dt.correct(t)
-    dt.debug_print_deltatiers()
-    print("---")
+    dt.correct(t3)
+    if test_normal:
+        print("0.5 should be overflown")
+        print("1.5 should have bookstarts{depth,dvl_x,dvl_y}, dvl_x, dvl_y, depth, dvl_x_bookend")
+        dt.debug_print_buffers()
+        print("---")
 
-    
-    # TODO Loop and add truth measurements
-    # for i in range()
-    ### LOOP below until first delta tier has overflown
-    ## Add depth meas
-    ## Add dvl_x, dvl_y
-    ## Predict
-    ## Correct
-    ### END LOOP
-    ## Add new depth, add new dvl_x, dvl_y that are "surprising for some filters"
-    ## predict
-    ## correct
-    ## Check predicted 
-    # Pull buffer
-    # Create a new buffer
-    # Call catchup with new buffer
-    # Check estimate has changed but is still in same ballpark
+    ##### Test Buffer Pulling #####
+    if test_buffer_pull:
+        print("0.5 should be overflown")
+        print("1.5 should have bookstarts{depth,dvl_x,dvl_y}, dvl_x, dvl_y, depth")
+        print("Our buffer should be the 1.5 one")
+        dt.debug_print_buffers()
+        mult, buffer = dt.pull_buffer()
+        strbuffer = [x.meas_type for x in buffer]
+        print(strbuffer)
+        dt.debug_print_buffers()
+
+    ##### Test catching up #####
+    if test_catch_up:
+        print("{:.20f}".format(t1))
+        print("{:.20f}".format(t2))
+        print("{:.20f}".format(t3))
+        print("meas ledgers of: " + str(1.5))
+        dt.debug_print_meas_ledgers(1.5)
+        # dt.debug_print_buffers()
+        mult, buffer = dt.pull_buffer()
+        buf_contents = [x.meas_type for x in buffer]
+        # print(buf_contents)
+        from random import shuffle
+        shuffle(buffer)
+        # TODO, scramble the buffer
+
+        # strbuffer = [x.meas_type for x in buffer]
+        # print(strbuffer)
+
+        dt2 = DeltaTier(6, x0, P, buffer_cap, meas_space_table, delta_codebook_table, [0.5,1.5], asset2id, "my_name")
+        dt2.predict(u, Q)
+        dt2.correct(t1)
+        dt2.predict(u, Q)
+        dt2.correct(t2)
+        dt2.predict(u, Q)
+        dt2.correct(t3)
+
+        print("catch up")
+        dt2.catch_up(mult, buffer)
+        dt2.debug_print_meas_ledgers(1.5)
+
+
+        # Should see the same meas ledgers as above for both
+        # dt2.debug_print_meas_ledgers(0.5)
+        # dt2.debug_print_meas_ledgers(1.5)
+
+
+    ## Pull buffer from one delta tier, instantiate another and predict/correct at all times but with no measurements
+    ## Catchup the buffer, the measurement ledgers should be the same
+    # the common estimates should be the same, the main estimates should be similar though not the same
+
+    ## Repeat scenario but add a single depth measurement at time t2, see that combining was not a problem
+    ## Check measurement ledger and common estimates differ slightly
+
+    ## Test placement of older measurements in the ledger
+    ## Test filling in of implicit measurements in the buffer
+    ## Test Catching up
+    ## Test creation of new ledger filters & main estimate
+    ## Check those measurements have actually been fused & the estimate has changed to be more accurate
+
 """
 delta_multipliers := [0.1,0.2,0.5,1]
 Initialize delta tier filter
