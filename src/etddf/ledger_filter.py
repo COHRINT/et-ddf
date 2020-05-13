@@ -196,6 +196,47 @@ class LedgerFilter:
         """
         return self.buffer.flush(final_time)
 
+    def reset(self, buffer, ledger_update_times, ledger_meas, ledger_control=[], ledger_ci=[]):
+        """Resets a ledger filter with the inputted ledgers
+
+        Arguments:
+            buffer {MeasurementBuffer} -- Measurement buffer to be preserved
+            ledger_update_times {list} -- Update times
+            ledger_meas {list} -- List of measurements at each update time
+
+        Keyword Arguments:
+            ledger_control {list} -- List of control inputs (default: {[]})
+            ledger_ci {list} -- List of covariance intersections (default: {[]})
+
+        Raises:
+            ValueError: lengths of ledgers do not match
+        """
+        self.buffer = deepcopy(buffer)
+        self.ledger_update_times = deepcopy(ledger_update_times)
+
+        # Measurement Ledger
+        self.ledger_meas = deepcopy(ledger_meas)
+        if len(self.ledger_meas) != len(self.ledger_update_times):
+                raise ValueError("Meas Ledger does not match length of update times!")
+
+        # Control Input Ledger
+        if ledger_control != []:
+            self.ledger_control = ledger_control
+            if len(self.ledger_control) != len(self.ledger_update_times):
+                raise ValueError("Control Ledger does not match length of update times!")
+        else:
+            # Initialize with empty lists
+            self.ledger_control = [[] for _ in range(len(self.ledger_update_times))]
+
+        # Covariance intersection ledger
+        if ledger_ci != []:
+            self.ledger_ci = ledger_ci
+            if len(self.ledger_ci) != len(self.ledger_update_times):
+                raise ValueError("CI Ledger does not match length of update times!")
+        else:
+            # Initialize with empty lists
+            self.ledger_ci = [[] for _ in range(len(self.ledger_update_times))]
+        
     def _get_meas_et_delta(self, ros_meas):
         """Gets the delta trigger for the measurement
 

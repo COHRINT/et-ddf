@@ -248,4 +248,8 @@ class ETFilter_Main( ETFilter ):
         return mu, Qe, alpha
 
     def _get_common_filter_states(self, asset_id):
+        # If only one common filter, just return that one
+        if len(self.common_filters) == 1:
+            return self.common_filters[self.common_filters.keys()[0]]
+        # return the specific common filter with that asset
         return self.common_filters[asset_id]
