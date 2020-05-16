@@ -62,7 +62,7 @@ class DeltaTier:
         self.main_filter = LedgerFilter(
             num_ownship_states, x0, P0, \
             buffer_capacity, meas_space_table, \
-            delta_codebook_table, 0.0, \
+            delta_codebook_table, 1.0, \
             True, asset2id[my_name]
         )
 
@@ -112,7 +112,7 @@ class DeltaTier:
             shared_buffer {list} -- buffer shared from another asset
         """
         # Fill in implicit measurements in the buffer and align the meas timestamps with our own
-        new_buffer, last_ledger_time_index = self._fillin_buffer(shared_buffer)
+        new_buffer, next_ledger_time_index = self._fillin_buffer(shared_buffer)
 
         # Add all measurements in buffer to ledgers of all ledger_filters
         for meas in new_buffer:
@@ -135,7 +135,7 @@ class DeltaTier:
         common_meas_ledger = {}
         for mult in self.delta_tiers.keys():
             common_meas_ledger[mult] = self.delta_tiers[mult].ledger_meas
-        main_control_ledger = self.main_filter.ledger_meas
+        main_control_ledger = self.main_filter.ledger_control
         main_ledger_meas = self.main_filter.ledger_meas
         # TODO add covariance intersection support (happens after correction?)
         main_ci_ledger = self.main_filter.ledger_meas
@@ -144,7 +144,7 @@ class DeltaTier:
         # Initialize a new main and common filters (all are etfilters) using original estimate
         for i_ledge in range(len(self.main_filter.ledger_update_times)):
 
-            [u, Q, delta_time] = main_control_ledger[i_ledge]
+            [u, Q, delta_time, _] = main_control_ledger[i_ledge]
             
             for mult in common_filters.keys():
                 common_filters[mult].predict(u, Q, delta_time, use_control_input=False)
@@ -159,11 +159,19 @@ class DeltaTier:
             main_filter.correct()
                 
         # Trim ledgers
-        ledger_update_times = self.main_filter.ledger_update_times[last_ledger_time_index:]
-        for mult in common_meas_ledger.keys():
-            common_meas_ledger[mult] = common_meas_ledger[last_ledger_time_index:]
-        main_ledger_meas = main_ledger_meas[last_ledger_time_index:]
-        main_control_ledger = main_control_ledger[last_ledger_time_index:]
+        if next_ledger_time_index != len(self.main_filter.ledger_update_times):
+            ledger_update_times = self.main_filter.ledger_update_times[next_ledger_time_index:]
+            for mult in common_meas_ledger.keys():
+                common_meas_ledger[mult] = common_meas_ledger[mult][next_ledger_time_index:]
+            main_ledger_meas = main_ledger_meas[next_ledger_time_index:]
+            main_control_ledger = main_control_ledger[next_ledger_time_index:]
+        else:
+            ledger_update_times = []
+            for mult in common_meas_ledger.keys():
+                common_meas_ledger[mult] = [[]]
+            main_ledger_meas = [[]]
+            main_control_ledger = [[]]
+
 
         # Reset the ledger filters
 
@@ -194,7 +202,7 @@ class DeltaTier:
         self.main_filter = LedgerFilter(
             self.num_ownship_states, x0, P0, \
             self.buffer_capacity, self.meas_space_table, \
-            self.delta_codebook_table, 0.0, \
+            self.delta_codebook_table, 1.0, \
             True, self.asset2id[self.my_name]
         )
         self.main_filter.reset(mainbuf, ledger_update_times, main_ledger_meas, main_control_ledger)
@@ -297,7 +305,7 @@ class DeltaTier:
         expected_meas = {}
         ledger_update_times = self.main_filter.ledger_update_times
 
-        last_ledger_time_index = len(ledger_update_times) - 1
+        next_ledger_time_index = len(ledger_update_times) - 1
 
         for i_ledge in range(len(ledger_update_times)):
             # Time instance at this index
@@ -354,10 +362,10 @@ class DeltaTier:
             
             # If we're out of measurements (including the "final_time"), our buffer is ready
             if len(shared_buffer) == 0:
-                last_ledger_time_index = i_ledge
+                next_ledger_time_index = i_ledge + 1
                 break
 
-        return new_buffer, last_ledger_time_index
+        return new_buffer, next_ledger_time_index
 
     def debug_print_meas_ledgers(self, multiplier):
         """Prints the measurement ledger of the multiplier's filter
@@ -494,6 +502,7 @@ if __name__ == "__main__":
 
         print("catch up")
         dt2.catch_up(mult, buffer)
+        dt.debug_print_meas_ledgers(1.5)
         dt2.debug_print_meas_ledgers(1.5)
 
 

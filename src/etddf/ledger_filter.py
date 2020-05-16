@@ -45,6 +45,9 @@ class LedgerFilter:
             is_main_filter {bool} -- Is this filter a common or main filter (if main the meas buffer does not matter)
             my_id {int} -- ID# of the current asset (typically 0)
         """
+        if delta_multiplier <= 0:
+            raise ValueError("Delta Multiplier must be greater than 0")
+
         self.original_estimate = [deepcopy(x0), deepcopy(P0)]
         self.delta_codebook_table = delta_codebook_table
         self.delta_multiplier = delta_multiplier
@@ -196,7 +199,7 @@ class LedgerFilter:
         """
         return self.buffer.flush(final_time)
 
-    def reset(self, buffer, ledger_update_times, ledger_meas, ledger_control=[], ledger_ci=[]):
+    def reset(self, buffer, ledger_update_times, ledger_meas, ledger_control=None, ledger_ci=None):
         """Resets a ledger filter with the inputted ledgers
 
         Arguments:
@@ -205,8 +208,8 @@ class LedgerFilter:
             ledger_meas {list} -- List of measurements at each update time
 
         Keyword Arguments:
-            ledger_control {list} -- List of control inputs (default: {[]})
-            ledger_ci {list} -- List of covariance intersections (default: {[]})
+            ledger_control {list} -- List of control inputs (default: {None})
+            ledger_ci {list} -- List of covariance intersections (default: {None})
 
         Raises:
             ValueError: lengths of ledgers do not match
@@ -216,22 +219,22 @@ class LedgerFilter:
 
         # Measurement Ledger
         self.ledger_meas = deepcopy(ledger_meas)
-        if len(self.ledger_meas) != len(self.ledger_update_times):
+        if len(self.ledger_meas)-1 != len(self.ledger_update_times):
                 raise ValueError("Meas Ledger does not match length of update times!")
 
         # Control Input Ledger
-        if ledger_control != []:
+        if ledger_control is not None:
             self.ledger_control = ledger_control
-            if len(self.ledger_control) != len(self.ledger_update_times):
+            if len(self.ledger_control)-1 != len(self.ledger_update_times):
                 raise ValueError("Control Ledger does not match length of update times!")
         else:
             # Initialize with empty lists
             self.ledger_control = [[] for _ in range(len(self.ledger_update_times))]
 
         # Covariance intersection ledger
-        if ledger_ci != []:
+        if ledger_ci is not None:
             self.ledger_ci = ledger_ci
-            if len(self.ledger_ci) != len(self.ledger_update_times):
+            if len(self.ledger_ci)-1 != len(self.ledger_update_times):
                 raise ValueError("CI Ledger does not match length of update times!")
         else:
             # Initialize with empty lists
