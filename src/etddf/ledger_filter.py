@@ -79,7 +79,7 @@ class LedgerFilter:
             measured_id {int} -- asset ID that was measured (can be any value for ownship measurement)
 
         Keyword Arguments:
-            delta_multiplier {int} -- Delta multiplier to use for this measurement (default: {THIS_FILTERS_DELTA})
+            delta_multiplier {float} -- Delta multiplier to use for this measurement (default: {THIS_FILTERS_DELTA})
         """
         # Get the delta trigger for this measurement
         et_delta = self._get_meas_et_delta(ros_meas)

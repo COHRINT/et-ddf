@@ -382,12 +382,16 @@ class DeltaTier:
 
         Arguments:
             multiplier {float} -- Must be a key in self.delta_tiers
+                If 'None', returns the main filter estimate
 
         Returns:
             np.array -- Mean of estimate of the filter
             np.array -- Covariance of estimate of the filter
         """
-        return deepcopy(self.delta_tiers[multiplier].x_hat), deepcopy(self.delta_tiers[multiplier].P)
+        if multiplier is None:
+            return deepcopy(self.main_filter.filter.x_hat), deepcopy(self.main_filter.filter.P)
+        else:
+            return deepcopy(self.delta_tiers[multiplier].filter.x_hat), deepcopy(self.delta_tiers[multiplier].filter.P)
 
     def debug_print_buffers(self):
         """Prints the contents of all of the delta tier buffers
@@ -483,6 +487,7 @@ if __name__ == "__main__":
         dt.debug_print_meas_ledgers(1.5)
         # dt.debug_print_buffers()
         mult, buffer = dt.pull_buffer()
+        print(mult)
         buf_contents = [x.meas_type for x in buffer]
         # print(buf_contents)
         from random import shuffle
@@ -504,7 +509,12 @@ if __name__ == "__main__":
         dt2.catch_up(mult, buffer)
         dt.debug_print_meas_ledgers(1.5)
         dt2.debug_print_meas_ledgers(1.5)
+        print("###")
 
+        x_hat, P = dt.debug_common_estimate(None)
+        x_hat2, P2 = dt2.debug_common_estimate(None)
+        print(x_hat)
+        print(x_hat2)
 
         # Should see the same meas ledgers as above for both
         # dt2.debug_print_meas_ledgers(0.5)

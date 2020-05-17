@@ -15,6 +15,25 @@ import numpy as np
 from copy import deepcopy
 
 def linear_propagation(x_hat, u, num_ownship_states, my_id, time_delta=1.0, use_control_input=False):
+    """Propagates the state
+
+    Control input can optionally be used for my_id
+    Assumes constant velocity model for all other assets
+
+    Arguments:
+        x_hat {np.array} -- State vector (num_states,1)
+        u {np.array} -- Control Input (3x1; x,y,z)
+        num_ownship_states {int} -- number of ownship states
+        my_id {innt} -- ID of asset for which control input corresponds
+
+    Keyword Arguments:
+        time_delta {float} -- amount of time to propagate the step (default: {1.0})
+        use_control_input {bool} -- whether to use control input or assume constant velocity (default: {False})
+
+    Returns:
+        np.array -- propagated state
+        np.array -- propagated uncertainty
+    """
     num_states = x_hat.size
     num_assets = int(num_states / num_ownship_states)
     x_hat = deepcopy(x_hat)
