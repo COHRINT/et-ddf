@@ -4,7 +4,7 @@ This repository provides a library of Python and ROS code implementing event-tri
 
 In addition, this repository provides a solution to windowed event-triggering filtering using an algorithm called Delta Tiering. The windowed communication problem can be defined as a situation in which there is a certain time period to communicate (share measurements in the case of ETDDF) but communication is not permitted outside of the time window. A buffer to store desired communications (measurements) is therefore necessary during the periods where communication is not permitted. Once the communication window opens, this buffer of communications is pulled and sent to the other asset. The Delta Tiering algorithm optimizes information sent to the other asset by maintaining multiple buffers and at pull time selecting the one with the most information.
 
-The basic filter in the repository is the ETFilter (Event Triggered Filter). This class implements an Extended Kalman Filter, the measurements able to be fused can be found in measurements.py. For non-windowed or more traditional asynchronous communication the Asset class is provided to manage common etfilters with other agents and implicit message generation. For windowed communication, the LedgerFilter class is provided that tracks all measurements, covariance intersects, and control inputs that the filter inputs. When a packet is received these ledgers are combined with the information in the packet from the other asset and then rolled forward to the present time fusing all of the combined information. The LedgerFiler similarly maintains a buffer (under the hood multiple buffers) of measurements that can be pulled at any time and transmitted to another asset.
+The basic filter in the repository is the ETFilter (Event Triggered Filter). This class implements an Extended Kalman Filter. For non-windowed or more traditional asynchronous communication the Asset class is provided to manage common etfilters with other agents and implicit message generation. For windowed communication, the LedgerFilter class is provided that tracks all measurements, covariance intersects, and control inputs that the filter inputs. When a packet is received these ledgers are combined with the information in the packet from the other asset and then rolled forward to the present time fusing all of the combined information. The LedgerFiler similarly maintains a buffer (under the hood multiple buffers) of measurements that can be pulled at any time and transmitted to another asset.
 
 
 These algorithms, and their implementations in this repository are currently in use as part of DARPA sprinter project OFFSET, as well as a collaboration between Orbit Logic, the University of Colorado Boulder, the University of California San Diego, and the Office of Naval Research called MinAu (Minimal Autonomy).
@@ -36,8 +36,20 @@ NOTE: The ETDDF instance on the other asset expects the buffer in the same form 
 Each MeasurementPackage must have Measurements with the following meas_types (Measurement.meas_type)
 - meas_type="final_time" indicating the final time measurements were considered for this package
 - a measurement stream start, a "bookstart". This can be indicated by any actual measurement OR by a meas_type="*_bookstart". Either of these tell ETDDF to start filling in implicit measurements after this time
-- Optionally, a measurement stream stop, a "bookend". These indicate that a measurement stream stopped, such as an asset being no longer in view of the asset's sonar. These are indicated by meas_type="*_bookend". If the measuremnt stream continues through the end of "final_time" a bookend is not needed.
+- Optionally, a measurement stream stop, a "bookend". These indicate that a measurement stream stopped; for example, an asset being no longer in view of the asset's sonar would generate a "sonar_x_bookend" measurement. These are indicated by meas_type="*_bookend". If the measuremnt stream continues through the end of "final_time" a bookend is not needed.
 
+The currently supported measurement types (Measurement.meas_type) are
+- depth
+- modem_range (asset-to-asset measurement differs from surface-to-asset measurement by value of Measurement.global_pose. It is global_pose=[], empty list, for asset to asset range)
+- modem_azimuth (see note on modem_range)
+- dvl_x
+- dvl_y
+
+### Buffer Receival
+The ETDDF node can receive a MeasurementPackage on the topic:
+```
+etddf/packages_in
+```
 
 ## Configuration
 Measurement configuration can be found in config/measurements.py.
