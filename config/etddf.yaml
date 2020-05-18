@@ -1,0 +1,71 @@
+update_rate: 4
+
+delta_tiers: [1, 2]
+
+### Buffer space configurations ###
+buffer_space:
+  capacity: 32 # Total capacity
+  bookstart: 1 # Space for indicating START of measurement stream
+  bookend: 1 # Space for indicating STOP of meas stream
+  final_time: 0 # Space to send last time in buffer
+
+use_control_input: False
+
+### Initial Mean Estimate Configurations ###
+default_starting_position:
+  x: 0.0
+  y: 0.0
+  z: 1.0
+  body_forward_vel: 0.0
+  body_strafe_vel: 0.0
+  body_depth_vel: 0.0
+
+### Process Noise Configurations ###
+process_noise:
+  ownship:
+    x: 0.01
+    y: 0.01
+    z: 0.01
+    body_forward_vel: 0.0
+    body_strafe_vel: 0.0
+    body_depth_vel: 0.0
+  blueteam:
+    x: 0.01
+    y: 0.01
+    z: 0.01
+    body_forward_vel: 0.0
+    body_strafe_vel: 0.0
+    body_depth_vel: 0.0
+  redteam:
+    x: 0.1
+    y: 0.1
+    z: 0.1
+    body_forward_vel: 0.0
+    body_strafe_vel: 0.0
+    body_depth_vel: 0.0
+
+### Initial Uncertainty Configurations ###
+initial_uncertainty:
+  ownship:
+    x: 1.0
+    y: 1.0
+    z: 1.0
+    body_forward_vel: 1
+    body_strafe_vel: 1
+    body_depth_vel: 1
+  # for asset positions provided to us through roslaunch params
+  known_starting_position: 
+    x: 1.0
+    y: 1.0
+    z: 1.0
+    body_forward_vel: 1
+    body_strafe_vel: 1
+    body_depth_vel: 1
+  # asset positions not provided in roslaunch, including redteam
+  unknown_starting_position: 
+    x: 1000
+    y: 1000
+    z: 8
+    body_forward_vel: 1
+    body_strafe_vel: 1
+    body_depth_vel: 1

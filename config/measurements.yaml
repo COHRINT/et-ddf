@@ -1,0 +1,30 @@
+measurements:
+  depth:
+    base_et_delta: 0.3
+    default_sd: 0.01
+    buffer_size: 2
+
+  modem_range:
+    base_et_delta: 1.0
+    default_sd: 0.1
+    buffer_size: 2 # NOT SENT
+
+  modem_azimuth: # radians
+    base_et_delta: 0.0
+    default_sd: 0.2
+    buffer_size: 2 # NOT SENT
+
+  sonar_x:
+    base_et_delta: 1.0
+    default_sd: 0.3
+    buffer_size: 2
+
+  sonar_y:
+    base_et_delta: 1.0
+    default_sd: 0.3
+    buffer_size: 2
+
+  sonar_z:
+    base_et_delta: 1.0
+    default_sd: 0.3
+    buffer_size: 2

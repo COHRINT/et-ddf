@@ -1,5 +1,3 @@
-*.m~
+# Emacs backup files
+*~
 *.pyc
-venv
-env
-python/etddf.egg-info/

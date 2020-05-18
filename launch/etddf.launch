@@ -1,0 +1,23 @@
+<launch>
+    <arg name="my_name" default="bluerov2_3" />
+    <arg name="blue_team_names" default="[]" />
+
+    <!-- not required, list of lists, index of outer 
+    list corresponds to index in blue_team_names -->
+    <arg name="blue_team_positions" default="[]" /> 
+    
+    <arg name="red_team_names" default="[]" />
+    <arg name="config_file" default="$(find etddf)/config/etddf.yaml" />
+    <arg name="starting_position" default="[0,0,0]" /> <!-- [x,y,z] -->
+    
+    <node name="etddf" pkg="etddf" type="etddf_node.py" output="screen">
+        <param name="my_name" value="$(arg my_name)" />
+        <rosparam param="blue_team_positions" subst_value="True">$(arg blue_team_positions)</rosparam> 
+        <rosparam param="blue_team_names" subst_value="True">$(arg blue_team_names)</rosparam> 
+        <rosparam param="red_team_names" subst_value="True">$(arg red_team_names)</rosparam> 
+        <rosparam param="starting_position" subst_value="True">$(arg starting_position)</rosparam> 
+        <rosparam command="load" file="$(arg config_file)" />        
+        <rosparam command="load" file="$(find etddf)/config/measurements.yaml" />
+    </node>
+
+</launch>
