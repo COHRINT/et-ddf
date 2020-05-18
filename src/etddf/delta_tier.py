@@ -17,6 +17,9 @@ from etddf.etfilter import ETFilter, ETFilter_Main
 from etddf.msg import Measurement
 import time
 from pdb import set_trace as st
+import numpy as np
+import scipy
+import scipy.optimize
 
 ## Constant used to indicate each delta tier should scale the measurement's triggering
 ## threshold using its own delta factor
@@ -91,18 +94,57 @@ class DeltaTier:
         for key in self.delta_tiers.keys():
             self.delta_tiers[key].add_meas(ros_meas, src_id, measured_id, delta_multiplier)
 
-    def intersect(self, x, P):
-        """Runs covariance intersection and updates internal estimate
+    @staticmethod
+    def run_covariance_intersection(xa, Pa, xb, Pb):
+        """Runs covariance intersection on the two estimates A and B
 
         Arguments:
-            x {np.ndarray} -- estimate
-            P {np.ndarray} -- covariance
+            xa {np.ndarray} -- mean of A
+            Pa {np.ndarray} -- covariance of A
+            xb {np.ndarray} -- mean of B
+            Pb {np.ndarray} -- covariance of B
+        
+        Returns:
+            c_bar {np.ndarray} -- intersected estimate
+            Pcc {np.ndarray} -- intersected covariance
+        """
+        Pa_inv = np.linalg.inv(Pa)
+        Pb_inv = np.linalg.inv(Pb)
+
+        fxn = lambda omega: np.trace(np.linalg.inv(omega*Pa_inv + (1-omega)*Pb_inv))
+        omega_optimal = scipy.optimize.minimize_scalar(fxn, bounds=(0,1), method="bounded").x
+
+        Pcc = np.linalg.inv(omega_optimal*Pa_inv + (1-omega_optimal)*Pb_inv)
+        c_bar = Pcc.dot( omega_optimal*Pa_inv.dot(xa) + (1-omega_optimal)*Pb_inv.dot(xb))
+        return c_bar, Pcc
+
+    def intersect(self, x, P):
+        """Runs covariance intersection with main filter's estimate
+
+        Arguments:
+            x {np.ndarray} -- other filter's mean
+            P {np.ndarray} -- other filter's covariance
 
         Returns:
-            x {np.ndarray} -- intersected estimate
-            P {np.ndarray} -- intersected covariance
+            c_bar {np.ndarray} -- intersected estimate
+            Pcc {np.ndarray} -- intersected covariance
         """
-        pass
+        my_id = self.asset2id[self.my_name]
+
+        # Slice out overlapping states in main filter
+        begin_ind = my_id*self.num_ownship_states
+        end_ind = (my_id+1)*self.num_ownship_states
+        x_main = self.main_filter.filter.x_hat[begin_ind:end_ind].reshape(-1,1)
+        P_main = self.main_filter.filter.P[begin_ind:end_ind,begin_ind:end_ind]
+        P_main = P_main.reshape(self.num_ownship_states, self.num_ownship_states)
+        
+        c_bar, Pcc = DeltaTier.run_covariance_intersection(x, P, x_main, P_main)
+
+        # Update main filter states
+        self.main_filter.filter.x_hat[begin_ind:end_ind] = c_bar
+        self.main_filter.filter.P[begin_ind:end_ind,begin_ind:end_ind] = Pcc
+
+        return c_bar, Pcc
 
     def catch_up(self, delta_multiplier, shared_buffer):
         """Updates main estimate and common estimate using the shared buffer
@@ -238,7 +280,7 @@ class DeltaTier:
                 
         return lowest_multiplier, buffer
 
-    def predict(self, u, Q, time_delta=1.0):
+    def predict(self, u, Q, time_delta=1.0, use_control_input=False):
         """Executes prediction step on all filters
 
         Arguments:
@@ -247,8 +289,9 @@ class DeltaTier:
 
         Keyword Arguments:
             time_delta {float} -- Amount of time to predict in future (default: {1.0})
+            use_control_input {bool} -- Use control input on main filter
         """
-        self.main_filter.predict(u, Q, time_delta, use_control_input=True)
+        self.main_filter.predict(u, Q, time_delta, use_control_input=use_control_input)
         for key in self.delta_tiers.keys():
             self.delta_tiers[key].predict(u, Q, time_delta, use_control_input=False)
 
@@ -280,12 +323,11 @@ class DeltaTier:
             np.ndarray -- Covariance of estimate of asset (num_ownship_states, num_ownship_states)
         """
         asset_id = self.asset2id[asset_name]
-        estimate_mean = deepcopy(self.main_filter.filter.x_hat)
-        estimate_unc = deepcopy(self.main_filter.filter.P)
-        asset_mean = estimate_mean[asset_id*self.num_ownship_states:(asset_id+1)*self.num_ownship_states,0]
-        asset_unc = estimate_unc[asset_id*self.num_ownship_states:(asset_id+1)*self.num_ownship_states, \
-            self.num_ownship_states:(asset_id+1)*self.num_ownship_states]
-        return asset_mean, asset_unc
+        begin_ind = asset_id*self.num_ownship_states
+        end_ind = (asset_id+1)*self.num_ownship_states
+        asset_mean = self.main_filter.filter.x_hat[begin_ind:end_ind,0]
+        asset_unc = self.main_filter.filter.P[begin_ind:end_ind,begin_ind:end_ind]
+        return deepcopy(asset_mean), deepcopy(asset_unc)
 
     def _fillin_buffer(self, shared_buffer):
         """Fills in implicit measurements to buffer and generates time indices

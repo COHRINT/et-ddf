@@ -1,42 +1,30 @@
 measurements:
-  yaw:
-    low_et_delta: 0.3
-    high_et_delta: 1.0
-    default_sd: 0.5 # standard deviation
-    buffer_size: 1
-
   depth:
-    low_et_delta: 0.3
-    high_et_delta: 1.0
+    base_et_delta: 0.3
     default_sd: 0.01
-    buffer_size: 1
-
-  modem_range:
-    low_et_delta: 1.0
-    high_et_delta: 4.0
-    default_sd: 0.1
-    buffer_size: 1
-
-  modem_azimuth:
-    low_et_delta: 0.0
-    high_et_delta: 0.0 # always send azimuth variance
-    default_sd: dynamic # dynamic
     buffer_size: 2
 
-  sonar_range:
-    low_et_delta: 1.0
-    high_et_delta: 4.0
-    default_sd: 0.3
-    buffer_size: 1
-
-  sonar_azimuth: # radians
-    low_et_delta: 0.3
-    high_et_delta: 1.0
-    default_sd: 0.1 
-    buffer_size: 1
-
-  sonar_elevation: # radians
-    low_et_delta: 0.3
-    high_et_delta: 1.0
+  modem_range:
+    base_et_delta: 1.0
     default_sd: 0.1
-    buffer_size: 1
+    buffer_size: 2 # NOT SENT
+
+  modem_azimuth: # radians
+    base_et_delta: 0.0
+    default_sd: 0.2
+    buffer_size: 2 # NOT SENT
+
+  sonar_x:
+    base_et_delta: 1.0
+    default_sd: 0.3
+    buffer_size: 2
+
+  sonar_y:
+    base_et_delta: 1.0
+    default_sd: 0.3
+    buffer_size: 2
+
+  sonar_z:
+    base_et_delta: 1.0
+    default_sd: 0.3
+    buffer_size: 2
