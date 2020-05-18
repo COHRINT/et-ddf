@@ -11,6 +11,7 @@ import rospy
 import threading
 from minau.msg import ControlStatus
 from etddf.msg import Measurement, MeasurementPackage, NetworkEstimate, AssetEstimate
+from etddf.srv import GetMeasurementPackage
 import numpy as np
 from copy import deepcopy
 from std_msgs.msg import Header
@@ -80,12 +81,15 @@ class ETDDF_Node:
         # TODO NavFilter / Robot localization filter
         rospy.Subscriber("odometry/filtered", Odometry, self.nav_filter_callback, queue_size=1)
 
+        # Initialize Buffer Service
+        rospy.Service('etddf/get_measurement_package', GetMeasurementPackage, self.get_meas_pkg_callback)
+
         # Initialize Measurement Callbacks
         self.update_seq = 0
         self.last_depth_meas = None
         self.last_update_time = rospy.get_rostime() - rospy.Duration(1 / self.update_rate)
         self.meas_lock = threading.Lock()
-        # self.update_lock = threading.Lock()
+        self.update_lock = threading.Lock()
         rospy.loginfo("etddf node loaded")
 
     def nav_filter_callback(self, odom):
@@ -95,6 +99,8 @@ class ETDDF_Node:
         delta_t_ros =  t_now - self.last_update_time
         if delta_t_ros < rospy.Duration(1/self.update_rate):
             return
+
+        self.update_lock.acquire()
 
         ### Run Prediction ###
         if self.use_control_input:
@@ -136,6 +142,7 @@ class ETDDF_Node:
         self.publish_estimates(t_now, odom)
         self.last_update_time = t_now
         self.update_seq += 1
+        self.update_lock.release()
     
     def control_status_callback(self, msg):
         self.meas_lock.acquire()
@@ -182,12 +189,29 @@ class ETDDF_Node:
         self.network_pub.publish(ne)
 
     def meas_pkg_callback(self, msg):
-        # determine if it's shared OR if it's our own modem that took the measurement
-        pass
 
-    def get_meas_pkg_callback(self, msg):
-        pass
-    
+        # Modem update
+        if msg.src_asset == "surface":
+            for meas in msg.measurements:
+                # Approximate the fuse on the next update, so we can get other asset's position immediately
+                self.filter.add_meas(meas, force_fuse=True)
+        else:
+            self.update_lock.acquire()
+            self.filter.catch_up(msg.delta_multiplier, msg.measurements)
+            self.update_lock.release()
+
+    def get_meas_pkg_callback(self, req):
+        delta, buffer = self.filter.pull_buffer()
+        print(len(buffer))
+        return MeasurementPackage(buffer, self.my_name, delta)
+
+
+################################
+################################
+### Initialization Functions ###
+################################
+################################
+
 def get_indices_from_asset_names():
     my_name = rospy.get_param("~my_name")
     blue_team = rospy.get_param("~blue_team_names")

@@ -67,7 +67,7 @@ class LedgerFilter:
         self.ledger_control.append([])
         self.ledger_ci.append([])
 
-    def add_meas(self, ros_meas, src_id, measured_id, delta_multiplier=THIS_FILTERS_DELTA):
+    def add_meas(self, ros_meas, src_id, measured_id, delta_multiplier=THIS_FILTERS_DELTA, force_fuse=False):
         """Adds and records a measurement to the filter
 
         Measurements after last correction step time will be fused at next correction step
@@ -80,6 +80,8 @@ class LedgerFilter:
 
         Keyword Arguments:
             delta_multiplier {float} -- Delta multiplier to use for this measurement (default: {THIS_FILTERS_DELTA})
+            force_fuse {bool} -- If measurement is in the past, fuse it on the next update step anyway (default: {False})
+                Note: the ledger will still reflect the correct measurement time
         """
         # Get the delta trigger for this measurement
         et_delta = self._get_meas_et_delta(ros_meas)
@@ -124,7 +126,7 @@ class LedgerFilter:
         self.ledger_meas[time_index].append(meas)
 
         # Fuse on next timestamp
-        if time_index == FUSE_MEAS_NEXT_UPDATE:
+        if time_index == FUSE_MEAS_NEXT_UPDATE or force_fuse:
             self.filter.add_meas(meas)
         else:
             pass # Measurement will be fused on delta_tier's catch_up()

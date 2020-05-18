@@ -76,23 +76,27 @@ class DeltaTier:
         self.delta_codebook_table = delta_codebook_table
         self.delta_multipliers = delta_multipliers
 
-    def add_meas(self, ros_meas, delta_multiplier=USE_DELTA_TIERS):
-        """Adds a measurement to all ledger filters. Measurement will be fused on next correction step
+    def add_meas(self, ros_meas, delta_multiplier=USE_DELTA_TIERS, force_fuse=False):
+        """Adds a measurement to all ledger filters.
+        
+        If Measurement is after last correction step, it will be fused on next correction step
 
         Arguments:
             ros_meas {etddf.Measurement.msg} -- Measurement taken
 
         Keyword Arguments:
             delta_multiplier {int} -- Delta multiplier to use for this measurement (default: {USE_DELTA_TIERS})
+            force_fuse {bool} -- If measurement is in the past, fuse it on the next update step anyway (default: {False})
+                Note: the ledger will still reflect the correct measurement time
         """
         src_id = self.asset2id[ros_meas.src_asset]
         if ros_meas.measured_asset in self.asset2id.keys():
             measured_id = self.asset2id[ros_meas.measured_asset]
         else:
             measured_id = -1
-        self.main_filter.add_meas(ros_meas, src_id, measured_id, delta_multiplier)
+        self.main_filter.add_meas(ros_meas, src_id, measured_id, delta_multiplier, force_fuse)
         for key in self.delta_tiers.keys():
-            self.delta_tiers[key].add_meas(ros_meas, src_id, measured_id, delta_multiplier)
+            self.delta_tiers[key].add_meas(ros_meas, src_id, measured_id, delta_multiplier, force_fuse)
 
     @staticmethod
     def run_covariance_intersection(xa, Pa, xb, Pb):
@@ -179,7 +183,7 @@ class DeltaTier:
             common_meas_ledger[mult] = self.delta_tiers[mult].ledger_meas
         main_control_ledger = self.main_filter.ledger_control
         main_ledger_meas = self.main_filter.ledger_meas
-        # TODO add covariance intersection support (happens after correction?)
+        # TODO add covariance intersection support (happens before correction)
         main_ci_ledger = self.main_filter.ledger_meas
 
         # Grab lock, no updates for right now
@@ -215,7 +219,7 @@ class DeltaTier:
             main_control_ledger = [[]]
 
 
-        # Reset the ledger filters
+        ### Reset the ledger filters ###
 
         # Reset the delta tier filters
         for multiplier in self.delta_tiers.keys():
@@ -234,7 +238,7 @@ class DeltaTier:
             )
             self.delta_tiers[multiplier].reset(buf, ledger_update_times, common_meas_ledger[multiplier])
 
-        # Reset the main filter
+        ### Reset the main filter ###
 
         # Caught up estimate becomes new initial estimate
         x0 = main_filter.x_hat
@@ -534,7 +538,6 @@ if __name__ == "__main__":
         # print(buf_contents)
         from random import shuffle
         shuffle(buffer)
-        # TODO, scramble the buffer
 
         # strbuffer = [x.meas_type for x in buffer]
         # print(strbuffer)
