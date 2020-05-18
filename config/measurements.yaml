@@ -7,12 +7,12 @@ measurements:
   modem_range:
     base_et_delta: 1.0
     default_sd: 0.1
-    buffer_size: 2 # NOT SENT
+    buffer_size: 2 # NOT SHARED
 
   modem_azimuth: # radians
     base_et_delta: 0.0
     default_sd: 0.2
-    buffer_size: 2 # NOT SENT
+    buffer_size: 2 # NOT SHARED
 
   sonar_x:
     base_et_delta: 1.0

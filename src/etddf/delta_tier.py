@@ -564,39 +564,3 @@ if __name__ == "__main__":
         # Should see the same meas ledgers as above for both
         # dt2.debug_print_meas_ledgers(0.5)
         # dt2.debug_print_meas_ledgers(1.5)
-
-
-    ## Pull buffer from one delta tier, instantiate another and predict/correct at all times but with no measurements
-    ## Catchup the buffer, the measurement ledgers should be the same
-    # the common estimates should be the same, the main estimates should be similar though not the same
-
-    ## Repeat scenario but add a single depth measurement at time t2, see that combining was not a problem
-    ## Check measurement ledger and common estimates differ slightly
-
-    ## Test placement of older measurements in the ledger
-    ## Test filling in of implicit measurements in the buffer
-    ## Test Catching up
-    ## Test creation of new ledger filters & main estimate
-    ## Check those measurements have actually been fused & the estimate has changed to be more accurate
-
-"""
-delta_multipliers := [0.1,0.2,0.5,1]
-Initialize delta tier filter
-
-Regular Update (pixhawk OR dvl):
-add_meas(depth)
-x_new, P_new = intersect(x,P)
-publish x_new, P_new to Pixhawk
-predict(u, Q, delta_t)
-correct(update_time)
-
-Pulling of buffer:
-pull_buffer()
-
-Receiving buffer:
-catch_up(buffer)
-
-On receival of sonar:
-call add_meas()
-
-"""

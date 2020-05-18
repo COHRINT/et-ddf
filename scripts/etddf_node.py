@@ -191,7 +191,7 @@ class ETDDF_Node:
     def meas_pkg_callback(self, msg):
 
         # Modem update
-        if msg.src_asset == "surface":
+        if msg.src_asset == "surface" or msg.src_asset == self.my_name:
             for meas in msg.measurements:
                 # Approximate the fuse on the next update, so we can get other asset's position immediately
                 self.filter.add_meas(meas, force_fuse=True)
@@ -202,7 +202,6 @@ class ETDDF_Node:
 
     def get_meas_pkg_callback(self, req):
         delta, buffer = self.filter.pull_buffer()
-        print(len(buffer))
         return MeasurementPackage(buffer, self.my_name, delta)
 
 
@@ -380,8 +379,5 @@ if __name__ == "__main__":
                         Q,\
                         default_meas_variance,\
                         use_control_input)
-    # print(update_rate)
-    # load rosparams, initialize etddf_node
-    # 
 
     rospy.spin()
