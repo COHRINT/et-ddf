@@ -1,0 +1,14 @@
+<launch>
+    <group ns="bluerov2_3">    
+        <node name="uuv_control" pkg="minau" type="uuv_control_node.py" output="screen">
+            <param name="config" value="$(find minau)/config/vehicle.sitl.json"/>
+            <param name="rate" value="20.0"/>
+        </node>
+    </group>
+    <group ns="bluerov2_4">    
+        <node name="uuv_control" pkg="minau" type="uuv_control_node.py" output="screen">
+            <param name="config" value="$(find minau)/config/vehicle.sitl.json"/>
+            <param name="rate" value="20.0"/>
+        </node>
+    </group>
+</launch>

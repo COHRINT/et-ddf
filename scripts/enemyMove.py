@@ -37,7 +37,7 @@ p = Point(1,2,-4)
 w.point = p
 w.max_forward_speed = 0.4
 w.heading_offset = 0
-w.use_fixed_heading = False
+w.use_fixed_heading = True
 #initiate the enemy rover
 em = EnemyMove()
 rate = rospy.Rate(1)
@@ -60,8 +60,8 @@ while not rospy.is_shutdown():
         gt = rospy.ServiceProxy('go_to',GoTo)
         res1 = gt(w,0.4,'lipb')
         #wait to determine a new waypoint until distance is really small
-        while dist(em,w) > 0.05:
-            a = 1
+        while dist(em,w) > 0.5:
+            a = 4
 
 
 
