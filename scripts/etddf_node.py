@@ -70,27 +70,59 @@ class ETDDF_Node:
         for asset in self.asset2id.keys():
             if "surface" in asset:
                 continue
-            self.asset_pub_dict[asset] = rospy.Publisher("etddf/estimate/" + asset, Odometry, queue_size=10)
+            self.asset_pub_dict[asset] = rospy.Publisher("etddf/estimate/" + asset, Odometry, queue_size=10)        
 
-        rospy.Subscriber("mavros/global_position/local", Odometry, self.depth_callback, queue_size=1)
+        self.update_seq = 0
+        self.last_depth_meas = None
+        rospy.sleep(rospy.Duration(1 / self.update_rate))
+        self.last_update_time = rospy.get_rostime() - rospy.Duration(1 / self.update_rate)
+        self.meas_lock = threading.Lock()
+        self.update_lock = threading.Lock()
+
+        # Initialize Measurement Callbacks
+        # rospy.Subscriber("mavros/global_position/local", Odometry, self.depth_callback, queue_size=1)
         rospy.Subscriber("etddf/packages_in", MeasurementPackage, self.meas_pkg_callback, queue_size=1)
 
         if self.use_control_input:
             rospy.Subscriber("uuv_control/control_status", ControlStatus, self.control_status_callback, queue_size=1)
 
-        # TODO NavFilter / Robot localization filter
-        rospy.Subscriber("odometry/filtered", Odometry, self.nav_filter_callback, queue_size=1)
+        if rospy.get_param("~measurement_topics/imu_ci") == "None":
+            rospy.Timer(rospy.Duration(1 / self.update_rate), self.no_nav_filter_callback)
+        else:
+            rospy.Subscriber(rospy.get_param("~measurement_topics/imu_ci"), Odometry, self.nav_filter_callback, queue_size=1)
 
         # Initialize Buffer Service
         rospy.Service('etddf/get_measurement_package', GetMeasurementPackage, self.get_meas_pkg_callback)
-
-        # Initialize Measurement Callbacks
-        self.update_seq = 0
-        self.last_depth_meas = None
-        self.last_update_time = rospy.get_rostime() - rospy.Duration(1 / self.update_rate)
-        self.meas_lock = threading.Lock()
-        self.update_lock = threading.Lock()
         rospy.loginfo("etddf node loaded")
+
+    def no_nav_filter_callback(self, event):
+        t_now = rospy.get_rostime()
+        delta_t_ros =  t_now - self.last_update_time
+        self.update_lock.acquire()
+
+        ### Run Prediction ###
+        if self.use_control_input:
+            raise NotImplementedError("using control input not ready yet")
+        else:
+            self.filter.predict(np.zeros((3,1)), self.Q, delta_t_ros.to_sec(), False)
+
+        ### Run Correction ###
+
+        # Construct depth measurement
+        z_r = self.default_meas_variance["depth"]
+        z_data = self.last_depth_meas
+        if z_data != None:
+            z = Measurement("depth", t_now, self.my_name,"", z_data, z_r, [])
+            self.filter.add_meas(z)
+            self.last_depth_meas = None
+
+        # correction
+        self.filter.correct(t_now)
+        self.publish_estimates(t_now, Odometry())
+        self.last_update_time = t_now
+        self.update_seq += 1
+        self.update_lock.release()
+
 
     def nav_filter_callback(self, odom):
 
@@ -113,8 +145,10 @@ class ETDDF_Node:
         # Construct depth measurement
         z_r = self.default_meas_variance["depth"]
         z_data = self.last_depth_meas
-        z = Measurement("depth", t_now, self.my_name,"", z_data, z_r, [])
-        self.filter.add_meas(z)
+        if z_data != None:
+            z = Measurement("depth", t_now, self.my_name,"", z_data, z_r, [])
+            self.filter.add_meas(z)
+            self.last_depth_meas = None
 
         # correction
         self.filter.correct(t_now)
@@ -159,8 +193,8 @@ class ETDDF_Node:
         for asset in self.asset2id.keys():
             if "surface" in asset:
                 continue
-            else:
-                print("publishing " + asset + "'s estimate")
+            # else:
+            #     print("publishing " + asset + "'s estimate")
 
             # Construct Odometry Msg for Asset
             nav_covpt = np.array(nav_estimate.pose.covariance).reshape(6,6)
