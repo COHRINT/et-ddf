@@ -1,0 +1,67 @@
+buffer_size: 6
+default_starting_pose:
+  body_depth_vel: 0.0
+  body_forward_vel: 0.0
+  body_strafe_vel: 0.0
+  body_yaw_vel: 0.0
+  x: 5.0
+  y: 5.0
+  yaw: 0.0
+  z: 5.0
+initial_uncertainty:
+  known_starting_pose:
+    body_depth_vel: 1
+    body_forward_vel: 1
+    body_strafe_vel: 1
+    body_yaw_vel: 1
+    x: 1.0
+    y: 1.0
+    yaw: 3
+    z: 1.0
+  ownship:
+    body_depth_vel: 1
+    body_forward_vel: 1
+    body_strafe_vel: 1
+    body_yaw_vel: 1
+    x: 1.0
+    y: 1.0
+    yaw: 9
+    z: 1.0
+  unknown_starting_pose:
+    body_depth_vel: 1
+    body_forward_vel: 1
+    body_strafe_vel: 1
+    x: 1000
+    y: 1000
+    yaw: 9
+    z: 8
+num_delta_tiers: 4
+process_noise:
+  blueteam:
+    body_depth_vel: 0.0
+    body_forward_vel: 0.0
+    body_strafe_vel: 0.0
+    body_yaw_vel: 0.0
+    x: 0.01
+    y: 0.01
+    yaw: 0.01
+    z: 0.01
+  ownship:
+    body_depth_vel: 0.0
+    body_forward_vel: 0.0
+    body_strafe_vel: 0.0
+    body_yaw_vel: 0.0
+    x: 0.01
+    y: 0.01
+    yaw: 0.01
+    z: 0.01
+  redteam:
+    body_depth_vel: 0.0
+    body_forward_vel: 0.0
+    body_strafe_vel: 0.0
+    body_yaw_vel: 0.0
+    x: 0.1
+    y: 0.1
+    yaw: 0.1
+    z: 0.1
+update_rate: 4
