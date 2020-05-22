@@ -125,7 +125,7 @@ class ETFilter(object):
             raise ValueError("Q must have (state x state) dimensions")
 
         if self.linear_dynamics:
-            self.x_hat, A = linear_propagation(self.x_hat, u, self.num_ownship_states, self.my_id, use_control_input=use_control_input)
+            self.x_hat, A = linear_propagation(self.x_hat, u, self.num_ownship_states, self.my_id, time_delta, use_control_input)
             self.P = A.dot( self.P.dot( A.T )) + Q
         else: # nonlinear dynamics
             # G = nonlinear_propagation(u)

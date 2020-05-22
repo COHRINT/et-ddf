@@ -13,6 +13,7 @@ from minau.msg import ControlStatus
 from etddf.msg import Measurement, MeasurementPackage, NetworkEstimate, AssetEstimate
 from etddf.srv import GetMeasurementPackage
 import numpy as np
+np.set_printoptions(suppress=True)
 from copy import deepcopy
 from std_msgs.msg import Header
 from geometry_msgs.msg import PoseWithCovariance, Pose, Point, Quaternion, Twist, Vector3, TwistWithCovariance
@@ -293,9 +294,9 @@ def _dict2arr(d):
     return np.array([[d["x"]],\
                     [d["y"]],\
                     [d["z"]],\
-                    [d["body_forward_vel"]], \
-                    [d["body_strafe_vel"]],\
-                    [d["body_depth_vel"]]])
+                    [d["x_vel"]], \
+                    [d["y_vel"]],\
+                    [d["z_vel"]]])
 def _list2arr(l):
     return np.array([l]).reshape(-1,1)
 
@@ -325,10 +326,10 @@ def get_initial_estimate(num_states):
     blue_team_positions = rospy.get_param("~blue_team_positions")
     red_team_names = rospy.get_param("~red_team_names")
 
-    next_index = 0
+    next_index = 1
     for asset in blue_team_names:
-        if len(blue_team_positions) > next_index: # we were given the positione of this asset in roslaunch
-            next_position = _add_velocity_states( _list2arr( blue_team_positions[next_index]))
+        if len(blue_team_positions) >= next_index: # we were given the positione of this asset in roslaunch
+            next_position = _add_velocity_states( _list2arr( blue_team_positions[next_index-1]))
             uncertainty_vector = np.zeros((num_states,1))
             uncertainty_vector[next_index*NUM_OWNSHIP_STATES:(next_index+1)*NUM_OWNSHIP_STATES] = uncertainty_known_starting_position
             uncertainty += np.eye(num_states) * uncertainty_vector
@@ -365,7 +366,7 @@ def get_process_noise(num_states):
     blue_team_names = rospy.get_param("~blue_team_names")
     red_team_names = rospy.get_param("~red_team_names")
 
-    next_index = 0 
+    next_index = 1
     for asset in blue_team_names:
         Q_vec = np.zeros((num_states,1))
         Q_vec[next_index*NUM_OWNSHIP_STATES:(next_index+1)*NUM_OWNSHIP_STATES] = blueteam_Q

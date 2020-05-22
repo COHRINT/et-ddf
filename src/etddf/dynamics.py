@@ -41,9 +41,8 @@ def linear_propagation(x_hat, u, num_ownship_states, my_id, time_delta=1.0, use_
     A = np.eye(num_states)
     num_base_states = int(num_ownship_states / 2)
     for i in range(num_assets):
-        if i != my_id:
-            for d in range(num_base_states):
-                A[i*num_ownship_states+d, i*num_ownship_states + num_base_states + d] = time_delta
+        for d in range(num_base_states):
+            A[i*num_ownship_states+d, i*num_ownship_states + num_base_states + d] = time_delta
 
     x_new = None
     if use_control_input:
