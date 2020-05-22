@@ -294,6 +294,12 @@ class LedgerFilter:
                 return Velocityx_Explicit(src_id, ros_meas.data, ros_meas.variance, et_delta)
             elif ros_meas.meas_type == "dvl_y":
                 return Velocityy_Explicit(src_id, ros_meas.data, ros_meas.variance, et_delta)
+            elif ros_meas.meas_type == "sonar_x":
+                return LinRelx_Explicit(src_id, measured_id, ros_meas.data, ros_meas.variance, et_delta)
+            elif ros_meas.meas_type == "sonar_y":
+                return LinRely_Explicit(src_id, measured_id, ros_meas.data, ros_meas.variance, et_delta)
+            elif ros_meas.meas_type == "sonar_z":
+                return LinRelz_Explicit(src_id, measured_id, ros_meas.data, ros_meas.variance, et_delta)
             else:
                 raise NotImplementedError(str(ros_meas))
         # Implicit Measurement
@@ -304,6 +310,12 @@ class LedgerFilter:
                 return Velocityx_Implicit(src_id, ros_meas.variance, et_delta)
             elif ros_meas.meas_type == "dvl_y_implicit":
                 return Velocityy_Implicit(src_id, ros_meas.variance, et_delta)
+            elif ros_meas.meas_type == "sonar_x_implicit":
+                return LinRelx_Implicit(src_id, measured_id, ros_meas.variance, et_delta)
+            elif ros_meas.meas_type == "sonar_y_implicit":
+                return LinRely_Implicit(src_id, measured_id, ros_meas.variance, et_delta)
+            elif ros_meas.meas_type == "sonar_z_implicit":
+                return LinRelz_Implicit(src_id, measured_id, ros_meas.variance, et_delta)
             else:
                 raise NotImplementedError(str(ros_meas))
     

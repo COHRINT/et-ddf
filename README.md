@@ -44,6 +44,9 @@ The currently supported measurement types (Measurement.meas_type) are
 - modem_azimuth (see note on modem_range)
 - dvl_x
 - dvl_y
+- sonar_x
+- sonar_y
+- sonar_z
 
 ### Buffer Receival
 The ETDDF node can receive a MeasurementPackage on the topic:
