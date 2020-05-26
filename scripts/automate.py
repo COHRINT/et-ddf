@@ -23,17 +23,17 @@ while x < 3:
     time.sleep(30)
 
     args3 = ['rosrun','etddf','border_patrol_node.py','__ns:=bluerov2_3','waypt_i:=1']
-    # args4 = ['rosrun','etddf','border_patrol_node.py','__ns:=bluerov2_4']
-    # args6 = ['rosrun','etddf','enemyMove.py','__ns:=rexrov2']
+    args4 = ['rosrun','etddf','border_patrol_node.py','__ns:=bluerov2_4']
+    args6 = ['rosrun','etddf','enemyMove.py','__ns:=rexrov2']
     proc3 = subprocess.Popen(args3)
     time.sleep(5)
-    # proc4 = subprocess.Popen(args4)
-    # if x==0:
-        # time.sleep(5)
-        # proc6 = subprocess.Popen(args6)
+    proc4 = subprocess.Popen(args4)
+    if x==0:
+        time.sleep(5)
+        proc6 = subprocess.Popen(args6)
 
     time.sleep(25)
-    # proc4.terminate()
+    proc4.terminate()
     proc3.terminate()
     proc2.terminate()
     time.sleep(25)
@@ -42,4 +42,5 @@ while x < 3:
     proc5 = subprocess.Popen(args5)
     x+=1
 time.sleep(30)
+proc6.terminate()
 proc1.terminate()

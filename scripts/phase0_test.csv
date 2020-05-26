@@ -1,0 +1,4 @@
+Test_Group_Name,Test_Name,Number_Tests_dep,Mins_Per_Test_dep,Map_Dim_x_dep, Map_Dim_y_dep,Map_Dim_z_dep, IMU_Data 
+phase0_0,control, 3, 2.0,5,10,5, false
+phase0_0,imu_test,220349020,100201202100,5,10,5,true
+

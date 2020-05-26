@@ -1,67 +1,63 @@
-buffer_size: 6
-default_starting_pose:
+buffer_space:
+  bookend: 1
+  bookstart: 1
+  capacity: 32
+  final_time: 0
+default_starting_position:
   body_depth_vel: 0.0
   body_forward_vel: 0.0
   body_strafe_vel: 0.0
-  body_yaw_vel: 0.0
-  x: 5.0
-  y: 5.0
-  yaw: 0.0
-  z: 5.0
+  x: 0.0
+  y: 0.0
+  z: 1.0
+delta_tiers:
+- 1
+- 2
 initial_uncertainty:
-  known_starting_pose:
+  known_starting_position:
     body_depth_vel: 1
     body_forward_vel: 1
     body_strafe_vel: 1
-    body_yaw_vel: 1
     x: 1.0
     y: 1.0
-    yaw: 3
     z: 1.0
   ownship:
     body_depth_vel: 1
     body_forward_vel: 1
     body_strafe_vel: 1
-    body_yaw_vel: 1
     x: 1.0
     y: 1.0
-    yaw: 9
     z: 1.0
-  unknown_starting_pose:
+  unknown_starting_position:
     body_depth_vel: 1
     body_forward_vel: 1
     body_strafe_vel: 1
     x: 1000
     y: 1000
-    yaw: 9
     z: 8
-num_delta_tiers: 4
+measurement_topics:
+  imu_ci: None
 process_noise:
   blueteam:
     body_depth_vel: 0.0
     body_forward_vel: 0.0
     body_strafe_vel: 0.0
-    body_yaw_vel: 0.0
     x: 0.01
     y: 0.01
-    yaw: 0.01
     z: 0.01
   ownship:
     body_depth_vel: 0.0
     body_forward_vel: 0.0
     body_strafe_vel: 0.0
-    body_yaw_vel: 0.0
     x: 0.01
     y: 0.01
-    yaw: 0.01
     z: 0.01
   redteam:
     body_depth_vel: 0.0
     body_forward_vel: 0.0
     body_strafe_vel: 0.0
-    body_yaw_vel: 0.0
     x: 0.1
     y: 0.1
-    yaw: 0.1
     z: 0.1
 update_rate: 4
+use_control_input: false
