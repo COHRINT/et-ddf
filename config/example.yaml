@@ -4,60 +4,60 @@ buffer_space:
   capacity: 32
   final_time: 0
 default_starting_position:
-  body_depth_vel: 0.0
-  body_forward_vel: 0.0
-  body_strafe_vel: 0.0
   x: 0.0
+  x_vel: 0.0
   y: 0.0
+  y_vel: 0.0
   z: 1.0
+  z_vel: 0.0
 delta_tiers:
 - 1
 - 2
 initial_uncertainty:
   known_starting_position:
-    body_depth_vel: 1
-    body_forward_vel: 1
-    body_strafe_vel: 1
     x: 1.0
+    x_vel: 0.001
     y: 1.0
+    y_vel: 0.001
     z: 1.0
+    z_vel: 0.001
   ownship:
-    body_depth_vel: 1
-    body_forward_vel: 1
-    body_strafe_vel: 1
     x: 1.0
+    x_vel: 0.001
     y: 1.0
+    y_vel: 0.001
     z: 1.0
+    z_vel: 0.001
   unknown_starting_position:
-    body_depth_vel: 1
-    body_forward_vel: 1
-    body_strafe_vel: 1
     x: 1000
+    x_vel: 0.01
     y: 1000
+    y_vel: 0.01
     z: 8
+    z_vel: 0.01
 measurement_topics:
-  imu_ci: None
+  imu_ci: odometry/filtered
 process_noise:
   blueteam:
-    body_depth_vel: 0.0
-    body_forward_vel: 0.0
-    body_strafe_vel: 0.0
     x: 0.01
+    x_vel: 0.0
     y: 0.01
+    y_vel: 0.0
     z: 0.01
+    z_vel: 0.0
   ownship:
-    body_depth_vel: 0.0
-    body_forward_vel: 0.0
-    body_strafe_vel: 0.0
     x: 0.01
+    x_vel: 0.0
     y: 0.01
+    y_vel: 0.0
     z: 0.01
+    z_vel: 0.0
   redteam:
-    body_depth_vel: 0.0
-    body_forward_vel: 0.0
-    body_strafe_vel: 0.0
     x: 0.1
+    x_vel: 0.0
     y: 0.1
+    y_vel: 0.0
     z: 0.1
+    z_vel: 0.0
 update_rate: 4
 use_control_input: false

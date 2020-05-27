@@ -1,4 +1,6 @@
 <launch>
+    <arg name="pos3" default="[0,0,0]"/>
+    <arg name="pos4" default="[0,0,0]"/>
     <group ns="bluerov2_3">    
         <node name="uuv_control" pkg="minau" type="uuv_control_node.py" output="screen">
             <param name="config" value="$(find minau)/config/vehicle.sitl.json"/>
@@ -6,13 +8,13 @@
         </node>
         <include file="$(find etddf)/launch/etddf.launch">
             <arg name="my_name" value="bluerov2_3" />
-            <arg name="blue_team_names" default="[]" />
+            <arg name="blue_team_names" default="[bluerov2_4]" />
             <!-- not required, list of lists, index of outer 
             list corresponds to index in blue_team_names -->
-            <arg name="blue_team_positions" default="[]" /> 
+            <arg name="blue_team_positions" default="[$(arg pos4)]" /> 
             <arg name="red_team_names" default="[]" />
             <arg name="config_file" default="$(find etddf)/config/example.yaml" />
-            <arg name="starting_position" default="[0,0,0]" />
+            <arg name="starting_position" default="$(arg pos3)" />
         </include>
     </group>
     <group ns="bluerov2_4">    
@@ -22,13 +24,13 @@
         </node>
         <include file="$(find etddf)/launch/etddf.launch">
             <arg name="my_name" value="bluerov2_4" />
-            <arg name="blue_team_names" default="[]" />
+            <arg name="blue_team_names" default="[bluerov2_3]" />
             <!-- not required, list of lists, index of outer 
             list corresponds to index in blue_team_names -->
-            <arg name="blue_team_positions" default="[]" /> 
+            <arg name="blue_team_positions" default="[$(arg pos3)]" /> 
             <arg name="red_team_names" default="[]" />
             <arg name="config_file" default="$(find etddf)/config/example.yaml" />
-            <arg name="starting_position" default="[0,0,0]" />
+            <arg name="starting_position" default="$(arg pos4)" />
         </include>
     </group>
 </launch>

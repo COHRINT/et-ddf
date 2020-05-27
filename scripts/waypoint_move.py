@@ -1,4 +1,10 @@
 #!/usr/bin/env python
+"""
+
+Takes in a name of a file that contains waypoints and moves the rov from one waypoint to the next.
+
+    
+"""
 from __future__ import division
 import rospy
 from minau.srv import ArmControl, SetHeadingVelocity
@@ -37,12 +43,20 @@ def normalize_velocity(v,speed):
 class Waypoint:
 
     def __init__(self):
+        """
+        Constructor the subscribes to a couple topics.
+        """
         self.pose = None
         self.yaw = None
         rospy.Subscriber("pose_gt", Odometry, self.pose_callback)
         rospy.Subscriber("uuv_control/control_status", ControlStatus, self.yaw_estimate_callback)
 
     def pose_callback(self, msg):
+        """Stores all the odometry information
+
+        Arguments:
+            msg {Odometry} -- All the position and orientation of the rov
+        """
         self.pose = msg
         (r, p, self.yaw) = tf.transformations.euler_from_quaternion([msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w])
 
