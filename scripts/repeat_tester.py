@@ -105,7 +105,7 @@ class repeatTester:
             # #using this dictionary format you can change any of the attributes you want
             etddf["measurement_topics"]["imu_ci"]="odometry/filtered"
         else:
-            etddf["measurement_topics"]["imu_ci"]="odometry/filtered"
+            etddf["measurement_topics"]["imu_ci"]="None"
         # #this writes the changes to the file
         with open('example.yaml', 'w') as f:
             yaml.dump(etddf, f)
