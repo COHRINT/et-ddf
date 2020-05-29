@@ -222,7 +222,7 @@ class LedgerFilter:
         # Measurement Ledger
         self.ledger_meas = deepcopy(ledger_meas)
         if len(self.ledger_meas)-1 != len(self.ledger_update_times):
-                raise ValueError("Meas Ledger does not match length of update times!")
+            raise ValueError("Meas Ledger does not match length of update times!")
 
         # Control Input Ledger
         if ledger_control is not None:

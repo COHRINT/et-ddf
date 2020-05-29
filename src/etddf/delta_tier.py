@@ -156,13 +156,22 @@ class DeltaTier:
         Arguments:
             delta_multiplier {float} -- multiplier to scale et_delta's with
             shared_buffer {list} -- buffer shared from another asset
+        Returns:
+            int -- implicit measurement count in shared_buffer
+            int -- explicit measurement count in this shared_buffer
         """
         # Fill in implicit measurements in the buffer and align the meas timestamps with our own
         new_buffer, next_ledger_time_index = self._fillin_buffer(shared_buffer)
+        implicit_meas_cnt = 0
+        explicit_meas_cnt = 0
 
         # Add all measurements in buffer to ledgers of all ledger_filters
         for meas in new_buffer:
             self.add_meas(meas, delta_multiplier)
+            if "implicit" in meas.meas_type:
+                implicit_meas_cnt += 1
+            else:
+                explicit_meas_cnt += 1
 
         common_filters = {}
         for mult in self.delta_tiers.keys():
@@ -252,6 +261,8 @@ class DeltaTier:
             True, self.asset2id[self.my_name]
         )
         self.main_filter.reset(mainbuf, ledger_update_times, main_ledger_meas, main_control_ledger)
+
+        return implicit_meas_cnt, explicit_meas_cnt
 
     def pull_buffer(self):
         """Pulls lowest delta multiplier's buffer that hasn't overflown

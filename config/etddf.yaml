@@ -7,6 +7,7 @@ delta_tiers: [1, 2]
 ## Measurement topics
 measurement_topics:
   imu_ci: "odometry/filtered"
+  sonar: "sonar_processing/target_list"
 
 ### Buffer space configurations ###
 buffer_space:

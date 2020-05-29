@@ -10,7 +10,7 @@ from etddf.delta_tier import DeltaTier
 import rospy
 import threading
 from minau.msg import ControlStatus
-from etddf.msg import Measurement, MeasurementPackage, NetworkEstimate, AssetEstimate
+from etddf.msg import Measurement, MeasurementPackage, NetworkEstimate, AssetEstimate, EtddfStatistics
 from etddf.srv import GetMeasurementPackage
 import numpy as np
 np.set_printoptions(suppress=True)
@@ -19,6 +19,7 @@ from std_msgs.msg import Header
 from geometry_msgs.msg import PoseWithCovariance, Pose, Point, Quaternion, Twist, Vector3, TwistWithCovariance
 from tf.transformations import quaternion_from_euler
 from nav_msgs.msg import Odometry
+from minau.msg import SonarTargetList, SonarTarget
 
 __author__ = "Luke Barbier"
 __copyright__ = "Copyright 2020, COHRINT Lab"
@@ -26,7 +27,7 @@ __email__ = "luke.barbier@colorado.edu"
 __status__ = "Development"
 __license__ = "MIT"
 __maintainer__ = "Luke Barbier"
-__version__ = "1.0.1"
+__version__ = "1.1.0"
 
 NUM_OWNSHIP_STATES = 6
 DYNAMIC_VARIANCE = -1
@@ -66,6 +67,8 @@ class ETDDF_Node:
                                 my_name)
                                                 
         self.network_pub = rospy.Publisher("etddf/estimate/network", NetworkEstimate, queue_size=10)
+        self.statistics_pub = rospy.Publisher("etddf/statistics", EtddfStatistics, queue_size=10)
+        self.statistics = EtddfStatistics(0, rospy.get_rostime(), 0, 0, delta_tiers, [0 for _ in delta_tiers])
 
         self.asset_pub_dict = {}
         for asset in self.asset2id.keys():
@@ -87,14 +90,28 @@ class ETDDF_Node:
         if self.use_control_input:
             rospy.Subscriber("uuv_control/control_status", ControlStatus, self.control_status_callback, queue_size=1)
 
+        # IMU Covariance Intersection
         if rospy.get_param("~measurement_topics/imu_ci") == "None":
             rospy.Timer(rospy.Duration(1 / self.update_rate), self.no_nav_filter_callback)
         else:
             rospy.Subscriber(rospy.get_param("~measurement_topics/imu_ci"), Odometry, self.nav_filter_callback, queue_size=1)
 
+        # Sonar Subscription
+        if rospy.get_param("~measurement_topics/sonar") != "None":
+            rospy.Subscriber(rospy.get_param("~measurement_topics/sonar"), SonarTargetList, self.sonar_callback)
+
         # Initialize Buffer Service
         rospy.Service('etddf/get_measurement_package', GetMeasurementPackage, self.get_meas_pkg_callback)
         rospy.loginfo("etddf node loaded")
+
+    def sonar_callback(self, sonar_list):
+        pass
+    #     for sonar_msg in sonar_list:
+
+    def publish_stats(self, last_update_time):
+        self.statistics.seq = self.update_seq
+        self.statistics.stamp = last_update_time
+        self.statistics_pub.publish(self.statistics)
 
     def no_nav_filter_callback(self, event):
         t_now = rospy.get_rostime()
@@ -123,7 +140,7 @@ class ETDDF_Node:
         self.last_update_time = t_now
         self.update_seq += 1
         self.update_lock.release()
-
+        self.publish_stats(t_now)
 
     def nav_filter_callback(self, odom):
 
@@ -178,6 +195,7 @@ class ETDDF_Node:
         self.last_update_time = t_now
         self.update_seq += 1
         self.update_lock.release()
+        self.publish_stats(t_now)
     
     def control_status_callback(self, msg):
         self.meas_lock.acquire()
@@ -232,11 +250,15 @@ class ETDDF_Node:
                 self.filter.add_meas(meas, force_fuse=True)
         else:
             self.update_lock.acquire()
-            self.filter.catch_up(msg.delta_multiplier, msg.measurements)
+            implicit_cnt, explicit_cnt = self.filter.catch_up(msg.delta_multiplier, msg.measurements)
             self.update_lock.release()
+            self.statistics.implicit_count += implicit_cnt
+            self.statistics.explicit_count += explicit_cnt
 
     def get_meas_pkg_callback(self, req):
         delta, buffer = self.filter.pull_buffer()
+        ind = self.statistics.delta_tiers.index(delta)
+        self.statistics.buffer_counts[ind] += 1
         return MeasurementPackage(buffer, self.my_name, delta)
 
 

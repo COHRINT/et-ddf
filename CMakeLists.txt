@@ -16,6 +16,7 @@ add_message_files(
    MeasurementPackage.msg
    AssetEstimate.msg
    NetworkEstimate.msg
+   EtddfStatistics.msg
 )
 
 add_service_files(
