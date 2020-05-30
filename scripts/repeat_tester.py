@@ -159,8 +159,8 @@ class repeatTester:
                 proc3.terminate()
                 proc4.terminate()
                 proc2.terminate()
-    print('All tests complete')
-    print('Data located in data/'+self.test_group_name)
+        print('All tests complete')
+        print('Data located in data/'+self.test_group_name)
                 
 
 def terminate_ros_node(s):
