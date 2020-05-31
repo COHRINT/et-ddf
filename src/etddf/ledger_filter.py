@@ -10,7 +10,7 @@ __email__ = "luke.barbier@colorado.edu"
 __status__ = "Development"
 __license__ = "MIT"
 __maintainer__ = "Luke Barbier"
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 from copy import deepcopy
 from etddf.etfilter import ETFilter, ETFilter_Main
@@ -67,7 +67,7 @@ class LedgerFilter:
         self.ledger_control.append([])
         self.ledger_ci.append([])
 
-    def add_meas(self, ros_meas, src_id, measured_id, delta_multiplier=THIS_FILTERS_DELTA, force_fuse=False):
+    def add_meas(self, ros_meas, src_id, measured_id, delta_multiplier=THIS_FILTERS_DELTA, force_fuse=True):
         """Adds and records a measurement to the filter
 
         Measurements after last correction step time will be fused at next correction step
@@ -80,7 +80,7 @@ class LedgerFilter:
 
         Keyword Arguments:
             delta_multiplier {float} -- Delta multiplier to use for this measurement (default: {THIS_FILTERS_DELTA})
-            force_fuse {bool} -- If measurement is in the past, fuse it on the next update step anyway (default: {False})
+            force_fuse {bool} -- If measurement is in the past, fuse it on the next update step anyway (default: {True})
                 Note: the ledger will still reflect the correct measurement time
         """
         # Get the delta trigger for this measurement

@@ -13,6 +13,7 @@ from minau.msg import ControlStatus
 from etddf.msg import Measurement, MeasurementPackage, NetworkEstimate, AssetEstimate, EtddfStatistics
 from etddf.srv import GetMeasurementPackage
 import numpy as np
+import tf
 np.set_printoptions(suppress=True)
 from copy import deepcopy
 from std_msgs.msg import Header
@@ -27,7 +28,7 @@ __email__ = "luke.barbier@colorado.edu"
 __status__ = "Development"
 __license__ = "MIT"
 __maintainer__ = "Luke Barbier"
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 NUM_OWNSHIP_STATES = 6
 DYNAMIC_VARIANCE = -1
@@ -82,6 +83,7 @@ class ETDDF_Node:
         self.last_update_time = rospy.get_rostime() - rospy.Duration(1 / self.update_rate)
         self.meas_lock = threading.Lock()
         self.update_lock = threading.Lock()
+        self.last_orientation = None
 
         # Initialize Measurement Callbacks
         # rospy.Subscriber("mavros/global_position/local", Odometry, self.depth_callback, queue_size=1)
@@ -105,8 +107,35 @@ class ETDDF_Node:
         rospy.loginfo("etddf node loaded")
 
     def sonar_callback(self, sonar_list):
-        pass
-    #     for sonar_msg in sonar_list:
+        for target in sonar_list.targets:
+
+            # TODO Placeholder until we have deterministic function id->asset name
+            # ... assume if we're bluerov2_3, we're measuring bluerov2_4
+            if self.my_name == "bluerov2_3":
+                other_asset_name = "bluerov2_4"
+            else:
+                other_asset_name = "bluerov2_3"
+
+            if self.last_orientation is None: # No orientation, no linearization of the sonar measurement
+                return
+            # Convert quaternions to Euler angles.
+            (r, p, y) = tf.transformations.euler_from_quaternion([self.last_orientation.x, \
+                self.last_orientation.y, self.last_orientation.z, self.last_orientation.w])
+            bearing_world = y - target.bearing_rad # TODO flip with conventional basic frame
+
+            z = target.range_m * np.sin(target.elevation_rad)
+            xy_dist = target.range_m * np.cos(target.elevation_rad)
+            x = xy_dist * np.cos(bearing_world)
+            y = xy_dist * np.sin(bearing_world)
+
+            now = rospy.get_rostime()
+            sonar_x = Measurement("sonar_x", now, self.my_name, other_asset_name, x, self.default_meas_variance["sonar_x"], [])
+            sonar_y = Measurement("sonar_y", now, self.my_name, other_asset_name, y, self.default_meas_variance["sonar_y"], [])
+            sonar_z = Measurement("sonar_z", now, self.my_name, other_asset_name, z, self.default_meas_variance["sonar_z"], [])
+
+            self.filter.add_meas(sonar_x)
+            self.filter.add_meas(sonar_y)
+            self.filter.add_meas(sonar_z)
 
     def publish_stats(self, last_update_time):
         self.statistics.seq = self.update_seq
@@ -191,6 +220,7 @@ class ETDDF_Node:
 
         # TODO partial state update everything
 
+        self.last_orientation = odom.pose.pose.orientation
         self.publish_estimates(t_now, odom)
         self.last_update_time = t_now
         self.update_seq += 1
@@ -232,8 +262,8 @@ class ETDDF_Node:
             twist_cov[:3,:3] = cov[3:6,3:6]
             twist_cov[3:,3:] = nav_covtw[3:,3:]
             twc = TwistWithCovariance(tw, list(twist_cov.flatten()))
-            h = Header(self.update_seq, timestamp, "world_ned")
-            o = Odometry(h, asset+"/base_link", pwc, twc)
+            h = Header(self.update_seq, timestamp, "map")
+            o = Odometry(h, "map", pwc, twc)
 
             ae = AssetEstimate(o, asset)
             ne.assets.append(ae)
@@ -263,9 +293,7 @@ class ETDDF_Node:
 
 
 ################################
-################################
 ### Initialization Functions ###
-################################
 ################################
 
 def get_indices_from_asset_names():

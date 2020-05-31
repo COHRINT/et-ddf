@@ -76,7 +76,7 @@ class DeltaTier:
         self.delta_codebook_table = delta_codebook_table
         self.delta_multipliers = delta_multipliers
 
-    def add_meas(self, ros_meas, delta_multiplier=USE_DELTA_TIERS, force_fuse=False):
+    def add_meas(self, ros_meas, delta_multiplier=USE_DELTA_TIERS, force_fuse=True):
         """Adds a measurement to all ledger filters.
         
         If Measurement is after last correction step, it will be fused on next correction step
@@ -86,7 +86,7 @@ class DeltaTier:
 
         Keyword Arguments:
             delta_multiplier {int} -- Delta multiplier to use for this measurement (default: {USE_DELTA_TIERS})
-            force_fuse {bool} -- If measurement is in the past, fuse it on the next update step anyway (default: {False})
+            force_fuse {bool} -- If measurement is in the past, fuse it on the next update step anyway (default: {True})
                 Note: the ledger will still reflect the correct measurement time
         """
         src_id = self.asset2id[ros_meas.src_asset]
@@ -167,7 +167,7 @@ class DeltaTier:
 
         # Add all measurements in buffer to ledgers of all ledger_filters
         for meas in new_buffer:
-            self.add_meas(meas, delta_multiplier)
+            self.add_meas(meas, delta_multiplier, force_fuse=False)
             if "implicit" in meas.meas_type:
                 implicit_meas_cnt += 1
             else:
