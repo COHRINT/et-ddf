@@ -21,8 +21,12 @@ add_message_files(
    AssetEstimate.msg
    NetworkEstimate.msg
 <<<<<<< HEAD
+<<<<<<< HEAD
    EtddfStatistics.msg
 =======
+=======
+   EtddfStatistics.msg
+>>>>>>> Added Etddf Stats Messages
    Sonar.msg
 <<<<<<< HEAD
 <<<<<<< HEAD
