@@ -6,10 +6,7 @@ find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
   nav_msgs
   std_msgs
-  std_srvs
   message_generation
-  uuv_control_msgs
-  robot_localization
 )
 
 catkin_python_setup()
@@ -20,23 +17,8 @@ add_message_files(
    MeasurementPackage.msg
    AssetEstimate.msg
    NetworkEstimate.msg
-<<<<<<< HEAD
-<<<<<<< HEAD
    EtddfStatistics.msg
-=======
-=======
-   EtddfStatistics.msg
->>>>>>> Added Etddf Stats Messages
    Sonar.msg
-<<<<<<< HEAD
-<<<<<<< HEAD
->>>>>>> Added node to simulate sonar
-=======
-   Waypoint.msg
-   WaypointSet.msg
->>>>>>> Added Enemy Rov script to move the rexrov
-=======
->>>>>>> Added beginning of automating the simulation
 )
 
 add_service_files(
@@ -48,8 +30,6 @@ generate_messages(
   DEPENDENCIES
   nav_msgs
   std_msgs
-  geometry_msgs
-  std_srvs
 )
 
 catkin_package(

@@ -118,10 +118,14 @@ class ETDDF_Node:
         if rospy.get_param("~measurement_topics/sonar") != "None":
             rospy.Subscriber(rospy.get_param("~measurement_topics/sonar"), SonarTargetList, self.sonar_callback)
 
+        if rospy.get_param("~measurement_topics/dvl") != "None":
+            rospy.Subscriber(rospy.get_param("~measurement_topics/dvl"),Vector3,self.dvl_callback)
+
         # Initialize Buffer Service
         # rospy.Service('etddf/get_measurement_package', GetMeasurementPackage, self.get_meas_pkg_callback)
         self.cuprint("loaded")
 
+<<<<<<< HEAD
     def correct_nav_filter(self, c_bar, Pcc, header, nav_estimate):
 
         nav_covpt = np.array(nav_estimate.pose.covariance).reshape(6,6)
@@ -135,6 +139,18 @@ class ETDDF_Node:
         pwcs = PoseWithCovarianceStamped(header, pwc)
         self.set_pose_pub.publish(pwcs)
 
+=======
+
+    def dvl_callback(self,vel):
+        now = rospy.get_rostime()
+        dvl_x_vel = Measurement("dvl_x_vel", now, self.my_name, self.my_name, vel.x, self.default_meas_variance["dvl_x_vel"], [])
+        dvl_y_vel = Measurement("dvl_y_vel", now, self.my_name, self.my_name, vel.y, self.default_meas_variance["dvl_y_vel"], [])
+        dvl_z_vel = Measurement("dvl_z_vel", now, self.my_name, self.my_name, vel.z, self.default_meas_variance["dvl_z_vel"], [])
+
+        self.filter.add_meas(dvl_x_vel)
+        self.filter.add_meas(dvl_y_vel)
+        self.filter.add_meas(dvl_z_vel)
+>>>>>>> Added DVL Sensor Data to ETDDF
     def sonar_callback(self, sonar_list):
 
         for target in sonar_list.targets:

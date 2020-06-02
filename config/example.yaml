@@ -1,63 +1,78 @@
+update_rate: 4
+
+## Multipliers for Delta tiers
+## increases a measurements threshold to be added to the buffer by the given amount
+delta_tiers: [1, 2]
+
+## Measurement topics
+measurement_topics:
+  imu_ci: "None"
+  sonar: "None"
+
+### Buffer space configurations ###
 buffer_space:
-  bookend: 1
-  bookstart: 1
-  capacity: 32
-  final_time: 0
+  capacity: 32 # Total capacity
+  bookstart: 1 # Space for indicating START of measurement stream
+  bookend: 1 # Space for indicating STOP of meas stream
+  final_time: 0 # Space to send last time in buffer
+
+use_control_input: False
+
+### Initial Mean Estimate Configurations ###
 default_starting_position:
   x: 0.0
-  x_vel: 0.0
   y: 0.0
-  y_vel: 0.0
   z: 1.0
+  x_vel: 0.0
+  y_vel: 0.0
   z_vel: 0.0
-delta_tiers:
-- 1
-- 2
-initial_uncertainty:
-  known_starting_position:
-    x: 1.0
-    x_vel: 0.001
-    y: 1.0
-    y_vel: 0.001
-    z: 1.0
-    z_vel: 0.001
-  ownship:
-    x: 1.0
-    x_vel: 0.001
-    y: 1.0
-    y_vel: 0.001
-    z: 1.0
-    z_vel: 0.001
-  unknown_starting_position:
-    x: 1000
-    x_vel: 0.01
-    y: 1000
-    y_vel: 0.01
-    z: 8
-    z_vel: 0.01
-measurement_topics:
-  imu_ci: odometry/filtered
+
+### Process Noise Configurations ###
 process_noise:
+  ownship:
+    x: 0.01
+    y: 0.01
+    z: 0.01
+    x_vel: 0.0
+    y_vel: 0.0
+    z_vel: 0.0
   blueteam:
     x: 0.01
-    x_vel: 0.0
     y: 0.01
-    y_vel: 0.0
     z: 0.01
-    z_vel: 0.0
-  ownship:
-    x: 0.01
     x_vel: 0.0
-    y: 0.01
     y_vel: 0.0
-    z: 0.01
     z_vel: 0.0
   redteam:
     x: 0.1
-    x_vel: 0.0
     y: 0.1
-    y_vel: 0.0
     z: 0.1
+    x_vel: 0.0
+    y_vel: 0.0
     z_vel: 0.0
-update_rate: 4
-use_control_input: false
+
+### Initial Uncertainty Configurations ###
+initial_uncertainty:
+  ownship:
+    x: 1.0
+    y: 1.0
+    z: 1.0
+    x_vel: 0.001
+    y_vel: 0.001
+    z_vel: 0.001
+  # for asset positions provided to us through roslaunch params
+  known_starting_position: 
+    x: 1.0
+    y: 1.0
+    z: 1.0
+    x_vel: 0.001
+    y_vel: 0.001
+    z_vel: 0.001
+  # asset positions not provided in roslaunch, including redteam
+  unknown_starting_position: 
+    x: 1000
+    y: 1000
+    z: 8
+    x_vel: 0.01
+    y_vel: 0.01
+    z_vel: 0.01

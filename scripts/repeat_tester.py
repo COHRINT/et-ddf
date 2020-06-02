@@ -40,9 +40,13 @@ class repeatTester:
         #extracts data and asigns it to variables
         self.config_names=[]
         self.IMU = []
+        self.Sonar = []
+        self.DVL = []
         for i in range(len(rows)):
             self.config_names.append(rows[i]['Test_Name'])
             self.IMU.append(rows[i]['IMU_Data'])
+            self.Sonar.append(rows[i]['Sonar_Data'])
+            self.DVL.append(rows[i]['DVL_Data'])
         self.test_group_name = rows[0]['Test_Group_Name']
         self.num_groups = int(rows[0]['Number_Tests_dep'])
         self.num_configs = len(rows)
@@ -86,7 +90,7 @@ class repeatTester:
                     self.first.append('['+str(self.waypoints[i][j][0])+','+str(self.waypoints[i][j][1])+','+str(self.waypoints[i][j][2])+']')
                 f.write(str(self.waypoints[i][j][0])+','+str(self.waypoints[i][j][1])+','+str(self.waypoints[i][j][2])+'\n')
             f.close()
-    def setup_imu(self,config_num):
+    def setup_config(self,config_num):
         """
         Based on the configuration this either enables or disables imu data.
 
@@ -94,8 +98,11 @@ class repeatTester:
             config_num {int} -- takes in an integer of the config number
         """
         include_imu = False
-        if self.IMU[config_num]=='true':
+        include_sonar = False
+        if (self.IMU[config_num]).lower()=='true':
             include_imu=True
+        if (self.Sonar[config_num]).lower()=='true':
+            include_sonar=True
         #this switches to the correct directory and reads in the yaml
         os.chdir("../config")
         with open('etddf.yaml') as f:
@@ -106,6 +113,10 @@ class repeatTester:
             etddf["measurement_topics"]["imu_ci"]="odometry/filtered"
         else:
             etddf["measurement_topics"]["imu_ci"]="None"
+        if include_sonar:
+            etddf["measurement_topics"]["sonar"]="sonar_processing/target_list"
+        else:
+            etddf["measurement_topics"]["sonar"]="None"
         # #this writes the changes to the file
         with open('example.yaml', 'w') as f:
             yaml.dump(etddf, f)
@@ -119,15 +130,12 @@ class repeatTester:
         This is the function that runs all the tests and bags all the data.
         """
         #this is where all the scripts and launch files are ran
-        d = os.getcwd()+'/data/'+self.test_group_name
-        os.mkdir(d)
+        dirTo = os.getcwd()+'/data/'+self.test_group_name
+        os.mkdir(dirTo)
         for j in range(self.num_configs):
-            self.setup_imu(j)
+            # self.setup_config(j)
             for i in range(self.num_groups):
                 print('\n\nExecuting '+self.test_group_name+'/'+self.config_names[j]+' #'+str(i+1)+' ('+str((i+1)+3*j)+'/'+str(self.total_tests)+') | Time Remaining: '+self.time()+'\n\n')
-                dirTo = os.getcwd()+'/data/'+self.test_group_name+'/'+self.config_names[j]+'_'+str(i+1)
-                # print(dirTo)
-                os.mkdir(dirTo)
                 # exit()
                 self.remaining_time -= self.mins_per
                 time.sleep(10)
@@ -139,7 +147,8 @@ class repeatTester:
                 # proc2 = subprocess.Popen(args2,stdout=FNULL,stderr=subprocess.STDOUT)
                 time.sleep(10)
                 # ,'/bluerov2_4/pose_gt','/bluerov2_3/etddf/estimate/network','/bluerov2_4/etddf/estimate/network'
-                args5 = 'rosbag record /bluerov2_3/pose_gt /bluerov2_4/pose_gt /bluerov2_3/etddf/estimate/network /bluerov2_4/etddf/estimate/network'
+                bagfile_name = self.config_names[j]+'_'+str(i+1)
+                args5 = 'rosbag record -O '+bagfile_name+' /bluerov2_3/pose_gt /bluerov2_4/pose_gt /bluerov2_3/etddf/estimate/bluerov2_3 /bluerov2_3/etddf/estimate/bluerov2_4'
                 fileFor3 = 'waypoints_'+str(i)+'.csv'
                 args3 = ['rosrun','etddf','waypoint_move.py','__ns:=bluerov2_3',fileFor3]
                 # proc3 =  subprocess.Popen(args3,stdout=FNULL,stderr=subprocess.STDOUT)

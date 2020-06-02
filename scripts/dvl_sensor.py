@@ -20,7 +20,7 @@ class DVLSensor:
 
 
 rospy.init_node('dvl_sensor')
-pub = rospy.Publisher('dvlSensor',Vector3,queue_size=10)
+pub = rospy.Publisher('dvl',Vector3,queue_size=10)
 
 ds = DVLSensor()
 
@@ -33,6 +33,5 @@ while not rospy.is_shutdown():
         dy = np.random.normal(0,.1)
         dz = np.random.normal(0,.1)
         v = Vector3(ds.vel.x+dx,ds.vel.y+dy,ds.vel.z+dz)
-        rospy.loginfo(v)
         pub.publish(v)
     rate.sleep()

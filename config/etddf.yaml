@@ -8,7 +8,12 @@ delta_tiers: [1]
 measurement_topics:
   depth: "mavros/global_position/rel_alt"
   imu_ci: "odometry/filtered"
+<<<<<<< HEAD
   sonar: "None" #"sonar_processing/target_list"
+=======
+  sonar: "sonar_processing/target_list"
+  dvl: "dvl"
+>>>>>>> Added DVL Sensor Data to ETDDF
 
 ### Buffer space configurations ###
 buffer_space:
