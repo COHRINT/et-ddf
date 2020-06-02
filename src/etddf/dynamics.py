@@ -7,9 +7,8 @@ State propagation functions
 __author__ = "Luke Barbier"
 __copyright__ = "Copyright 2020, COHRINT Lab"
 __email__ = "luke.barbier@colorado.edu"
-__status__ = "Production"
+__status__ = "Stable"
 __maintainer__ = "Luke Barbier"
-__version__ = "1.0.0"
 
 import numpy as np
 from copy import deepcopy

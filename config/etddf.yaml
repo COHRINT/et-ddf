@@ -2,7 +2,7 @@ update_rate: 4
 
 ## Multipliers for Delta tiers
 ## increases a measurements threshold to be added to the buffer by the given amount
-delta_tiers: [1, 2]
+delta_tiers: [1]
 
 ## Measurement topics
 measurement_topics:
