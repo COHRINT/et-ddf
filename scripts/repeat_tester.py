@@ -99,10 +99,13 @@ class repeatTester:
         """
         include_imu = False
         include_sonar = False
+        include_dvl = False
         if (self.IMU[config_num]).lower()=='true':
             include_imu=True
         if (self.Sonar[config_num]).lower()=='true':
             include_sonar=True
+        if (self.DVL[config_num]).lower()=='true':
+            include_dvl = True
         #this switches to the correct directory and reads in the yaml
         os.chdir("../config")
         with open('etddf.yaml') as f:
@@ -117,6 +120,11 @@ class repeatTester:
             etddf["measurement_topics"]["sonar"]="sonar_processing/target_list"
         else:
             etddf["measurement_topics"]["sonar"]="None"
+        if include_dvl:
+            etddf["measurement_topics"]["dvl"] = "dvl"
+        else:
+            etddf["measurement_topics"]["dvl"] = "None"
+
         # #this writes the changes to the file
         with open('example.yaml', 'w') as f:
             yaml.dump(etddf, f)
@@ -133,7 +141,7 @@ class repeatTester:
         dirTo = os.getcwd()+'/data/'+self.test_group_name
         os.mkdir(dirTo)
         for j in range(self.num_configs):
-            # self.setup_config(j)
+            self.setup_config(j)
             for i in range(self.num_groups):
                 print('\n\nExecuting '+self.test_group_name+'/'+self.config_names[j]+' #'+str(i+1)+' ('+str((i+1)+3*j)+'/'+str(self.total_tests)+') | Time Remaining: '+self.time()+'\n\n')
                 # exit()
@@ -148,7 +156,7 @@ class repeatTester:
                 time.sleep(10)
                 # ,'/bluerov2_4/pose_gt','/bluerov2_3/etddf/estimate/network','/bluerov2_4/etddf/estimate/network'
                 bagfile_name = self.config_names[j]+'_'+str(i+1)
-                args5 = 'rosbag record -O '+bagfile_name+' /bluerov2_3/pose_gt /bluerov2_4/pose_gt /bluerov2_3/etddf/estimate/bluerov2_3 /bluerov2_3/etddf/estimate/bluerov2_4'
+                args5 = 'rosbag record -O '+bagfile_name+' /bluerov2_3/pose_gt /bluerov2_4/pose_gt /bluerov2_3/etddf/estimate/network /bluerov2_4/etddf/estimate/network /bluerov2_3/etddf/statistics /bluerov2_4/etddf/statistics'
                 fileFor3 = 'waypoints_'+str(i)+'.csv'
                 args3 = ['rosrun','etddf','waypoint_move.py','__ns:=bluerov2_3',fileFor3]
                 # proc3 =  subprocess.Popen(args3,stdout=FNULL,stderr=subprocess.STDOUT)

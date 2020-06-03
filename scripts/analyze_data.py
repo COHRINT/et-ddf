@@ -56,10 +56,23 @@ class AnalyzeData:
         # print(poseDiff)
         print(len(self.truth_poses))
 
-
+        
         
         avgs = [np.average(poseDiff[0]),np.average(poseDiff[1]),np.average(poseDiff[2])]
-        plt.bar(self.bag_files,avgs)
+
+        avgs0 = [avgs[0]for i in range(3)]
+        avgs1 = [avgs[1]for i in range(3)]
+        avgs2 = [avgs[2]for i in range(3)]
+
+
+        ind = np.arange(3) 
+        width = 0.3       
+        plt.bar(ind-width, avgs0, width, label='Trial 1')
+        plt.bar(ind, avgs1, width, label='Trial 2')
+        plt.bar(ind + width, avgs2, width,
+            label='Trial 3')
+        plt.xticks(ind, ('Control','DVL','Sonar'))
+        plt.legend(loc='best')
         plt.show()
 
 

@@ -34,3 +34,13 @@ measurements:
     default_sd: 0.3
     buffer_size: 2
     missed_tolerance: 10
+  
+  dvl_x:
+    base_et_delta: 1.0
+    default_sd: 0.3
+    buffer_size: 2
+
+  dvl_y:
+    base_et_delta: 1.0
+    default_sd: 0.3
+    buffer_size: 2

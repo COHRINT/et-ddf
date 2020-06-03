@@ -109,6 +109,7 @@ class ETDDF_Node:
 
         # IMU Covariance Intersection
         if rospy.get_param("~measurement_topics/imu_ci") == "None":
+            print('Hello!')
             rospy.Timer(rospy.Duration(1 / self.update_rate), self.no_nav_filter_callback)
         else:
             rospy.Subscriber(rospy.get_param("~measurement_topics/imu_ci"), Odometry, self.nav_filter_callback, queue_size=1)
@@ -116,9 +117,13 @@ class ETDDF_Node:
 
         # Sonar Subscription
         if rospy.get_param("~measurement_topics/sonar") != "None":
+            print('Sonar:')
+            print(rospy.get_param("~measurement_topics/sonar"))
             rospy.Subscriber(rospy.get_param("~measurement_topics/sonar"), SonarTargetList, self.sonar_callback)
 
         if rospy.get_param("~measurement_topics/dvl") != "None":
+            print("DVL:")
+            print(rospy.get_param("~measurement_topics/dvl"))
             rospy.Subscriber(rospy.get_param("~measurement_topics/dvl"),Vector3,self.dvl_callback)
 
         # Initialize Buffer Service
@@ -143,14 +148,20 @@ class ETDDF_Node:
 
     def dvl_callback(self,vel):
         now = rospy.get_rostime()
-        dvl_x_vel = Measurement("dvl_x_vel", now, self.my_name, self.my_name, vel.x, self.default_meas_variance["dvl_x_vel"], [])
-        dvl_y_vel = Measurement("dvl_y_vel", now, self.my_name, self.my_name, vel.y, self.default_meas_variance["dvl_y_vel"], [])
-        dvl_z_vel = Measurement("dvl_z_vel", now, self.my_name, self.my_name, vel.z, self.default_meas_variance["dvl_z_vel"], [])
+        dvl_x = Measurement("dvl_x", now, self.my_name, self.my_name, vel.x, self.default_meas_variance["dvl_x"], [])
+        dvl_y = Measurement("dvl_y", now, self.my_name, self.my_name, vel.y, self.default_meas_variance["dvl_y"], [])
+        # dvl_z = Measurement("dvl_z", now, self.my_name, self.my_name, vel.z, self.default_meas_variance["dvl_z"], [])
 
+<<<<<<< HEAD
         self.filter.add_meas(dvl_x_vel)
         self.filter.add_meas(dvl_y_vel)
         self.filter.add_meas(dvl_z_vel)
 >>>>>>> Added DVL Sensor Data to ETDDF
+=======
+        self.filter.add_meas(dvl_x)
+        self.filter.add_meas(dvl_y)
+        # self.filter.add_meas(dvl_z)
+>>>>>>> Added Changes before rebasing with modem integration
     def sonar_callback(self, sonar_list):
 
         for target in sonar_list.targets:
