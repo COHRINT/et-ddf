@@ -19,59 +19,124 @@ class AnalyzeData:
         self.data_loc = os.getcwd()+'/'+data
         os.chdir(self.data_loc)
         self.bag_files = os.listdir('.')
-        print(self.bag_files)
-        self.truth_poses = [[]for i in range(len(self.bag_files))]
-        self.estimate_poses = [[]for i in range(len(self.bag_files))]
+        # print(self.bag_files)
+        self.truth_poses3 = [[]for i in range(len(self.bag_files))]
+        self.truth_poses4 = [[]for i in range(len(self.bag_files))]
+        self.estimate3_poses4 = [[]for i in range(len(self.bag_files))]
+        self.estimate3_poses3 = [[]for i in range(len(self.bag_files))]
+        self.estimate4_poses4 = [[]for i in range(len(self.bag_files))]
+        self.estimate4_poses3 = [[]for i in range(len(self.bag_files))]
         self.ratio = []
         for i in range(len(self.bag_files)):
             bag = rosbag.Bag(self.bag_files[i])
             for topic, msg, t in bag.read_messages(topics=['/bluerov2_3/pose_gt']):
-                self.truth_poses[i].append(msg)
+                self.truth_poses3[i].append(msg)
+            for topic, msg, t in bag.read_messages(topics=['/bluerov2_4/pose_gt']):
+                self.truth_poses4[i].append(msg)
+            for topic, msg, t in bag.read_messages(topics=['/bluerov2_3/etddf/estimate/network']):
+                for j in range(len(msg.assets)):
+                    if msg.assets[j].name == 'bluerov2_3':
+                        self.estimate3_poses3[i].append(msg.assets[j].odom)
+                    else:
+                        self.estimate3_poses4[i].append(msg.assets[j].odom)
+            for topic, msg, t in bag.read_messages(topics=['/bluerov2_4/etddf/estimate/network']):
+                for j in range(len(msg.assets)):
+                    if msg.assets[j].name == 'bluerov2_3':
+                        self.estimate4_poses3[i].append(msg.assets[j].odom)
+                    else:
+                        self.estimate4_poses4[i].append(msg.assets[j].odom)
             bag.close()
-            bag = rosbag.Bag(self.bag_files[i])
-            for topic, msg, t in bag.read_messages(topics=['/bluerov2_3/etddf/estimate/bluerov2_3']):
-                self.estimate_poses[i].append(msg)
-            bag.close()
-            self.ratio.append(len(self.truth_poses[i])//len(self.estimate_poses[i]) - 3) 
+            self.ratio.append(len(self.truth_poses3[i])//len(self.estimate3_poses3[i]) - 3) 
+        # print(self.ratio)
     def run(self):
-        poseDiff = [[]for i in range(len(self.bag_files))]
+        pose3Diff3 = [[]for i in range(len(self.bag_files))]
+        pose3Diff4 = [[]for i in range(len(self.bag_files))]
+        pose4Diff4 = [[]for i in range(len(self.bag_files))]
+        pose4Diff3 = [[]for i in range(len(self.bag_files))]
+
         for k in range(len(self.bag_files)):
             i = 0
             j = 0
-            timeDiff = abs(self.estimate_poses[k][0].header.stamp-self.truth_poses[k][0].header.stamp)
-            num = 0
-            while i < len(self.estimate_poses[k]):
-                # print(num)
-                num+=1
-                tempTime = abs(self.estimate_poses[k][i].header.stamp-self.truth_poses[k][j].header.stamp)
+            timeDiff = abs(self.estimate3_poses3[k][0].header.stamp-self.truth_poses3[k][0].header.stamp)
+            while i < len(self.estimate3_poses3[k]):
+                tempTime = abs(self.estimate3_poses3[k][i].header.stamp-self.truth_poses3[k][j].header.stamp)
                 if tempTime > timeDiff:
-                    poseDiff[k].append(quadratureDiff(self.estimate_poses[k][i],self.truth_poses[k][j-1]))   
+                    pose3Diff3[k].append(quadratureDiff(self.estimate3_poses3[k][i],self.truth_poses3[k][j-1]))
+                    pose3Diff4[k].append(quadratureDiff(self.estimate3_poses4[k][i],self.truth_poses4[k][j-1]))   
                     i+=1
                     j+=self.ratio[k]
-                    if i!=len(self.estimate_poses[k]):
-                        timeDiff = abs(self.estimate_poses[k][i].header.stamp-self.truth_poses[k][0].header.stamp)
+                    if i!=len(self.estimate3_poses3[k]):
+                        timeDiff = abs(self.estimate3_poses3[k][i].header.stamp-self.truth_poses3[k][0].header.stamp)
+                else:
+                    j+=1
+                    timeDiff = tempTime
+            i = 0
+            j = 0
+            timeDiff = abs(self.estimate4_poses4[k][0].header.stamp-self.truth_poses4[k][0].header.stamp)
+            while i < len(self.estimate4_poses4[k])-1:
+                tempTime = abs(self.estimate4_poses4[k][i].header.stamp-self.truth_poses4[k][j].header.stamp)
+                if tempTime > timeDiff:
+                    pose4Diff3[k].append(quadratureDiff(self.estimate4_poses3[k][i],self.truth_poses3[k][j-1]))
+                    pose4Diff4[k].append(quadratureDiff(self.estimate4_poses4[k][i],self.truth_poses4[k][j-1]))   
+                    i+=1
+                    j+=self.ratio[k]
+                    if i!=len(self.estimate4_poses4[k]):
+                        timeDiff = abs(self.estimate4_poses4[k][i].header.stamp-self.truth_poses4[k][0].header.stamp)
                 else:
                     j+=1
                     timeDiff = tempTime
         # print(poseDiff)
-        print(len(self.truth_poses))
 
+        # print(len(pose3Diff3))
+        # print(len(pose3Diff4))
+        # print(len(pose4Diff4))
+        # print(len(pose4Diff3))
+        
+        groups = [['control',[]]]
+        for i in range(len(self.bag_files)):
+            found = False
+            for j in range(len(groups)):
+                if groups[j][0]==self.bag_files[i][:-6]:
+                    found = True
+                    groups[j][1].append(i)
+                    break
+            if not found:
+                groups.append([self.bag_files[i][:-6],[i]])
+            
+        
+        for i in range(len(groups)):
+            for j in range(len(groups[i][1])):
+                idx = int(self.bag_files[groups[i][1][j]][-5])-1
+                groups[i][1][j], groups[i][1][idx] = groups[i][1][idx], groups[i][1][j]
         
         
-        avgs = [np.average(poseDiff[0]),np.average(poseDiff[1]),np.average(poseDiff[2])]
 
-        avgs0 = [avgs[0]for i in range(3)]
-        avgs1 = [avgs[1]for i in range(3)]
-        avgs2 = [avgs[2]for i in range(3)]
+        diff33 = [[]for i in range(len(groups))]
+        diff43 = [[]for i in range(len(groups))]
+        diff34 = [[]for i in range(len(groups))]
+        diff44 = [[]for i in range(len(groups))]
+
+        for i in range(len(groups)):
+            for j in range(len(groups[i][1])):
+                diff33[i].append(np.average(pose3Diff3[groups[i][1][j]]))
+                diff43[i].append(np.average(pose4Diff3[groups[i][1][j]]))
+                diff34[i].append(np.average(pose3Diff4[groups[i][1][j]]))
+                diff44[i].append(np.average(pose4Diff4[groups[i][1][j]]))
+        
+        
+        
+        
+        
 
 
-        ind = np.arange(3) 
+
+        ind = np.arange(len(groups))
         width = 0.3       
-        plt.bar(ind-width, avgs0, width, label='Trial 1')
-        plt.bar(ind, avgs1, width, label='Trial 2')
-        plt.bar(ind + width, avgs2, width,
+        plt.bar(ind-width, [i[0] for i in diff34], width, label='Trial 1')
+        plt.bar(ind, [i[1] for i in diff34], width, label='Trial 2')
+        plt.bar(ind + width, [i[2] for i in diff34], width,
             label='Trial 3')
-        plt.xticks(ind, ('Control','DVL','Sonar'))
+        plt.xticks(ind, [i[0]for i in groups])
         plt.legend(loc='best')
         plt.show()
 
