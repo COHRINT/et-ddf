@@ -9,7 +9,6 @@ __email__ = "luke.barbier@colorado.edu"
 __status__ = "Development"
 __license__ = "MIT"
 __maintainer__ = "Luke Barbier"
-__version__ = "1.0.1"
 
 from copy import deepcopy
 from etddf.ledger_filter import LedgerFilter, MEASUREMENT_TYPES_NOT_SHARED, THIS_FILTERS_DELTA
@@ -33,7 +32,7 @@ class DeltaTier:
     DeltaTier filter in a planned fashion. 
     """
 
-    def __init__(self, num_ownship_states, x0, P0, buffer_capacity, meas_space_table, delta_codebook_table, delta_multipliers, asset2id, my_name):
+    def __init__(self, num_ownship_states, x0, P0, buffer_capacity, meas_space_table, missed_meas_tolerance_table, delta_codebook_table, delta_multipliers, asset2id, my_name):
         """Constructor
 
         Arguments:
@@ -42,6 +41,7 @@ class DeltaTier:
             P0 {np.ndarray} -- initial uncertainty
             buffer_capacity {int} -- capacity of measurement buffer
             meas_space_table {dict} -- Hash that stores how much buffer space a measurement takes up. Str (meas type) -> int (buffer space)
+            missed_meas_tolerance_table {dict} -- Hash that determines how many measurements of each type do we need to miss before indicating a bookend
             delta_codebook_table {dict} -- Hash that stores delta trigger for each measurement type. Str(meas type) -> float (delta trigger)
             delta_multipliers {list} -- List of delta trigger multipliers
             asset2id {dict} -- Hash to get the id number of an asset from the string name
@@ -57,6 +57,7 @@ class DeltaTier:
             self.delta_tiers[multiplier] = LedgerFilter(
                 num_ownship_states, x0, P0, \
                 buffer_capacity, meas_space_table, \
+                missed_meas_tolerance_table, \
                 delta_codebook_table, multiplier, \
                 False, asset2id[my_name]
             )
@@ -65,6 +66,7 @@ class DeltaTier:
         self.main_filter = LedgerFilter(
             num_ownship_states, x0, P0, \
             buffer_capacity, meas_space_table, \
+            missed_meas_tolerance_table, \
             delta_codebook_table, 1.0, \
             True, asset2id[my_name]
         )
@@ -73,6 +75,7 @@ class DeltaTier:
         self.num_ownship_states = num_ownship_states
         self.buffer_capacity = buffer_capacity
         self.meas_space_table = meas_space_table
+        self.missed_meas_tolerance_table = missed_meas_tolerance_table
         self.delta_codebook_table = delta_codebook_table
         self.delta_multipliers = delta_multipliers
 
@@ -242,6 +245,7 @@ class DeltaTier:
             self.delta_tiers[multiplier] = LedgerFilter(
                 self.num_ownship_states, x0, P0, \
                 self.buffer_capacity, self.meas_space_table, \
+                self.missed_meas_tolerance_table, \
                 self.delta_codebook_table, multiplier, \
                 False, self.asset2id[self.my_name]
             )
@@ -257,12 +261,32 @@ class DeltaTier:
         self.main_filter = LedgerFilter(
             self.num_ownship_states, x0, P0, \
             self.buffer_capacity, self.meas_space_table, \
+            self.missed_meas_tolerance_table, \
             self.delta_codebook_table, 1.0, \
             True, self.asset2id[self.my_name]
         )
         self.main_filter.reset(mainbuf, ledger_update_times, main_ledger_meas, main_control_ledger)
 
         return implicit_meas_cnt, explicit_meas_cnt
+
+    def peek_buffer(self):
+        """ Get the current lowest multiplier buffer without clearing it
+
+        Returns:
+            bool -- whether the buffer has been overflown
+            float -- the lowest delta tier multiplier
+            list -- the buffer of the lowest not overflown buffer
+        """
+        # Find lowest delta tier that hasn't overflown
+        lowest_multiplier = -1
+        for key in self.delta_tiers:
+            if not self.delta_tiers[key].check_overflown():
+                lowest_multiplier = key
+                break
+        if lowest_multiplier == -1:
+            return True, 0, []
+        else:
+            return False, lowest_multiplier, self.delta_tiers[lowest_multiplier].peek()
 
     def pull_buffer(self):
         """Pulls lowest delta multiplier's buffer that hasn't overflown

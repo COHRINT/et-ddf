@@ -45,6 +45,7 @@ class ETDDF_Node:
                 delta_codebook_table, \
                 buffer_size, \
                 meas_space_table, \
+                missed_meas_tolerance_table, \
                 x0,\
                 P0,\
                 Q,\
@@ -63,6 +64,7 @@ class ETDDF_Node:
                                 P0,\
                                 buffer_size,\
                                 meas_space_table,\
+                                missed_meas_tolerance_table, \
                                 delta_codebook_table,\
                                 delta_tiers,\
                                 self.asset2id,\
@@ -109,7 +111,7 @@ class ETDDF_Node:
         self.cuprint("loaded")
 
     def sonar_callback(self, sonar_list):
-        self.cuprint("receiving sonar data")
+
         for target in sonar_list.targets:
 
             if self.last_orientation is None: # No orientation, no linearization of the sonar measurement
@@ -328,6 +330,15 @@ def get_delta_codebook_table():
         delta_codebook[meas] = base_et_delta
     return delta_codebook
 
+def get_missed_meas_tolerance_table():
+    meas_tolerance_table = {}
+
+    meas_info = rospy.get_param("~measurements")
+    for meas in meas_info.keys():
+        meas_tolerance_table[meas] = meas_info[meas]["missed_tolerance"]
+
+    return meas_space_table
+
 def get_meas_space_table():
     meas_space_table = {}
 
@@ -447,6 +458,7 @@ if __name__ == "__main__":
     delta_codebook_table = get_delta_codebook_table()
     buffer_size = rospy.get_param("~buffer_space/capacity")
     meas_space_table = get_meas_space_table()
+    missed_meas_tolerance_table = get_missed_meas_tolerance_table()
     num_assets = len(asset2id) - 1 # subtract surface
     x0, P0 = get_initial_estimate(num_assets * NUM_OWNSHIP_STATES)
     Q = get_process_noise(num_assets * NUM_OWNSHIP_STATES)
@@ -460,6 +472,7 @@ if __name__ == "__main__":
                         delta_codebook_table, \
                         buffer_size, \
                         meas_space_table, \
+                        missed_meas_tolerance_table, \
                         x0,\
                         P0,\
                         Q,\

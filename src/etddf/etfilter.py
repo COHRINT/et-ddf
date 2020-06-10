@@ -19,10 +19,9 @@ Supports fusing all Explicit and Implicit measurements defined in etddf/measurem
 __author__ = "Luke Barbier"
 __copyright__ = "Copyright 2020, COHRINT Lab"
 __email__ = "luke.barbier@colorado.edu"
-__status__ = "Development"
+__status__ = "Stable"
 __license__ = "MIT"
 __maintainer__ = "Luke Barbier"
-__version__ = "1.1.0"
 
 import numpy as np
 from etddf.measurements import *

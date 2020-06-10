@@ -10,7 +10,6 @@ __email__ = "luke.barbier@colorado.edu"
 __status__ = "Development"
 __license__ = "MIT"
 __maintainer__ = "Luke Barbier"
-__version__ = "1.1.0"
 
 from copy import deepcopy
 from etddf.etfilter import ETFilter, ETFilter_Main
@@ -30,7 +29,7 @@ THIS_FILTERS_DELTA =                -1
 class LedgerFilter:
     """Records filter inputs and makes available an event triggered buffer. """    
 
-    def __init__(self, num_ownship_states, x0, P0, buffer_capacity, meas_space_table, delta_codebook_table, delta_multiplier, is_main_filter, my_id):
+    def __init__(self, num_ownship_states, x0, P0, buffer_capacity, meas_space_table, missed_meas_tolerance_table, delta_codebook_table, delta_multiplier, is_main_filter, my_id):
         """Constructor
 
         Arguments:
@@ -40,7 +39,8 @@ class LedgerFilter:
             buffer_capacity {int} -- capacity of measurement buffer
             meas_space_table {dict} -- Hash that stores how much buffer space a measurement takes up. Str (meas type) -> int (buffer space)
                 Must have key entries "bookend", "bookstart" to indicate space needed for measurement implicitness filling in
-            delta_codebook_table {dict} -- Hash that stores delta trigger for each measurement type. Str(meas type) -> float (delta trigger)
+            missed_meas_tolerance_table {dict} -- Hash that determines how many measurements of each type do we need to miss before indicating a bookend
+            delta_codebook_table {dict} -- Hash thatp stores delta trigger for each measurement type. Str(meas type) -> float (delta trigger)
             delta_multiplier {float} -- Delta trigger constant multiplier for this filter
             is_main_filter {bool} -- Is this filter a common or main filter (if main the meas buffer does not matter)
             my_id {int} -- ID# of the current asset (typically 0)
@@ -52,6 +52,7 @@ class LedgerFilter:
         self.delta_codebook_table = delta_codebook_table
         self.delta_multiplier = delta_multiplier
         self.buffer = MeasurementBuffer(meas_space_table, buffer_capacity)
+        self.missed_meas_tolerance_table = missed_meas_tolerance_table
         self.is_main_filter = is_main_filter
         self.filter = ETFilter(my_id, num_ownship_states, 3, x0, P0, True)
 
@@ -110,6 +111,7 @@ class LedgerFilter:
                     bookstart = meas.__class__.__name__ not in self.expected_measurements.keys()
                     
                     if bookstart:
+                        print("########## INSERTING ######")
                         self.buffer.insert_marker(ros_meas, ros_meas.stamp, bookstart=True)
 
                     meas = Asset.get_implicit_msg_equivalent(meas)
@@ -120,7 +122,8 @@ class LedgerFilter:
                     self.buffer.add_meas(deepcopy(ros_meas))
                 
                 # Indicate we receieved our expected measurement
-                self.expected_measurements[orig_meas.__class__.__name__] = [True, ros_meas]
+                missed_tolerance = self.missed_meas_tolerance_table[ros_meas.meas_type]
+                self.expected_measurements[orig_meas.__class__.__name__] = [missed_tolerance, ros_meas]
 
         # Append to the ledger
         self.ledger_meas[time_index].append(meas)
@@ -156,14 +159,13 @@ class LedgerFilter:
         for emeas in self.expected_measurements.keys():
             [rx, ros_meas] = self.expected_measurements[emeas]
 
-            # Did not receive our expected measurement
-            if not rx:
-                print("Did not receive expected measurement: " + emeas)
+            # We have reached our tolerance on the number of updates without receiving this measurement
+            if rx < 1:
+                print("############################ Did not receive expected measurement: " + emeas)
                 self.buffer.insert_marker(ros_meas, update_time, bookstart=False)
                 del self.expected_measurements[emeas]
-            # Received our expected measurement
             else:
-                self.expected_measurements[emeas] = [False, ros_meas]
+                self.expected_measurements[emeas] = [rx - 1, ros_meas]
 
         # Run correction step on filter
         self.filter.correct()
@@ -189,6 +191,14 @@ class LedgerFilter:
             bool -- True if buffer has overflown
         """
         return self.buffer.check_overflown()
+
+    def peek(self):
+        """ Allows peeking of the buffer
+
+        Returns:
+            list -- the current state of the buffer
+        """
+        return self.buffer.peek()
 
     def flush_buffer(self, final_time):
         """Returns the event triggered buffer
@@ -393,6 +403,14 @@ class MeasurementBuffer:
         if self.size > self.capacity:
             self.overflown = True
         return self.overflown
+
+    def peek(self):
+        """ Allows peeking of the buffer
+
+        Returns:
+            list -- the current state of the buffer
+        """
+        return deepcopy(self.buffer)
 
     def flush(self, final_time):
         """Returns and clears the buffer
