@@ -37,7 +37,7 @@ initial_uncertainty:
     z: 8
     z_vel: 0.01
 measurement_topics:
-  imu_ci: "odometry/filtered"
+  imu_ci: odometry/filtered
   sonar: "sonar_processing/target_list"
   dvl: "dvl"
 process_noise:

@@ -82,7 +82,7 @@ class ETDDF_Node:
         
         self.network_pub = rospy.Publisher("etddf/estimate/network", NetworkEstimate, queue_size=10)
         self.statistics_pub = rospy.Publisher("etddf/statistics", EtddfStatistics, queue_size=10)
-        self.set_pose = rospy.Publisher("estimated_pose",PoseWithCovarianceStamped,queue_size=10)
+        self.set_pose = rospy.Publisher("estimate_pose",PoseWithCovarianceStamped,queue_size=10)
         self.statistics = EtddfStatistics(0, rospy.get_rostime(), 0, 0, delta_tiers, [0 for _ in delta_tiers], 0.0, [], False)
 
         self.asset_pub_dict = {}
