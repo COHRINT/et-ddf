@@ -11,12 +11,10 @@
   <arg name="roll" default="0.0"/>
   <arg name="pitch" default="0.0"/>
   <arg name="yaw" default="0.0"/>
-
-<<<<<<< HEAD
   <arg name="use_360" default="False"/>
 
-=======
->>>>>>> Updated phase 1 with dvl and sonar. Also made a local vehicle.bluerov2.sitl.launch file so it can be changed seperate from the one in onboard.
+  <arg name="use_360" default="False"/>
+
   <arg name="schedule_file" default="$(find minau)/config/schedules/schedule_3_assets.json"/>
   <!-- DDF params -->
   <arg name="blue_team_names" default="[]"/>
@@ -88,7 +86,7 @@
          true, true, true,
          true, true, true]
       </rosparam>
-      <param name="odom0" value="pose_gt"/>
+      <!-- <param name="odom0" value="pose_gt"/>
       <param name="odom0_differential" value="false"/>
       <param name="odom0_relative" value="false"/>
       <param name="odom0_queue_size" value="10"/>
@@ -98,7 +96,7 @@
          false, false, false,
          false, false, false,
          false, false, false]
-      </rosparam>
+      </rosparam> -->
     </node>
 
     <!-- Start the MinAu DDF node -->
@@ -114,7 +112,7 @@
       <param name="rate" value="20.0"/>
       <param name="schedule_file" value="$(arg schedule_file)"/>
     </node>
-
+    -->
     <!-- Start the SIMULATED SONAR Processing node -->
     <node name="sonar_processing" pkg="minau" type="sonar_processing_sim_node.py" output="screen">
       <param name="rate" value="1.0"/>

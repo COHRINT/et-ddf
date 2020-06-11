@@ -1,6 +1,7 @@
 <launch>
     <arg name="pos3" default="[0,0,0]"/>
     <arg name="pos4" default="[0,0,0]"/>
+    <arg name="schedule_file" default="$(find minau)/config/schedules/schedule_3_assets.json"/>
     <group ns="bluerov2_3">    
         <node name="uuv_control" pkg="minau" type="uuv_control_node.py" output="screen">
             <param name="config" value="$(find minau)/config/vehicle.sitl.json"/>
@@ -16,6 +17,10 @@
             <arg name="config_file" default="$(find etddf)/config/example.yaml" />
             <arg name="starting_position" default="$(arg pos3)" />
         </include>
+        <node name="fleet_communication" pkg="minau" type="fleet_communication_node.py" output="screen">
+            <param name="rate" value="20.0"/>
+            <param name="schedule_file" value="$(arg schedule_file)"/>
+        </node>
     </group>
     <group ns="bluerov2_4">    
         <node name="uuv_control" pkg="minau" type="uuv_control_node.py" output="screen">
@@ -32,5 +37,9 @@
             <arg name="config_file" default="$(find etddf)/config/example.yaml" />
             <arg name="starting_position" default="$(arg pos4)" />
         </include>
+        <node name="fleet_communication" pkg="minau" type="fleet_communication_node.py" output="screen">
+            <param name="rate" value="20.0"/>
+            <param name="schedule_file" value="$(arg schedule_file)"/>
+        </node>
     </group>
 </launch>

@@ -12,6 +12,8 @@ default_starting_position:
   z_vel: 0.0
 delta_tiers:
 - 1
+- 2
+- 5
 initial_uncertainty:
   known_starting_position:
     x: 1.0
@@ -35,9 +37,9 @@ initial_uncertainty:
     z: 8
     z_vel: 0.01
 measurement_topics:
-  dvl: None
-  imu_ci: None
-  sonar: None
+  imu_ci: "odometry/filtered"
+  sonar: "sonar_processing/target_list"
+  dvl: "dvl"
 process_noise:
   blueteam:
     x: 0.01

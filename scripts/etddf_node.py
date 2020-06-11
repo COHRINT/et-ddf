@@ -82,7 +82,7 @@ class ETDDF_Node:
         
         self.network_pub = rospy.Publisher("etddf/estimate/network", NetworkEstimate, queue_size=10)
         self.statistics_pub = rospy.Publisher("etddf/statistics", EtddfStatistics, queue_size=10)
-        self.set_pose = rospy.Publisher("set_pose",PoseWithCovariance,queue_size=10)
+        self.set_pose = rospy.Publisher("estimated_pose",PoseWithCovarianceStamped,queue_size=10)
         self.statistics = EtddfStatistics(0, rospy.get_rostime(), 0, 0, delta_tiers, [0 for _ in delta_tiers], 0.0, [], False)
 
         self.asset_pub_dict = {}
@@ -268,28 +268,29 @@ class ETDDF_Node:
         c_bar, Pcc = self.filter.intersect(mean, cov)
         self.correct_nav_filter(c_bar, Pcc, odom.header, odom)
 
-        print('')
-        print('')
-        print('')
-        print('')
-        print('')
-        print('')
-        print(c_bar)
-        print(Pcc)
-        print('')
-        print('')
-        print('')
-        print('')
-        print('')
-        print('')
+        # print('')
+        # print('')
+        # print('')
+        # print('')
+        # print('')
+        # print('')
+        # print(c_bar)
+        # print(Pcc)
+        # print('')
+        # print('')
+        # print('')
+        # print('')
+        # print('')
+        # print('')
         # TODO partial state update everything
         pose = Pose(Point(c_bar[0],c_bar[1],c_bar[2]),odom.pose.pose.orientation)
         pose_cov = np.zeros((6,6))
         pose_cov[:3,:3] = Pcc[:3,:3]
-        pose_cov[3:,3:] = cov_point[3:,3:]
+        pose_cov[3:,3:] = cov_twist[3:,3:]
         pwc = PoseWithCovariance(pose,list(pose_cov.flatten()))
-        print(pwc)
-        self.set_pose(pwc)
+        # print(pwc)
+        h = Header(self.update_seq, t_now, "map")
+        self.set_pose.publish(PoseWithCovarianceStamped(h,pwc))
 
         self.last_orientation = odom.pose.pose.orientation
         self.publish_estimates(t_now, odom)
