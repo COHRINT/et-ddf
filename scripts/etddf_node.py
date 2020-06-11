@@ -82,7 +82,7 @@ class ETDDF_Node:
         
         self.network_pub = rospy.Publisher("etddf/estimate/network", NetworkEstimate, queue_size=10)
         self.statistics_pub = rospy.Publisher("etddf/statistics", EtddfStatistics, queue_size=10)
-        self.set_pose = rospy.Publisher("estimate_pose",PoseWithCovarianceStamped,queue_size=10)
+        self.set_pose = rospy.Publisher("set_pose",PoseWithCovarianceStamped,queue_size=10)
         self.statistics = EtddfStatistics(0, rospy.get_rostime(), 0, 0, delta_tiers, [0 for _ in delta_tiers], 0.0, [], False)
 
         self.asset_pub_dict = {}
@@ -268,28 +268,15 @@ class ETDDF_Node:
         c_bar, Pcc = self.filter.intersect(mean, cov)
         self.correct_nav_filter(c_bar, Pcc, odom.header, odom)
 
-        # print('')
-        # print('')
-        # print('')
-        # print('')
-        # print('')
-        # print('')
-        # print(c_bar)
-        # print(Pcc)
-        # print('')
-        # print('')
-        # print('')
-        # print('')
-        # print('')
-        # print('')
         # TODO partial state update everything
+        # L3 attempting to set pose to adjust
         pose = Pose(Point(c_bar[0],c_bar[1],c_bar[2]),odom.pose.pose.orientation)
         pose_cov = np.zeros((6,6))
         pose_cov[:3,:3] = Pcc[:3,:3]
-        pose_cov[3:,3:] = cov_twist[3:,3:]
+        pose_cov[3:,3:] = cov_point[3:,3:]     #Not sure if this is the right coviarance for the orientation
         pwc = PoseWithCovariance(pose,list(pose_cov.flatten()))
         # print(pwc)
-        h = Header(self.update_seq, t_now, "map")
+        h = Header(self.update_seq, t_now, "map")   #Also not sure what to use for the 3rd argument
         self.set_pose.publish(PoseWithCovarianceStamped(h,pwc))
 
         self.last_orientation = odom.pose.pose.orientation
@@ -379,7 +366,10 @@ class ETDDF_Node:
             self.statistics.explicit_count += explicit_cnt
 
     def get_meas_pkg_callback(self, req):
+<<<<<<< HEAD
         self.cuprint("pulling buffer")
+=======
+>>>>>>> Attempt at cbar,Pcc integration to reset pose
         delta, buffer = self.filter.pull_buffer()
         ind = self.statistics.delta_tiers.index(delta)
         self.statistics.buffer_counts[ind] += 1
