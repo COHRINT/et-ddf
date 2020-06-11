@@ -1,0 +1,93 @@
+<launch>
+  <arg name="ardusub_params" default="$(find minau)/config/ardusub_sitl_no_gps.param"/>
+  
+  <!-- Start Gazebo Simulator with open ocean world -->
+  <arg name="latitude" default="56.71897669633431"/>
+  <arg name="longitude" default="3.515625"/>
+
+  <arg name="schedule_file" default="$(find etddf)/config/schedules/schedule_3_assets.json"/>
+
+  <include file="$(find uuv_gazebo_worlds)/launch/ocean_waves.launch">
+    <arg name="paused" value="true"/>
+  </include>
+
+  <arg name="use_360" default="False"/>
+
+  <!-- Asset 3 Starting Position -->
+  <arg name="x_3" value="0.0"/>
+  <arg name="y_3" value="0.5"/>
+  <arg name="z_3" value="0.0"/>
+  <arg name="starting_position_3" value="[$(arg x_3), $(arg y_3), $(arg z_3)]"/>
+  <!-- Asset 4 Starting Position -->
+  <arg name="x_4" value="0.0"/>
+  <arg name="y_4" value="-0.5"/>
+  <arg name="z_4" value="0.0"/>
+  <arg name="starting_position_4" value="[$(arg x_4), $(arg y_4), $(arg z_4)]"/>
+
+  <!-- Spawn WAM-V mothership model in the simulated environment -->
+  <include file="$(find minau)/launch/vehicle.wamv.sitl.launch">
+    <arg name="asset_id" value="1"/>
+    <arg name="ardusub_instance" value="5"/>
+    <arg name="ardusub_params" value="$(arg ardusub_params)"/>
+    <arg name="latitude" value="$(arg latitude)"/>
+    <arg name="longitude" value="$(arg longitude)"/>
+    <!-- The following arguments must be set w.r.t. NED world frame -->
+    <arg name="x" value="0.0"/>
+    <arg name="y" value="0.0"/>
+    <arg name="z" value="0.2"/>
+    <arg name="roll" value="0.0"/>
+    <arg name="pitch" value="0.0"/>
+    <arg name="yaw" value="0.0"/>
+
+    <arg name="schedule_file" value="$(arg schedule_file)"/>
+  </include>
+
+  <!-- Spawn BlueROV2 model in the simulated environment -->
+  <include file="$(find etddf)/launch/vehicle.bluerov2.sitl.launch">
+    <arg name="asset_id" value="3"/>
+    <arg name="ardusub_instance" value="0"/>
+    <arg name="ardusub_params" value="$(arg ardusub_params)"/>
+    <arg name="latitude" value="$(arg latitude)"/>
+    <arg name="longitude" value="$(arg longitude)"/>
+    <!-- The following arguments must be set w.r.t. NED world frame -->
+    <arg name="x" value="$(arg x_3)"/>
+    <arg name="y" value="$(arg y_3)"/>
+    <arg name="z" value="$(arg z_3)"/>
+    <arg name="roll" value="0.0"/>
+    <arg name="pitch" value="0.0"/>
+    <arg name="yaw" value="1.57"/>
+
+    <arg name="use_360" value="$(arg use_360)"/>
+
+    <arg name="schedule_file" value="$(arg schedule_file)"/>
+    <!-- DDF params -->
+    <arg name="blue_team_names" value="[bluerov2_4]" />
+    <arg name="blue_team_positions" value="[$(arg starting_position_4)]"/>
+  </include>
+
+  <include file="$(find etddf)/launch/vehicle.bluerov2.sitl.launch">
+    <arg name="asset_id" value="4"/>
+    <arg name="ardusub_instance" value="1"/>
+    <arg name="ardusub_params" value="$(arg ardusub_params)"/>
+    <arg name="latitude" value="$(arg latitude)"/>
+    <arg name="longitude" value="$(arg longitude)"/>
+    <!-- The following arguments must be set w.r.t. NED world frame -->
+    <arg name="x" value="$(arg x_4)"/>
+    <arg name="y" value="$(arg y_4)"/>
+    <arg name="z" value="$(arg z_4)"/>
+    <arg name="roll" value="0.0"/>
+    <arg name="pitch" value="0.0"/>
+    <arg name="yaw" value="-1.57"/>
+
+    <arg name="use_360" value="$(arg use_360)"/>
+
+    <arg name="schedule_file" value="$(arg schedule_file)"/>
+    <!-- DDF params -->
+    <arg name="blue_team_names" value="[bluerov2_3]" />
+    <arg name="blue_team_positions" value="[$(arg starting_position_3)]"/>
+  </include>
+
+  <node name="namespace_node" pkg="minau" type="namespace_provider_node.py" output="screen">
+  </node>
+</launch>
+
