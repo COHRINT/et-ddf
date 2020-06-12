@@ -1,7 +1,7 @@
 measurements:
   depth:
-    base_et_delta: 0.3
-    default_sd: 0.01
+    base_et_delta: 1.0
+    default_sd: 0.5
     buffer_size: 2
     missed_tolerance: 10 # How many of these messages do we need to miss on updates cycles before we indicate a bookend
 

@@ -284,7 +284,7 @@ class DeltaTier:
                 lowest_multiplier = key
                 break
         if lowest_multiplier == -1:
-            return True, 0, []
+            return True, -1.0, []
         else:
             return False, lowest_multiplier, self.delta_tiers[lowest_multiplier].peek()
 

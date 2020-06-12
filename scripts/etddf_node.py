@@ -32,9 +32,6 @@ __maintainer__ = "Luke Barbier"
 __version__ = "1.2.1"
 
 NUM_OWNSHIP_STATES = 6
-DYNAMIC_VARIANCE = -1
-
-# Design decision, do not instantiate asset (in the filter) until have first measurement of them
 
 class ETDDF_Node:
 
@@ -90,7 +87,7 @@ class ETDDF_Node:
         self.last_orientation = None
 
         # Initialize Measurement Callbacks
-        # rospy.Subscriber("mavros/global_position/local", Odometry, self.depth_callback, queue_size=1)
+        rospy.Subscriber("mavros/global_position/local", Odometry, self.depth_callback, queue_size=1)
         rospy.Subscriber("etddf/packages_in", MeasurementPackage, self.meas_pkg_callback, queue_size=1)
 
         if self.use_control_input:
@@ -138,11 +135,10 @@ class ETDDF_Node:
     def publish_stats(self, last_update_time):
         self.statistics.seq = self.update_seq
         self.statistics.stamp = last_update_time
-        overflown, delta, buffer = self.filter.peek_buffer()
+        self.statistics.overflown, delta, buffer = self.filter.peek_buffer()
         self.statistics.current_lowest_multiplier = delta
         meas_name_list = [x.meas_type for x in buffer]
         self.statistics.current_lowest_buffer = meas_name_list
-        self.overflown = overflown
         self.statistics_pub.publish(self.statistics)
 
     def no_nav_filter_callback(self, event):
@@ -447,7 +443,7 @@ def get_default_meas_variance():
     meas_info = rospy.get_param("~measurements")
     for meas in meas_info.keys():
         sd = meas_info[meas]["default_sd"]
-        meas_vars[meas] = sd ** 2 if type(sd) != str else DYNAMIC_VARIANCE
+        meas_vars[meas] = sd ** 2
     return meas_vars
 
 if __name__ == "__main__":

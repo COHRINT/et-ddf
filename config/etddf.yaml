@@ -33,16 +33,16 @@ process_noise:
     x: 0.01
     y: 0.01
     z: 0.01
-    x_vel: 0.0
-    y_vel: 0.0
-    z_vel: 0.0
+    x_vel: 0.05
+    y_vel: 0.05
+    z_vel: 0.05
   blueteam:
     x: 0.01
     y: 0.01
     z: 0.01
-    x_vel: 0.0
-    y_vel: 0.0
-    z_vel: 0.0
+    x_vel: 0.05
+    y_vel: 0.05
+    z_vel: 0.05
   redteam:
     x: 0.1
     y: 0.1
@@ -54,25 +54,25 @@ process_noise:
 ### Initial Uncertainty Configurations ###
 initial_uncertainty:
   ownship:
-    x: 1.0
-    y: 1.0
-    z: 1.0
-    x_vel: 0.001
-    y_vel: 0.001
-    z_vel: 0.001
+    x: 0.0
+    y: 0.0
+    z: 0.0
+    x_vel: 0.0
+    y_vel: 0.0
+    z_vel: 0.0
   # for asset positions provided to us through roslaunch params
   known_starting_position: 
-    x: 1.0
-    y: 1.0
-    z: 1.0
-    x_vel: 0.001
-    y_vel: 0.001
-    z_vel: 0.001
+    x: 0.0
+    y: 0.0
+    z: 0.0
+    x_vel: 0.0
+    y_vel: 0.0
+    z_vel: 0.0
   # asset positions not provided in roslaunch, including redteam
   unknown_starting_position: 
     x: 1000
     y: 1000
     z: 8
-    x_vel: 0.01
-    y_vel: 0.01
-    z_vel: 0.01
+    x_vel: 1.0
+    y_vel: 1.0
+    z_vel: 1.0
