@@ -67,7 +67,7 @@ class DeltaTier:
             num_ownship_states, x0, P0, \
             buffer_capacity, meas_space_table, \
             missed_meas_tolerance_table, \
-            delta_codebook_table, 1.0, \
+            delta_codebook_table, 69, \
             True, asset2id[my_name]
         )
 

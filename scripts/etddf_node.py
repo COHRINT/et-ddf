@@ -29,7 +29,7 @@ __email__ = "luke.barbier@colorado.edu"
 __status__ = "Development"
 __license__ = "MIT"
 __maintainer__ = "Luke Barbier"
-__version__ = "1.2.0"
+__version__ = "1.2.1"
 
 NUM_OWNSHIP_STATES = 6
 DYNAMIC_VARIANCE = -1
@@ -69,7 +69,8 @@ class ETDDF_Node:
                                 delta_tiers,\
                                 self.asset2id,\
                                 my_name)
-                                                
+
+        self.cuprint = CUPrint(rospy.get_name())             
         self.network_pub = rospy.Publisher("etddf/estimate/network", NetworkEstimate, queue_size=10)
         self.statistics_pub = rospy.Publisher("etddf/statistics", EtddfStatistics, queue_size=10)
         self.statistics = EtddfStatistics(0, rospy.get_rostime(), 0, 0, delta_tiers, [0 for _ in delta_tiers], 0.0, [], False)
@@ -107,7 +108,6 @@ class ETDDF_Node:
 
         # Initialize Buffer Service
         rospy.Service('etddf/get_measurement_package', GetMeasurementPackage, self.get_meas_pkg_callback)
-        self.cuprint = CUPrint(rospy.get_name())
         self.cuprint("loaded")
 
     def sonar_callback(self, sonar_list):
@@ -202,6 +202,7 @@ class ETDDF_Node:
 
         # correction
         self.filter.correct(t_now)
+        self.sonar_rx = False
 
         ### Covariancee Intersect ###
 
@@ -337,7 +338,7 @@ def get_missed_meas_tolerance_table():
     for meas in meas_info.keys():
         meas_tolerance_table[meas] = meas_info[meas]["missed_tolerance"]
 
-    return meas_space_table
+    return meas_tolerance_table
 
 def get_meas_space_table():
     meas_space_table = {}

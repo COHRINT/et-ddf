@@ -18,6 +18,7 @@ from etddf.asset import Asset
 import numpy as np
 from pdb import set_trace as st
 from etddf.msg import Measurement
+import rospy
 
 ## Lists all measurement substrings to not send implicitly
 MEASUREMENT_TYPES_NOT_SHARED =     ["modem"]
@@ -111,7 +112,6 @@ class LedgerFilter:
                     bookstart = meas.__class__.__name__ not in self.expected_measurements.keys()
                     
                     if bookstart:
-                        print("########## INSERTING ######")
                         self.buffer.insert_marker(ros_meas, ros_meas.stamp, bookstart=True)
 
                     meas = Asset.get_implicit_msg_equivalent(meas)
@@ -122,7 +122,7 @@ class LedgerFilter:
                     self.buffer.add_meas(deepcopy(ros_meas))
                 
                 # Indicate we receieved our expected measurement
-                missed_tolerance = self.missed_meas_tolerance_table[ros_meas.meas_type]
+                missed_tolerance = deepcopy(self.missed_meas_tolerance_table[ros_meas.meas_type])
                 self.expected_measurements[orig_meas.__class__.__name__] = [missed_tolerance, ros_meas]
 
         # Append to the ledger
@@ -161,7 +161,6 @@ class LedgerFilter:
 
             # We have reached our tolerance on the number of updates without receiving this measurement
             if rx < 1:
-                print("############################ Did not receive expected measurement: " + emeas)
                 self.buffer.insert_marker(ros_meas, update_time, bookstart=False)
                 del self.expected_measurements[emeas]
             else:
