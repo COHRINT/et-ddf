@@ -82,7 +82,6 @@ class ETDDF_Node:
         
         self.network_pub = rospy.Publisher("etddf/estimate/network", NetworkEstimate, queue_size=10)
         self.statistics_pub = rospy.Publisher("etddf/statistics", EtddfStatistics, queue_size=10)
-        self.set_pose = rospy.Publisher("set_pose",PoseWithCovarianceStamped,queue_size=10)
         self.statistics = EtddfStatistics(0, rospy.get_rostime(), 0, 0, delta_tiers, [0 for _ in delta_tiers], 0.0, [], False)
 
         self.asset_pub_dict = {}
@@ -120,15 +119,16 @@ class ETDDF_Node:
             rospy.Subscriber(rospy.get_param("~measurement_topics/sonar"), SonarTargetList, self.sonar_callback)
 
         if rospy.get_param("~measurement_topics/dvl") != "None":
-            print("DVL:")
-            print(rospy.get_param("~measurement_topics/dvl"))
             rospy.Subscriber(rospy.get_param("~measurement_topics/dvl"),Vector3,self.dvl_callback)
 
         # Initialize Buffer Service
         # rospy.Service('etddf/get_measurement_package', GetMeasurementPackage, self.get_meas_pkg_callback)
         self.cuprint("loaded")
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> Added cupring messages to etddf node for debugging
     def correct_nav_filter(self, c_bar, Pcc, header, nav_estimate):
 
         nav_covpt = np.array(nav_estimate.pose.covariance).reshape(6,6)
@@ -142,14 +142,18 @@ class ETDDF_Node:
         pwcs = PoseWithCovarianceStamped(header, pwc)
         self.set_pose_pub.publish(pwcs)
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> Added cupring messages to etddf node for debugging
 
     def dvl_callback(self,vel):
         now = rospy.get_rostime()
-        dvl_x = Measurement("dvl_x", now, self.my_name, self.my_name, vel.x, self.default_meas_variance["dvl_x"], [])
-        dvl_y = Measurement("dvl_y", now, self.my_name, self.my_name, vel.y, self.default_meas_variance["dvl_y"], [])
-        # dvl_z = Measurement("dvl_z", now, self.my_name, self.my_name, vel.z, self.default_meas_variance["dvl_z"], [])
+        dvl_x_vel = Measurement("dvl_x_vel", now, self.my_name, self.my_name, vel.x, self.default_meas_variance["dvl_x_vel"], [])
+        dvl_y_vel = Measurement("dvl_y_vel", now, self.my_name, self.my_name, vel.y, self.default_meas_variance["dvl_y_vel"], [])
+        dvl_z_vel = Measurement("dvl_z_vel", now, self.my_name, self.my_name, vel.z, self.default_meas_variance["dvl_z_vel"], [])
 
+<<<<<<< HEAD
 
         self.filter.add_meas(dvl_x)
         self.filter.add_meas(dvl_y)
@@ -159,6 +163,15 @@ class ETDDF_Node:
 
         for target in sonar_list.targets:
             # self.cuprint("Receiving sonar data")
+=======
+        self.filter.add_meas(dvl_x_vel)
+        self.filter.add_meas(dvl_y_vel)
+        self.filter.add_meas(dvl_z_vel)
+    def sonar_callback(self, sonar_list):
+
+        for target in sonar_list.targets:
+
+>>>>>>> Added cupring messages to etddf node for debugging
             if self.last_orientation is None: # No orientation, no linearization of the sonar measurement
                 return
             # Convert quaternions to Euler angles.
@@ -269,15 +282,6 @@ class ETDDF_Node:
         self.correct_nav_filter(c_bar, Pcc, odom.header, odom)
 
         # TODO partial state update everything
-        # L3 attempting to set pose to adjust
-        pose = Pose(Point(c_bar[0],c_bar[1],c_bar[2]),odom.pose.pose.orientation)
-        pose_cov = np.zeros((6,6))
-        pose_cov[:3,:3] = Pcc[:3,:3]
-        pose_cov[3:,3:] = cov_point[3:,3:]     #Not sure if this is the right coviarance for the orientation
-        pwc = PoseWithCovariance(pose,list(pose_cov.flatten()))
-        # print(pwc)
-        h = Header(self.update_seq, t_now, "map")   #Also not sure what to use for the 3rd argument
-        self.set_pose.publish(PoseWithCovarianceStamped(h,pwc))
 
         self.last_orientation = odom.pose.pose.orientation
         self.publish_estimates(t_now, odom)
