@@ -17,7 +17,7 @@ import tf
 np.set_printoptions(suppress=True)
 from copy import deepcopy
 from std_msgs.msg import Header
-from geometry_msgs.msg import PoseWithCovariance, Pose, Point, Quaternion, Twist, Vector3, TwistWithCovariance
+from geometry_msgs.msg import PoseWithCovariance, Pose, Point, Quaternion, Twist, Vector3, TwistWithCovariance, PoseWithCovarianceStamped
 from tf.transformations import quaternion_from_euler
 from nav_msgs.msg import Odometry
 from minau.msg import SonarTargetList, SonarTarget
@@ -29,7 +29,7 @@ __email__ = "luke.barbier@colorado.edu"
 __status__ = "Development"
 __license__ = "MIT"
 __maintainer__ = "Luke Barbier"
-__version__ = "1.2.1"
+__version__ = "1.2.2"
 
 NUM_OWNSHIP_STATES = 6
 
@@ -98,6 +98,7 @@ class ETDDF_Node:
             rospy.Timer(rospy.Duration(1 / self.update_rate), self.no_nav_filter_callback)
         else:
             rospy.Subscriber(rospy.get_param("~measurement_topics/imu_ci"), Odometry, self.nav_filter_callback, queue_size=1)
+            self.set_pose_pub = rospy.Publisher("set_pose", PoseWithCovarianceStamped, queue_size=10)
 
         # Sonar Subscription
         if rospy.get_param("~measurement_topics/sonar") != "None":
@@ -106,6 +107,19 @@ class ETDDF_Node:
         # Initialize Buffer Service
         rospy.Service('etddf/get_measurement_package', GetMeasurementPackage, self.get_meas_pkg_callback)
         self.cuprint("loaded")
+
+    def correct_nav_filter(self, c_bar, Pcc, header, nav_estimate):
+
+        nav_covpt = np.array(nav_estimate.pose.covariance).reshape(6,6)
+
+        pose = Pose(Point(c_bar[0],c_bar[1],c_bar[2]), \
+                    nav_estimate.pose.pose.orientation)
+        pose_cov = np.zeros((6,6))
+        pose_cov[:3,:3] = Pcc[:3,:3]
+        pose_cov[3:,3:] = nav_covpt[3:,3:]
+        pwc = PoseWithCovariance(pose, list(pose_cov.flatten()))
+        pwcs = PoseWithCovarianceStamped(header, pwc)
+        self.set_pose_pub.publish(pwcs)
 
     def sonar_callback(self, sonar_list):
 
@@ -217,6 +231,7 @@ class ETDDF_Node:
 
         # Run covariance intersection
         c_bar, Pcc = self.filter.intersect(mean, cov)
+        self.correct_nav_filter(c_bar, Pcc, odom.header, odom)
 
         # TODO partial state update everything
 
@@ -275,6 +290,7 @@ class ETDDF_Node:
 
         # Modem update
         if msg.src_asset == "surface" or msg.src_asset == self.my_name:
+            self.cuprint("Receiving Modem Measurements")
             for meas in msg.measurements:
                 # Approximate the fuse on the next update, so we can get other asset's position immediately
                 self.filter.add_meas(meas, force_fuse=True)
