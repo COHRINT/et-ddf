@@ -13,7 +13,6 @@
   <arg name="yaw" default="0.0"/>
   <arg name="use_360" default="False"/>
 
-  <arg name="use_360" default="False"/>
 
   <arg name="schedule_file" default="$(find minau)/config/schedules/schedule_3_assets.json"/>
   <!-- DDF params -->
