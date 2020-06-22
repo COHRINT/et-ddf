@@ -291,13 +291,13 @@ class LedgerFilter:
                 return Range_Explicit(src_id, measured_id, ros_meas.data, ros_meas.variance, et_delta)
             elif ros_meas.meas_type == "modem_range":
                 return RangeFromGlobal_Explicit(measured_id, \
-                                                np.array([ros_meas.global_pose]),\
+                                                np.array(ros_meas.global_pose).reshape(-1,1),\
                                                 ros_meas.data, ros_meas.variance, et_delta)
             elif ros_meas.meas_type == "modem_azimuth" and not ros_meas.global_pose: # check global_pose list empty
                 return Azimuth_Explicit(src_id, measured_id, ros_meas.data, ros_meas.variance, et_delta)
             elif ros_meas.meas_type == "modem_azimuth":
                 return AzimuthFromGlobal_Explicit(measured_id, \
-                                                np.array([ros_meas.global_pose]),\
+                                                np.array(ros_meas.global_pose).reshape(-1,1),\
                                                 ros_meas.data, ros_meas.variance, et_delta)
             elif ros_meas.meas_type == "dvl_x":
                 return Velocityx_Explicit(src_id, ros_meas.data, ros_meas.variance, et_delta)

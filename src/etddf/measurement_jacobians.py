@@ -53,8 +53,8 @@ def get_measurement_jacobian(meas, x_hat, num_states, world_dim, num_ownship_sta
     elif isinstance(meas, AzimuthGlobal_Explicit) or isinstance(meas, AzimuthGlobal_Implicit):
         src_x = x_hat[src_id*num_ownship_states,0]
         src_y = x_hat[src_id*num_ownship_states+1,0]
-        other_x = meas.global_pose[0]
-        other_y = meas.global_pose[1]
+        other_x = meas.global_pose[0,0]
+        other_y = meas.global_pose[1,0]
         diff_x = other_x - src_x
         diff_y = other_y - src_y
 
@@ -72,8 +72,8 @@ def get_measurement_jacobian(meas, x_hat, num_states, world_dim, num_ownship_sta
             C[0, src_id*num_ownship_states + 3] = -1
     elif isinstance(meas, AzimuthFromGlobal_Explicit) or isinstance(meas, AzimuthFromGlobal_Implicit):
         meas_id = meas.measured_asset_id
-        src_x = meas.global_pose[0]
-        src_y = meas.global_pose[1]
+        src_x = meas.global_pose[0,0]
+        src_y = meas.global_pose[1,0]
 
         other_x = x_hat[meas_id*num_ownship_states,0]
         other_y = x_hat[meas_id*num_ownship_states+1,0]
@@ -121,8 +121,8 @@ def get_measurement_jacobian(meas, x_hat, num_states, world_dim, num_ownship_sta
     elif isinstance(meas, RangeGlobal_Explicit) or isinstance(meas, RangeGlobal_Implicit):
         src_x = x_hat[src_id*num_ownship_states,0]
         src_y = x_hat[src_id*num_ownship_states+1,0]
-        other_x = meas.global_pose[0]
-        other_y = meas.global_pose[1]
+        other_x = meas.global_pose[0,0]
+        other_y = meas.global_pose[1,0]
         diff_x = other_x - src_x
         diff_y = other_y - src_y
         
@@ -133,7 +133,7 @@ def get_measurement_jacobian(meas, x_hat, num_states, world_dim, num_ownship_sta
             C[0, src_id*num_ownship_states+1] = -diff_y / r
         else: # World Dim 3D
             src_z = x_hat[src_id*num_ownship_states+2,0]
-            other_z = meas.global_pose[2]
+            other_z = meas.global_pose[2,0]
             diff_z = other_z - src_z
             r = np.sqrt( diff_x**2 + diff_y**2 + diff_z**2 )
             r = r if r > 0.01 else 0.01 # Division by zero protection
@@ -143,8 +143,8 @@ def get_measurement_jacobian(meas, x_hat, num_states, world_dim, num_ownship_sta
 
     elif isinstance(meas, RangeFromGlobal_Explicit) or isinstance(meas, RangeFromGlobal_Implicit):
         meas_id = meas.measured_asset_id
-        src_x = meas.global_pose[0]
-        src_y = meas.global_pose[1]
+        src_x = meas.global_pose[0,0]
+        src_y = meas.global_pose[1,0]
 
         other_x = x_hat[meas_id*num_ownship_states,0]
         other_y = x_hat[meas_id*num_ownship_states+1,0]
@@ -158,7 +158,7 @@ def get_measurement_jacobian(meas, x_hat, num_states, world_dim, num_ownship_sta
             C[0, meas_id*num_ownship_states] = diff_x / r
             C[0, meas_id*num_ownship_states+1] = diff_y / r
         else: # World Dim 3D
-            src_z = meas.global_pose[2]
+            src_z = meas.global_pose[2,0]
             other_z = x_hat[meas_id*num_ownship_states+2,0]
             
             diff_z = other_z - src_z
@@ -202,9 +202,9 @@ def get_measurement_jacobian(meas, x_hat, num_states, world_dim, num_ownship_sta
         src_x = x_hat[meas.src_id*num_ownship_states,0]
         src_y = x_hat[meas.src_id*num_ownship_states+1,0]
         src_z = x_hat[meas.src_id*num_ownship_states+2,0]
-        other_x = meas.global_pose[0]
-        other_y = meas.global_pose[1]
-        other_z = meas.global_pose[2]
+        other_x = meas.global_pose[0,0]
+        other_y = meas.global_pose[1,0]
+        other_z = meas.global_pose[2,0]
         diff_x = other_x - src_x
         diff_y = other_y - src_y
         diff_z = other_z - src_z
@@ -220,9 +220,9 @@ def get_measurement_jacobian(meas, x_hat, num_states, world_dim, num_ownship_sta
         C[0, src_id*num_ownship_states+2] = - np.sqrt(diff_x**2 + diff_y**2) / all_diff
     elif isinstance(meas, ElevationFromGlobal_Explicit) or isinstance(meas, ElevationFromGlobal_Implicit):
         meas_id = meas.measured_asset_id
-        src_x = meas.global_pose[0]
-        src_y = meas.global_pose[1]
-        src_z = meas.global_pose[2]
+        src_x = meas.global_pose[0,0]
+        src_y = meas.global_pose[1,0]
+        src_z = meas.global_pose[2,0]
         other_x = x_hat[meas_id*num_ownship_states,0]
         other_y = x_hat[meas_id*num_ownship_states+1,0]
         other_z = x_hat[meas_id*num_ownship_states+2,0]

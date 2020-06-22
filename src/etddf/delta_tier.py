@@ -19,6 +19,7 @@ from pdb import set_trace as st
 import numpy as np
 import scipy
 import scipy.optimize
+import rospy # just for warn print
 
 ## Constant used to indicate each delta tier should scale the measurement's triggering
 ## threshold using its own delta factor
@@ -95,8 +96,11 @@ class DeltaTier:
         src_id = self.asset2id[ros_meas.src_asset]
         if ros_meas.measured_asset in self.asset2id.keys():
             measured_id = self.asset2id[ros_meas.measured_asset]
-        else:
+        elif ros_meas.measured_asset == "":
             measured_id = -1
+        else:
+            rospy.logerr_once("ETDDF doesn't recognize: " + ros_meas.measured_asset + " ... ignoring")
+            return
         self.main_filter.add_meas(ros_meas, src_id, measured_id, delta_multiplier, force_fuse)
         for key in self.delta_tiers.keys():
             self.delta_tiers[key].add_meas(ros_meas, src_id, measured_id, delta_multiplier, force_fuse)

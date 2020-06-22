@@ -124,7 +124,7 @@ class ETDDF_Node:
     def sonar_callback(self, sonar_list):
 
         for target in sonar_list.targets:
-
+            # self.cuprint("Receiving sonar data")
             if self.last_orientation is None: # No orientation, no linearization of the sonar measurement
                 return
             # Convert quaternions to Euler angles.
@@ -295,6 +295,7 @@ class ETDDF_Node:
                 # Approximate the fuse on the next update, so we can get other asset's position immediately
                 self.filter.add_meas(meas, force_fuse=True)
         else:
+            self.cuprint("receiving buffer")
             self.update_lock.acquire()
             implicit_cnt, explicit_cnt = self.filter.catch_up(msg.delta_multiplier, msg.measurements)
             self.update_lock.release()
@@ -302,10 +303,13 @@ class ETDDF_Node:
             self.statistics.explicit_count += explicit_cnt
 
     def get_meas_pkg_callback(self, req):
+        self.cuprint("pulling buffer")
         delta, buffer = self.filter.pull_buffer()
         ind = self.statistics.delta_tiers.index(delta)
         self.statistics.buffer_counts[ind] += 1
-        return MeasurementPackage(buffer, self.my_name, delta)
+        mp = MeasurementPackage(buffer, self.my_name, delta)
+        print(mp)
+        return mp
 
 
 ################################
