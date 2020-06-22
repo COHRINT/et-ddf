@@ -12,8 +12,11 @@
   <arg name="pitch" default="0.0"/>
   <arg name="yaw" default="0.0"/>
 
+<<<<<<< HEAD
   <arg name="use_360" default="False"/>
 
+=======
+>>>>>>> Updated phase 1 with dvl and sonar. Also made a local vehicle.bluerov2.sitl.launch file so it can be changed seperate from the one in onboard.
   <arg name="schedule_file" default="$(find minau)/config/schedules/schedule_3_assets.json"/>
   <!-- DDF params -->
   <arg name="blue_team_names" default="[]"/>
@@ -106,7 +109,6 @@
       <arg name="red_team_names" value="$(arg red_team_names)" />
       <arg name="starting_position" value="[$(arg x), $(arg y), $(arg z)]" />
     </include>
-
     <!-- Start the MinAu Fleet Communication node -->
     <node name="fleet_communication" pkg="minau" type="fleet_communication_node.py" output="screen">
       <param name="rate" value="20.0"/>
@@ -127,7 +129,6 @@
       <param name="config" value="$(find minau)/config/vehicle.sitl.json"/>
       <param name="rate" value="20.0"/>
     </node>
-
     <!-- TODO (EBS): Start the MinAu Sensor Manager node -->
 
     <!-- Start the MinAu Plan Manager node for this vehicle instance -->

@@ -6,8 +6,12 @@ delta_tiers: [1]
 
 ## Measurement topics
 measurement_topics:
+<<<<<<< HEAD
   depth: "mavros/global_position/rel_alt"
   imu_ci: "odometry/filtered"
+=======
+  imu_ci: odometry/filtered
+>>>>>>> Rebasing with master
   sonar: "sonar_processing/target_list"
   dvl: "dvl"
 

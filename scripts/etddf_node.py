@@ -82,6 +82,7 @@ class ETDDF_Node:
         
         self.network_pub = rospy.Publisher("etddf/estimate/network", NetworkEstimate, queue_size=10)
         self.statistics_pub = rospy.Publisher("etddf/statistics", EtddfStatistics, queue_size=10)
+        self.set_pose = rospy.Publisher("set_pose",PoseWithCovariance,queue_size=10)
         self.statistics = EtddfStatistics(0, rospy.get_rostime(), 0, 0, delta_tiers, [0 for _ in delta_tiers], 0.0, [], False)
 
         self.asset_pub_dict = {}
@@ -109,7 +110,6 @@ class ETDDF_Node:
 
         # IMU Covariance Intersection
         if rospy.get_param("~measurement_topics/imu_ci") == "None":
-            print('Hello!')
             rospy.Timer(rospy.Duration(1 / self.update_rate), self.no_nav_filter_callback)
         else:
             rospy.Subscriber(rospy.get_param("~measurement_topics/imu_ci"), Odometry, self.nav_filter_callback, queue_size=1)
@@ -117,8 +117,6 @@ class ETDDF_Node:
 
         # Sonar Subscription
         if rospy.get_param("~measurement_topics/sonar") != "None":
-            print('Sonar:')
-            print(rospy.get_param("~measurement_topics/sonar"))
             rospy.Subscriber(rospy.get_param("~measurement_topics/sonar"), SonarTargetList, self.sonar_callback)
 
         if rospy.get_param("~measurement_topics/dvl") != "None":
@@ -130,7 +128,7 @@ class ETDDF_Node:
         # rospy.Service('etddf/get_measurement_package', GetMeasurementPackage, self.get_meas_pkg_callback)
         self.cuprint("loaded")
 
-<<<<<<< HEAD
+
     def correct_nav_filter(self, c_bar, Pcc, header, nav_estimate):
 
         nav_covpt = np.array(nav_estimate.pose.covariance).reshape(6,6)
@@ -144,7 +142,7 @@ class ETDDF_Node:
         pwcs = PoseWithCovarianceStamped(header, pwc)
         self.set_pose_pub.publish(pwcs)
 
-=======
+
 
     def dvl_callback(self,vel):
         now = rospy.get_rostime()
@@ -152,16 +150,11 @@ class ETDDF_Node:
         dvl_y = Measurement("dvl_y", now, self.my_name, self.my_name, vel.y, self.default_meas_variance["dvl_y"], [])
         # dvl_z = Measurement("dvl_z", now, self.my_name, self.my_name, vel.z, self.default_meas_variance["dvl_z"], [])
 
-<<<<<<< HEAD
-        self.filter.add_meas(dvl_x_vel)
-        self.filter.add_meas(dvl_y_vel)
-        self.filter.add_meas(dvl_z_vel)
->>>>>>> Added DVL Sensor Data to ETDDF
-=======
+
         self.filter.add_meas(dvl_x)
         self.filter.add_meas(dvl_y)
         # self.filter.add_meas(dvl_z)
->>>>>>> Added Changes before rebasing with modem integration
+
     def sonar_callback(self, sonar_list):
 
         for target in sonar_list.targets:
@@ -275,7 +268,28 @@ class ETDDF_Node:
         c_bar, Pcc = self.filter.intersect(mean, cov)
         self.correct_nav_filter(c_bar, Pcc, odom.header, odom)
 
+        print('')
+        print('')
+        print('')
+        print('')
+        print('')
+        print('')
+        print(c_bar)
+        print(Pcc)
+        print('')
+        print('')
+        print('')
+        print('')
+        print('')
+        print('')
         # TODO partial state update everything
+        pose = Pose(Point(c_bar[0],c_bar[1],c_bar[2]),odom.pose.pose.orientation)
+        pose_cov = np.zeros((6,6))
+        pose_cov[:3,:3] = Pcc[:3,:3]
+        pose_cov[3:,3:] = cov_point[3:,3:]
+        pwc = PoseWithCovariance(pose,list(pose_cov.flatten()))
+        print(pwc)
+        self.set_pose(pwc)
 
         self.last_orientation = odom.pose.pose.orientation
         self.publish_estimates(t_now, odom)

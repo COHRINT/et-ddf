@@ -7,6 +7,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 def quadratureDiff(A,B):
+    """Finds the difference in position in length
+
+    Arguments:
+        A {Odometry} -- Either truth or estimate odometry
+        B {Odometry} -- Either truth or estimate odometry
+
+    Returns:
+        int -- distance between truth and estimate position
+    """
     pos_A = A.pose.pose.position
     pos_B = B.pose.pose.position
     x_diff = pos_A.x - pos_B.x
@@ -16,6 +25,11 @@ def quadratureDiff(A,B):
 
 class AnalyzeData:
     def __init__(self,data):
+        """Reads in all the bag files and stores their data
+
+        Arguments:
+            data {string} -- location of bag files from scripts file
+        """
         self.data_loc = os.getcwd()+'/'+data
         os.chdir(self.data_loc)
         self.bag_files = os.listdir('.')
@@ -49,6 +63,9 @@ class AnalyzeData:
             self.ratio.append(len(self.truth_poses3[i])//len(self.estimate3_poses3[i]) - 3) 
         # print(self.ratio)
     def run(self):
+        """
+        Goes through data in bag file and extracts the data we want and graphs it.
+        """
         pose3Diff3 = [[]for i in range(len(self.bag_files))]
         pose3Diff4 = [[]for i in range(len(self.bag_files))]
         pose4Diff4 = [[]for i in range(len(self.bag_files))]
@@ -58,7 +75,7 @@ class AnalyzeData:
             i = 0
             j = 0
             timeDiff = abs(self.estimate3_poses3[k][0].header.stamp-self.truth_poses3[k][0].header.stamp)
-            while i < len(self.estimate3_poses3[k]):
+            while i < len(self.estimate3_poses3[k])-1:
                 tempTime = abs(self.estimate3_poses3[k][i].header.stamp-self.truth_poses3[k][j].header.stamp)
                 if tempTime > timeDiff:
                     pose3Diff3[k].append(quadratureDiff(self.estimate3_poses3[k][i],self.truth_poses3[k][j-1]))
@@ -122,36 +139,60 @@ class AnalyzeData:
                 diff43[i].append(np.average(pose4Diff3[groups[i][1][j]]))
                 diff34[i].append(np.average(pose3Diff4[groups[i][1][j]]))
                 diff44[i].append(np.average(pose4Diff4[groups[i][1][j]]))
-        
-        
-        
-        
-        
-
-
 
         ind = np.arange(len(groups))
-        width = 0.3       
+        width = 0.3
+        plt.figure()   
+        plt.title('Bluerov2_3 Estimation Error of Bluerov2_4')
+        plt.xlabel('Sensor Configuration')
+        plt.ylabel('Error in distance units')    
         plt.bar(ind-width, [i[0] for i in diff34], width, label='Trial 1')
         plt.bar(ind, [i[1] for i in diff34], width, label='Trial 2')
-        plt.bar(ind + width, [i[2] for i in diff34], width,
-            label='Trial 3')
+        plt.bar(ind + width, [i[2] for i in diff34], width, label='Trial 3')
         plt.xticks(ind, [i[0]for i in groups])
         plt.legend(loc='best')
-        plt.show()
+        plt.savefig('3estimating4.png')
 
+        plt.figure()   
+        plt.title('Bluerov2_4 Estimation Error of Bluerov2_3')
+        plt.xlabel('Sensor Configuration')
+        plt.ylabel('Error in distance units')    
+        plt.bar(ind-width, [i[0] for i in diff43], width, label='Trial 1')
+        plt.bar(ind, [i[1] for i in diff43], width, label='Trial 2')
+        plt.bar(ind + width, [i[2] for i in diff43], width, label='Trial 3')
+        plt.xticks(ind, [i[0]for i in groups])
+        plt.legend(loc='best')
+        plt.savefig('4estimating3.png')
 
+        plt.figure()   
+        plt.title('Bluerov2_3 Ownership Error')
+        plt.xlabel('Sensor Configuration')
+        plt.ylabel('Error in distance units')    
+        plt.bar(ind-width, [i[0] for i in diff33], width, label='Trial 1')
+        plt.bar(ind, [i[1] for i in diff33], width, label='Trial 2')
+        plt.bar(ind + width, [i[2] for i in diff33], width, label='Trial 3')
+        plt.xticks(ind, [i[0]for i in groups])
+        plt.legend(loc='best')
+        plt.savefig('3estimating3.png')
 
+        plt.figure()   
+        plt.title('Bluerov2_4 Ownership Error')
+        plt.xlabel('Sensor Configuration')
+        plt.ylabel('Error in distance units')    
+        plt.bar(ind-width, [i[0] for i in diff44], width, label='Trial 1')
+        plt.bar(ind, [i[1] for i in diff44], width, label='Trial 2')
+        plt.bar(ind + width, [i[2] for i in diff44], width, label='Trial 3')
+        plt.xticks(ind, [i[0]for i in groups])
+        plt.legend(loc='best')
+        plt.savefig('4estimating4.png')
 
-            
-
-        
-
-#learn how to read in bag file and compare pose_gt with estimate
 
 
 
 if __name__=="__main__":
+    """
+        Makes sure arguments work like they should and that you can ask for help if you don't know what the script wants.
+    """
     parser = argparse.ArgumentParser(description='Analyze Data')
     parser.add_argument("location", type=str, help="location of data from scripts file(data/phaseX_x/)")
     args = parser.parse_args()

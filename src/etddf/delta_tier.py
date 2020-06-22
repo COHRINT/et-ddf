@@ -306,6 +306,7 @@ class DeltaTier:
                 not_overflown_list.append(key)
             
         # TODO add overflow support -> possibly at runtime rather than extend this callback
+        print(self.delta_tiers)
         if not not_overflown_list:
             raise NotImplementedError("All deltatier buffers have overflown")
         else:
