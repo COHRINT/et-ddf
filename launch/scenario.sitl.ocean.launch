@@ -3,6 +3,11 @@
 
   <arg name="latitude" default="56.71897669633431"/>
   <arg name="longitude" default="3.515625"/>
+  <!--Changes the start time of the movement of the RexRov-->
+  <arg name="rexStart" default="30"/>
+  <arg name="use_360" default="False"/>
+  <arg name="pole_x" default="10"/>
+  <arg name="pole_y" default="0"/>
 
   <arg name="use_360" default="False"/>
   <!-- Arguments for the location of the pier:
@@ -36,14 +41,14 @@
   <arg name="starting_position_4" value="[$(arg x_4), $(arg y_4), $(arg z_4)]"/>
 
   <!-- Spawn WAM-V mothership model in the simulated environment -->
-  <!-- <include file="$(find minau)/launch/vehicle.wamv.sitl.launch">
+  <include file="$(find minau)/launch/vehicle.wamv.sitl.launch">
     <arg name="asset_id" value="1"/>
     <arg name="ardusub_instance" value="5"/>
     <arg name="ardusub_params" value="$(arg ardusub_params)"/>
     <arg name="latitude" value="$(arg latitude)"/>
-    <arg name="longitude" value="$(arg longitude)"/> -->
+    <arg name="longitude" value="$(arg longitude)"/>
     <!-- The following arguments must be set w.r.t. NED world frame -->
-    <!-- <arg name="x" value="0.0"/>
+    <arg name="x" value="0.0"/>
     <arg name="y" value="0.0"/>
     <arg name="z" value="0.2"/>
     <arg name="roll" value="0.0"/>
@@ -51,7 +56,7 @@
     <arg name="yaw" value="0.0"/>
 
     <arg name="schedule_file" value="$(arg schedule_file)"/>
-  </include> -->
+  </include>
 
   <!-- Spawns a Red Asset in the simulated environment--> 
   <include file="$(find minau)/launch/vehicle.red_actor.sitl.launch">
@@ -70,6 +75,11 @@
   <include file="$(find etddf)/launch/vehicle.bluerov2.sitl.launch">
   </include>
 
+    <arg name="x" value="5.0"/>
+    <arg name="y" value="2.0"/>
+    <arg name="z" value="1.5"/>
+  </include>
+  
   <!-- Spawn BlueROV2 model in the simulated environment -->
   <include file="$(find etddf)/launch/vehicle.bluerov2.sitl.launch">
     <arg name="asset_id" value="3"/>
@@ -86,31 +96,34 @@
     <arg name="yaw" value="0.0"/>
     <arg name="use_360" value="$(arg use_360)"/>
     <arg name="schedule_file" value="$(arg schedule_file)"/>
+    <arg name="pole_x" value ="$(arg pole_x)"/>
+    <arg name="pole_y" value="$(arg pole_y)"/>
     <!-- DDF params -->
     <arg name="blue_team_names" value="[bluerov2_4]" />
     <arg name="blue_team_positions" value="[$(arg starting_position_4)]"/>
   </include>
-<node name="spawn_post" pkg="gazebo_ros" type="spawn_model" args="-file /home/lukez/.gazebo/models/lamp_post/model.sdf -sdf -model lamp_post -z -5"/>
 
-  <!-- <include file="$(find etddf)/launch/vehicle.bluerov2.sitl.launch">
+  <include file="$(find etddf)/launch/vehicle.bluerov2.sitl.launch">
     <arg name="asset_id" value="4"/>
     <arg name="ardusub_instance" value="1"/>
     <arg name="ardusub_params" value="$(arg ardusub_params)"/>
     <arg name="latitude" value="$(arg latitude)"/>
-    <arg name="longitude" value="$(arg longitude)"/> -->
+    <arg name="longitude" value="$(arg longitude)"/>
     <!-- The following arguments must be set w.r.t. NED world frame -->
-    <!-- <arg name="x" value="$(arg x_4)"/>
+    <arg name="x" value="$(arg x_4)"/>
     <arg name="y" value="$(arg y_4)"/>
     <arg name="z" value="$(arg z_4)"/>
     <arg name="roll" value="0.0"/>
     <arg name="pitch" value="0.0"/>
     <arg name="yaw" value="0.0"/>
     <arg name="use_360" value="$(arg use_360)"/>
+    <arg name="pole_x" value ="$(arg pole_x)"/>
+    <arg name="pole_y" value="$(arg pole_y)"/>
     <arg name="schedule_file" value="$(arg schedule_file)"/>
     <!-- DDF params -->
-    <!-- <arg name="blue_team_names" value="[bluerov2_3]" />
+    <arg name="blue_team_names" value="[bluerov2_3]" />
     <arg name="blue_team_positions" value="[$(arg starting_position_3)]"/>
-  </include> -->
+  </include>
 
   <node name="spawn_pier" pkg="gazebo_ros" type="spawn_model" args="-file $(find etddf)/models/pier/model.sdf -sdf -model pier -z -7 -x $(arg pier_x) -y $(arg pier_y) -Y $(arg pier_yaw)"/>
   <node name="namespace_node" pkg="minau" type="namespace_provider_node.py" output="screen">

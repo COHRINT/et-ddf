@@ -133,10 +133,10 @@ while not rospy.is_shutdown():
         diff_x = float(target_waypt[0]) - wp.pose.pose.pose.position.x
         diff_y = float(target_waypt[1]) - wp.pose.pose.pose.position.y
         diff_z = -float(target_waypt[2]) + wp.pose.pose.pose.position.z
-        # print("target_waypt: " + str(target_waypt))
-        # print("x_diff: " + str(diff_x))
-        # print("y_diff: " + str(diff_y))
-        # print("z_diff: " + str(diff_z))
+        print("target_waypt: " + str(target_waypt))
+        print("x_diff: " + str(diff_x))
+        print("y_diff: " + str(diff_y))
+        print("z_diff: " + str(diff_z))
 
         ang = np.arctan2(diff_x, diff_y) # NED
         v3 = Vector3(diff_y,diff_x,diff_z)

@@ -116,10 +116,9 @@ class ETDDF_Node:
         # Sonar Subscription
         if rospy.get_param("~measurement_topics/sonar") != "None":
             rospy.Subscriber(rospy.get_param("~measurement_topics/sonar"), SonarTargetList, self.sonar_callback)
-        
+
+        #DVL Subscription
         if rospy.get_param("~measurement_topics/dvl") != "None":
-            print("DVL:")
-            print(rospy.get_param("~measurement_topics/dvl"))
             rospy.Subscriber(rospy.get_param("~measurement_topics/dvl"),Vector3,self.dvl_callback)
 
         # Initialize Buffer Service
@@ -139,7 +138,6 @@ class ETDDF_Node:
         pwcs = PoseWithCovarianceStamped(header, pwc)
         self.set_pose_pub.publish(pwcs)
 
-
     def dvl_callback(self,vel):
         now = rospy.get_rostime()
         dvl_x = Measurement("dvl_x", now, self.my_name, self.my_name, vel.x, self.default_meas_variance["dvl_x"], [])
@@ -148,15 +146,10 @@ class ETDDF_Node:
         self.filter.add_meas(dvl_x)
         self.filter.add_meas(dvl_y)
 
-
     def sonar_callback(self, sonar_list):
 
         for target in sonar_list.targets:
             # self.cuprint("Receiving sonar data")
-    def sonar_callback(self, sonar_list):
-
-        for target in sonar_list.targets:
-
             if self.last_orientation is None: # No orientation, no linearization of the sonar measurement
                 return
             # Convert quaternions to Euler angles.
@@ -188,6 +181,7 @@ class ETDDF_Node:
         self.statistics_pub.publish(self.statistics)
 
     def no_nav_filter_callback(self, event):
+        self.cuprint("no_nav_filter_callback")
         t_now = rospy.get_rostime()
         delta_t_ros =  t_now - self.last_update_time
         self.update_lock.acquire()
@@ -217,7 +211,6 @@ class ETDDF_Node:
         self.publish_stats(t_now)
 
     def nav_filter_callback(self, odom):
-
         # Update at specified rate
         t_now = rospy.get_rostime()
         delta_t_ros =  t_now - self.last_update_time

@@ -1,6 +1,3 @@
-float32 range
-float32 min_angle
-float32 max_angle
-bool fixed_angle
+etddf/SonarSettings settings
 ---
-bool success
+float32 time

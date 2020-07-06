@@ -12,6 +12,10 @@
   <arg name="pitch" default="0.0"/>
   <arg name="yaw" default="0.0"/>
   <arg name="use_360" default="False"/>
+  <arg name="ping_range" default="15.0"/>
+
+  <arg name="pole_x" default="10"/>
+  <arg name="pole_y" default="0"/>
 
 
   <arg name="schedule_file" default="$(find minau)/config/schedules/schedule_3_assets.json"/>
@@ -25,12 +29,12 @@
   
     <!-- Spawn BlueROV2 model in the simulated environment (in ENU world frame) -->
     <include file="$(find bluerov2)/launch/upload_bluerov2.launch">
-      <arg name="x" value="$(arg y)"/>
-      <arg name="y" value="$(arg x)"/>
+      <arg name="x" value="$(arg x)"/>
+      <arg name="y" value="$(arg y)"/>
       <arg name="z" value="$(eval -z)"/>
       <arg name="roll" value="$(arg roll)"/>
       <arg name="pitch" value="$(arg pitch)"/>
-      <arg name="yaw" value="$(eval yaw + 1.570796)"/>
+      <arg name="yaw" value="$(eval yaw +0.0)"/>
       <arg name="mode" value="default"/>
       <arg name="namespace" value="bluerov2_$(arg asset_id)"/>
     </include>
@@ -85,7 +89,7 @@
          true, true, true,
          true, true, true]
       </rosparam>
-      <param name="odom0" value="pose_gt"/>
+      <!-- <param name="odom0" value="pose_gt"/>
       <param name="odom0_differential" value="false"/>
       <param name="odom0_relative" value="false"/>
       <param name="odom0_queue_size" value="10"/>
@@ -95,7 +99,7 @@
          false, false, false,
          false, false, false,
          false, false, false]
-      </rosparam>
+      </rosparam> -->
     </node>
 
     <!-- Start the MinAu DDF node -->
@@ -111,7 +115,6 @@
       <param name="rate" value="20.0"/>
       <param name="schedule_file" value="$(arg schedule_file)"/>
     </node>
-    -->
     <!-- Start the SIMULATED SONAR Processing node -->
     <node name="sonar_processing" pkg="minau" type="sonar_processing_sim_node.py" output="screen">
       <param name="rate" value="1.0"/>
@@ -120,6 +123,22 @@
       <param name="fov_range_m" value="200"/>
       <param name="use_360" value="$(arg use_360)"/>
     </node>
+
+    <!-- Ping360 nodes -->
+    <node name="ping360" pkg="etddf" type="ping_360_node.py" output="screen">
+        <param name="range" value="$(arg ping_range)"/>
+    </node>
+
+    <node name="ping360_processing" pkg="etddf" type="process_sonar_node.py" output="screen">
+      <param name="pole_x" value="$(arg pole_x)"/>
+      <param name="pole_y" value="$(arg pole_y)"/>
+    </node>
+
+    <!-- <node name="ping360_control" pkg="etddf" type="scanner_control_node.py" output="screen">
+      <param name="pole_x" value="$(arg pole_x)"/>
+      <param name="pole_y" value="$(arg pole_y)"/>
+    </node> -->
+
 
     <!-- Start the MinAu UUV Control node for this vehicle instance -->
     <node name="uuv_control" pkg="minau" type="uuv_control_node.py" output="screen">
