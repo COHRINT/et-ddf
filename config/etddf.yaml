@@ -1,13 +1,13 @@
-update_rate: 2
+update_rate: 10
 
 ## Multipliers for Delta tiers
 ## increases a measurements threshold to be added to the buffer by the given amount
-delta_tiers: [1,2,5]
+delta_tiers: [1]
 
 ## Measurement topics
 measurement_topics:
-  imu_ci: "odometry/filtered"
-  sonar: "sonar_processing/target_list"
+  imu_ci: "None" #"odometry/filtered"
+  sonar: "None" #"sonar_processing/target_list"
 
 ### Buffer space configurations ###
 buffer_space:
@@ -30,19 +30,19 @@ default_starting_position:
 ### Process Noise Configurations ###
 process_noise:
   ownship:
-    x: 0.1
-    y: 0.1
-    z: 0.1
-    x_vel: 0.05
-    y_vel: 0.05
-    z_vel: 0.05
+    x: 0.0
+    y: 0.0
+    z: 0.01
+    x_vel: 0.0
+    y_vel: 0.0
+    z_vel: 0.0
   blueteam:
-    x: 0.1
-    y: 0.1
-    z: 0.1
-    x_vel: 0.05
-    y_vel: 0.05
-    z_vel: 0.05
+    x: 0.0
+    y: 0.0
+    z: 0.0
+    x_vel: 0.0
+    y_vel: 0.0
+    z_vel: 0.0
   redteam:
     x: 0.1
     y: 0.1
@@ -54,9 +54,9 @@ process_noise:
 ### Initial Uncertainty Configurations ###
 initial_uncertainty:
   ownship:
-    x: 0.0
-    y: 0.0
-    z: 0.0
+    x: 0.1
+    y: 0.1
+    z: 0.1
     x_vel: 0.1
     y_vel: 0.1
     z_vel: 0.1

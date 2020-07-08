@@ -4,6 +4,8 @@ from __future__ import division
 
 ROS interface script for delta tiering filter
 
+Filter operates in NED and converts 
+
 """
 
 from etddf.delta_tier import DeltaTier
@@ -86,8 +88,10 @@ class ETDDF_Node:
         self.update_lock = threading.Lock()
         self.last_orientation = None
 
-        # Initialize Measurement Callbacks
+        # Depth Sensor
         rospy.Subscriber("mavros/global_position/local", Odometry, self.depth_callback, queue_size=1)
+
+        # Modem & Measurement Packages
         rospy.Subscriber("etddf/packages_in", MeasurementPackage, self.meas_pkg_callback, queue_size=1)
 
         if self.use_control_input:
@@ -105,7 +109,7 @@ class ETDDF_Node:
             rospy.Subscriber(rospy.get_param("~measurement_topics/sonar"), SonarTargetList, self.sonar_callback)
 
         # Initialize Buffer Service
-        rospy.Service('etddf/get_measurement_package', GetMeasurementPackage, self.get_meas_pkg_callback)
+        # rospy.Service('etddf/get_measurement_package', GetMeasurementPackage, self.get_meas_pkg_callback)
         self.cuprint("loaded")
 
     def correct_nav_filter(self, c_bar, Pcc, header, nav_estimate):
@@ -212,7 +216,6 @@ class ETDDF_Node:
 
         # correction
         self.filter.correct(t_now)
-        self.sonar_rx = False
 
         ### Covariancee Intersect ###
 
@@ -295,6 +298,14 @@ class ETDDF_Node:
             self.cuprint("Receiving Modem Measurements")
             for meas in msg.measurements:
                 # Approximate the fuse on the next update, so we can get other asset's position immediately
+                if meas.meas_type == "modem_elevation":
+                    rospy.logerr_once("Ignoring Modem Elevation Measurement since we have depth measurements")
+                    continue
+                elif meas.meas_type == "modem_azimuth":
+                    meas.data = (meas.data * np.pi) / 180 # Convert to radians
+                    meas.variance = self.default_meas_variance["modem_azimuth"]
+                elif meas.meas_type == "modem_range":
+                    meas.variance = self.default_meas_variance["modem_range"]
                 self.filter.add_meas(meas, force_fuse=True)
         else:
             self.cuprint("receiving buffer")

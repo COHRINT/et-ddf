@@ -9,6 +9,8 @@ The basic filter in the repository is the ETFilter (Event Triggered Filter). Thi
 
 These algorithms, and their implementations in this repository are currently in use as part of DARPA sprinter project OFFSET, as well as a collaboration between Orbit Logic, the University of Colorado Boulder, the University of California San Diego, and the Office of Naval Research called MinAu (Minimal Autonomy).
 
+The etddf_node.py is implemented in **ENU** coordinate frame for the minau project.
+
 ## Running Instructions
 After building the package, the etddf node can be roslaunched.
 ```
