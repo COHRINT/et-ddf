@@ -17,11 +17,14 @@ add_message_files(
    AssetEstimate.msg
    NetworkEstimate.msg
    EtddfStatistics.msg
+   SonarSettings.msg
 )
 
 add_service_files(
   FILES
   GetMeasurementPackage.srv
+  GetSonarSettings.srv
+  SetSonarSettings.srv
 )
 
 generate_messages(
