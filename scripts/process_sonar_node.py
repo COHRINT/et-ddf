@@ -40,7 +40,7 @@ class ProcessSonar:
         # print(pole_x)
         # structure of this will be : [[[x1,y1],[x2,y2]...]]
         # each element represents a group that is one detection
-        self.pole_location = np.array([pole_x,pole_y,0])         # the z is just a place holder because we don't care about that location
+        self.pole_location = np.array([pole_x,pole_y])         # the z is just a place holder because we don't care about that location
         self.detections = []
         self._sequential_observation_id = 1
         self.num_wo_hits = []
@@ -124,8 +124,7 @@ class ProcessSonar:
         Returns:
             [np.array(float,float,float)]: Ownship location if that is indeed the pole
         """
-        own_pose = np.array([self.own_position.x,self.own_position.y,self.own_position.z])
-        self.pole_location[2] = detection[2]
+        own_pose = np.array([self.own_position.x,self.own_position.y])
         diff = self.pole_location - detection
         return own_pose+diff
 
@@ -141,12 +140,12 @@ class ProcessSonar:
             malonobis distance equal to or farther away as the detection
         """
         nav_cov = np.array(odom.pose.covariance).reshape(6,6)
-        cov = np.zeros((3,3))
-        cov[:3,:3] = nav_cov[:3,:3]
-        estimate = np.array([odom.pose.pose.position.x,odom.pose.pose.position.y,odom.pose.pose.position.z])
+        cov = np.zeros((2,2))
+        cov[:2,:2] = nav_cov[:2,:2]
+        estimate = np.array([odom.pose.pose.position.x,odom.pose.pose.position.y])
         m_dist_x = np.dot((detection-estimate).transpose(),np.linalg.inv(cov))
         m_dist_x = np.dot(m_dist_x, (detection-estimate))
-        return (1-stats.chi2.cdf(m_dist_x, 3))
+        return (1-stats.chi2.cdf(m_dist_x, 2))
 
     def calc_yaw_and_range(self,detection):
         """Calculate angle and range of the detection
@@ -158,7 +157,7 @@ class ProcessSonar:
             float,float: angle, and range of detection reletive to the rovs own position
         """
         detection = np.array(detection)
-        own_pose = np.array([self.own_position.x,self.own_position.y,self.own_position.z])
+        own_pose = np.array([self.own_position.x,self.own_position.y])
         range_to = np.linalg.norm(detection-own_pose)
         angle = np.arctan2(detection[1]-own_pose[1],detection[0]-own_pose[0])
         return angle,range_to
@@ -216,7 +215,6 @@ class ProcessSonar:
         if detection != None:
             # print(detection)
             avg_detection = self.avg(detection)
-            avg_detection.append(self.own_position.z)
             
             #finds mihalomis distance and then
             #using chi squared test to see how proble it is that the other blue asset is there.

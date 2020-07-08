@@ -195,7 +195,7 @@ class SonarPing:
 
         self.time = self.time / angleRatio
         if self.time > time_to_scan_all:
-            time_to_scan_all = self.time
+            time_to_scan_all += self.time
         self.fraction_angles = ((self.max_angle-self.min_angle)/(2*np.pi))
         self.time_per_scan = int(((self.time/360)/self.fraction_angles) * 10**9)
         # print(self.time_per_scan)
@@ -205,10 +205,11 @@ class SonarPing:
             # print(self.angle_range[0]-ang_avg)
             # print('')
             # print('')
-            if self.angle_range[0]-ang_avg < 0:
-                self.scan_positive = True
-            else:
-                self.scan_positive = False
+            if self.angle_range[0] > self.max_angle or self.angle_range[0] < self.min_angle:      #if current angle is outside the range, check which way to turn
+                if self.angle_range[0]-ang_avg < 0:
+                    self.scan_positive = True
+                else:
+                    self.scan_positive = False
         else:
             self.full_scan = True
         

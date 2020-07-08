@@ -23,7 +23,7 @@ rospy.init_node('dvl_sensor')
 pub = rospy.Publisher('dvl',Vector3,queue_size=10)
 
 ds = DVLSensor()
-error = 0.05
+error = rospy.get_param("~std_dev",0.1)
 rate = rospy.Rate(1)
 
 while not rospy.is_shutdown():

@@ -89,7 +89,7 @@
          true, true, true,
          true, true, true]
       </rosparam>
-      <!-- <param name="odom0" value="pose_gt"/>
+      <param name="odom0" value="pose_gt"/>
       <param name="odom0_differential" value="false"/>
       <param name="odom0_relative" value="false"/>
       <param name="odom0_queue_size" value="10"/>
@@ -99,7 +99,7 @@
          false, false, false,
          false, false, false,
          false, false, false]
-      </rosparam> -->
+      </rosparam>
     </node>
 
     <!-- Start the MinAu DDF node -->
@@ -138,6 +138,11 @@
       <param name="pole_x" value="$(arg pole_x)"/>
       <param name="pole_y" value="$(arg pole_y)"/>
     </node> -->
+
+    <!-- DVL -->
+    <node name="dvl_node" pkg="etddf" type="dvl_sensor.py" output="screen">
+      <param name="std_dev" value="0.1"/>
+    </node>
 
 
     <!-- Start the MinAu UUV Control node for this vehicle instance -->
