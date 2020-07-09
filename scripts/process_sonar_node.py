@@ -236,21 +236,21 @@ class ProcessSonar:
             p_pole = self.prob(self.own_pose,own_pole_location)
           
             location = " at " + str(avg_detection[0]) + ', ' + str(avg_detection[1])
-            # print(p_pole)
-            # print(p_asset)
+            print(p_pole)
+            print(p_asset)
             asset_id = None
             uuv_class = None
             if p_pole < .05 and p_asset[1] < .05:
-                # print('I think I just saw the red asset'+location)
+                print('I think I just saw the red asset'+location)
                 asset_id = 'red_asset'
                 uuv_class = SonarTarget.UUV_CLASS_RED
             else:
                 if p_pole > p_asset[1]:
-                    # print('I think I just saw the pole'+location)
+                    print('I think I just saw the pole'+location)
                     asset_id = 'pole'
                     uuv_class = SonarTarget.UUV_CLASS_UNKNOWN
                 else:
-                    # print('I think I just saw the other blue asset'+location)
+                    print('I think I just saw the other blue asset'+location)
                     asset_id = p_asset[0]
                     uuv_class = SonarTarget.UUV_CLASS_BLUE
             
