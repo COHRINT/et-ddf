@@ -4,7 +4,7 @@ from __future__ import division
 
 ROS interface script for delta tiering filter
 
-Filter operates in NED and converts 
+Filter operates in ENU
 
 """
 
@@ -57,6 +57,17 @@ class ETDDF_Node:
         self.use_control_input = use_control_input
         self.default_meas_variance = default_meas_variance
         self.my_name = my_name
+
+        self.cuprint = CUPrint(rospy.get_name())
+        # NED --> ENU
+        tmp = x0[0,0]
+        x0[0,0] = x0[1,0]
+        x0[1,0] = tmp
+        x0[2,0] = -x0[2,0]
+        tmp = x0[3,0]
+        x0[3,0] = x0[4,0]
+        x0[4,0] = tmp
+        x0[5,0] = -x0[5,0]
         
         self.filter = DeltaTier(NUM_OWNSHIP_STATES, \
                                 x0,\
@@ -68,8 +79,7 @@ class ETDDF_Node:
                                 delta_tiers,\
                                 self.asset2id,\
                                 my_name)
-
-        self.cuprint = CUPrint(rospy.get_name())             
+        
         self.network_pub = rospy.Publisher("etddf/estimate/network", NetworkEstimate, queue_size=10)
         self.statistics_pub = rospy.Publisher("etddf/statistics", EtddfStatistics, queue_size=10)
         self.statistics = EtddfStatistics(0, rospy.get_rostime(), 0, 0, delta_tiers, [0 for _ in delta_tiers], 0.0, [], False)
@@ -210,7 +220,7 @@ class ETDDF_Node:
         z_r = self.default_meas_variance["depth"]
         z_data = self.last_depth_meas
         if z_data != None:
-            z = Measurement("depth", t_now, self.my_name,"", z_data, z_r, [])
+            z = Measurement("depth", t_now, self.my_name,"", z_data, z_r, []) # Flip z data to transform enu -> NED
             self.filter.add_meas(z)
             self.last_depth_meas = None
 
@@ -302,9 +312,20 @@ class ETDDF_Node:
                     rospy.logerr_once("Ignoring Modem Elevation Measurement since we have depth measurements")
                     continue
                 elif meas.meas_type == "modem_azimuth":
+                    meas.global_pose = list(meas.global_pose)
+                    meas.global_pose[3] = 0.0
+                    if meas.measured_asset == self.my_name:
+                        self.cuprint("My Azimuth: " + str(meas.data))
+                        self.cuprint(str(meas.global_pose))
                     meas.data = (meas.data * np.pi) / 180 # Convert to radians
+                    
                     meas.variance = self.default_meas_variance["modem_azimuth"]
                 elif meas.meas_type == "modem_range":
+                    meas.global_pose = list(meas.global_pose)
+                    meas.global_pose[3] = 0.0
+                    if meas.measured_asset == self.my_name:
+                        self.cuprint("My Range: " + str(meas.data))
+                        self.cuprint(str(meas.global_pose))
                     meas.variance = self.default_meas_variance["modem_range"]
                 self.filter.add_meas(meas, force_fuse=True)
         else:

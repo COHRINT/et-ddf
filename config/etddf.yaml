@@ -6,6 +6,7 @@ delta_tiers: [1]
 
 ## Measurement topics
 measurement_topics:
+  depth: "mavros/global_position/rel_alt"
   imu_ci: "None" #"odometry/filtered"
   sonar: "None" #"sonar_processing/target_list"
 
@@ -30,9 +31,9 @@ default_starting_position:
 ### Process Noise Configurations ###
 process_noise:
   ownship:
-    x: 0.0
-    y: 0.0
-    z: 0.01
+    x: 0.001
+    y: 0.001
+    z: 0.001
     x_vel: 0.0
     y_vel: 0.0
     z_vel: 0.0
@@ -54,12 +55,12 @@ process_noise:
 ### Initial Uncertainty Configurations ###
 initial_uncertainty:
   ownship:
-    x: 0.1
-    y: 0.1
-    z: 0.1
-    x_vel: 0.1
-    y_vel: 0.1
-    z_vel: 0.1
+    x: 0.0
+    y: 0.0
+    z: 0.0
+    x_vel: 0.0
+    y_vel: 0.0
+    z_vel: 0.0
   # for asset positions provided to us through roslaunch params
   known_starting_position: 
     x: 0.0
