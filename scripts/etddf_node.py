@@ -314,18 +314,18 @@ class ETDDF_Node:
                 elif meas.meas_type == "modem_azimuth":
                     meas.global_pose = list(meas.global_pose)
                     meas.global_pose[3] = 0.0
-                    if meas.measured_asset == self.my_name:
-                        self.cuprint("My Azimuth: " + str(meas.data))
-                        self.cuprint(str(meas.global_pose))
-                    meas.data = (meas.data * np.pi) / 180 # Convert to radians
+                    # if meas.measured_asset == self.my_name:
+                    #     self.cuprint("My Azimuth: " + str(meas.data))
+                    #     self.cuprint(str(meas.global_pose))
+                    meas.data = - (meas.data * np.pi) / 180 # Convert to radians and flip the sign to convert to ENU
                     
                     meas.variance = self.default_meas_variance["modem_azimuth"]
                 elif meas.meas_type == "modem_range":
                     meas.global_pose = list(meas.global_pose)
                     meas.global_pose[3] = 0.0
-                    if meas.measured_asset == self.my_name:
-                        self.cuprint("My Range: " + str(meas.data))
-                        self.cuprint(str(meas.global_pose))
+                    # if meas.measured_asset == self.my_name:
+                    #     self.cuprint("My Range: " + str(meas.data))
+                    #     self.cuprint(str(meas.global_pose))
                     meas.variance = self.default_meas_variance["modem_range"]
                 self.filter.add_meas(meas, force_fuse=True)
         else:
