@@ -10,22 +10,22 @@ from etddf.srv import SetSonarSettings, GetSonarSettings
 from etddf.msg import SonarSettings
 import tf
 import copy
-
+ 
 rospy.init_node("ping_360_sonar")
-
-
+ 
+ 
 # use: multivariate_normal.cdf to find probablity of the rov to be there(will give the probablity that the rov is there or less)
 def normalize_ang(ang):
     while ang < 0:
-        ang+=2*np.pi 
+        ang+=2*np.pi
     while ang > 2*np.pi:
-        ang-=2*np.pi 
+        ang-=2*np.pi
     return ang
 
-
+ 
 class SonarPing:
     """
-    Takes the raw sonar data that shows all 360 of pings every update and makes it so the sonar only sees 
+    Takes the raw sonar data that shows all 360 of pings every update and makes it so the sonar only sees
     whats in the sonars range of view. Also makes a service that can change the settings of the sonar
     """
     def __init__(self):
@@ -253,12 +253,12 @@ class SonarPing:
             visual_view.range_max = 15
 
             self.visualpub.publish(visual_view)
-
-
-
-
-
-
+ 
+ 
+ 
+ 
+ 
+ 
 if __name__ == "__main__":
     sp = SonarPing()
     sp.run()
