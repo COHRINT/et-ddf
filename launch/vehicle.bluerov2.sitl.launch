@@ -129,10 +129,10 @@
         <param name="range" value="$(arg ping_range)"/>
     </node>
 
-    <!-- <node name="ping360_processing" pkg="etddf" type="process_sonar_node.py" output="screen">
+    <node name="ping360_processing" pkg="etddf" type="process_sonar_node.py" output="screen">
       <param name="pole_x" value="$(arg pole_x)"/>
       <param name="pole_y" value="$(arg pole_y)"/>
-    </node> -->
+    </node>
 
     <!-- <node name="ping360_control" pkg="etddf" type="scanner_control_node.py" output="screen">
       <param name="pole_x" value="$(arg pole_x)"/>
