@@ -7,10 +7,10 @@ from etddf.srv import SetSonarSettings, GetSonarSettings
 from etddf.msg import SonarSettings
 from minau.msg import SonarTargetList, SonarTarget
 import numpy as np
-
+ 
 def convert_ros_time(r):
     return r.secs + r.nsecs*10**(-9)
-
+ 
 class ScannerControl:
     def __init__(self):
         self.own_yaw = None
@@ -40,7 +40,7 @@ class ScannerControl:
         diffx = loc[0]-self.pole_loc[0]
         diffy = loc[1]-self.pole_loc[1]
         return np.linalg.norm([diffx,diffy])
-
+ 
     def pose_callback(self,msg):
         """
         Takes from etddf estimate the ownship pose estimate
@@ -50,13 +50,13 @@ class ScannerControl:
         """
         self.own_pose = msg
         (r, p, self.own_yaw) = tf.transformations.euler_from_quaternion([msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w])
-
+ 
     def check_for_pole(self,msg):
         for i in range(len(msg.targets)):
             print("I saw a " + msg.targets[i].id)
             if msg.targets[i].id == "pole":
                 self.seen_pole = True
-
+ 
     def run(self):
         """
         Checks if the covariance is too big and if so points the sonar toward the pole
@@ -77,12 +77,17 @@ class ScannerControl:
                 angle = angle - self.own_yaw
                 # print(angle)
                 self.seen_pole = False
-                num = 1
+                num = 2
                 while not self.seen_pole:
                     settings = SonarSettings()
-                    settings.range = distance+self.own_pose.pose.covariance[0]
-                    settings.min_angle = angle-(self.thirty_degrees*num)
-                    settings.max_angle = angle+(self.thirty_degrees*num)
+                    settings.range = distance+np.sqrt(self.own_pose.pose.covariance[0])*num
+                    #make sonar point turn toward where we think pole is
+                    settings.min_angle = angle-self.thirty_degrees
+                    settings.max_angle = angle+self.thirty_degrees
+                    self.set_sonar(settings).time-.5
+                    #make sonar go 360
+                    settings.min_angle = -4
+                    settings.max_angle = 4
                     wait_time = self.set_sonar(settings).time-.5
                     start_time = convert_ros_time(rospy.get_rostime())
                     rate2 = rospy.Rate(10)
@@ -95,17 +100,16 @@ class ScannerControl:
                     else:
                         print('I saw the pole!')
                         self.set_sonar(self.previous)
-
-
-
-
+ 
+ 
+ 
+ 
 rospy.init_node("scanner_control")
-
-
+ 
+ 
 if __name__ == "__main__":
     rate = rospy.Rate(.2)
     sc = ScannerControl()
     sc.run()
     while not rospy.is_shutdown():
         rate.sleep()
-

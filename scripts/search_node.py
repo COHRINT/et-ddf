@@ -173,6 +173,7 @@ class Search:
                 continue
             else:
                 found = True
+                self.spotted_3(target)
     def detections_4(self,msg):
         found = False
         for target in msg.targets:
@@ -180,6 +181,45 @@ class Search:
                 continue
             else:
                 found = True
+                self.spotted_4(target)
+    def spotted_3(self,target):
+        range_to = target.range_m
+        bearing = target.bearing_rad
+        bearing += self.truth_yaw_3
+        bearing = normalize_angle(bearing)
+        x = self.truth_pos_3.x + range_to*np.cos(bearing)
+        y = self.truth_pos_3.y + range_to*np.sin(bearing)
+        x_close = None
+        y_close = None
+        for i in range(len(self.x_cords)):
+            if np.norm(self.x_cords[i]-x) < .25:
+                x_close = i
+                break
+        for i in range(len(self.y_cords)):
+            if np.norm(self.y_cords[i]-y) < .25:
+                y_close = i
+                break
+        self.space[x_close][y_close] = 1
+    
+    def spotted_4(self,target):
+        range_to = target.range_m
+        bearing = target.bearing_rad
+        bearing += self.truth_yaw_3
+        bearing = normalize_angle(bearing)
+        x = self.truth_pos_3.x + range_to*np.cos(bearing)
+        y = self.truth_pos_3.y + range_to*np.sin(bearing)
+        x_close = None
+        y_close = None
+        for i in range(len(self.x_cords)):
+            if np.norm(self.x_cords[i]-x) < .25:
+                x_close = i
+                break
+        for i in range(len(self.y_cords)):
+            if np.norm(self.y_cords[i]-y) < .25:
+                y_close = i
+                break
+        self.space[x_close][y_close] = 1
+
     def truth_callback_3(self,msg):
         self.truth_pos_3 = msg.pose.pose.position
         (r,p,self.truth_yaw_3) = tf.transformations.euler_from_quaternion([msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w])
