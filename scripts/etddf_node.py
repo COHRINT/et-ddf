@@ -98,6 +98,7 @@ class ETDDF_Node:
         self.meas_lock = threading.Lock()
         self.update_lock = threading.Lock()
         self.last_orientation = None
+        self.red_asset_found = False
 
         # Depth Sensor
         rospy.Subscriber("mavros/global_position/local", Odometry, self.depth_callback, queue_size=1)
@@ -160,6 +161,8 @@ class ETDDF_Node:
             else:
                 sonar_x = Measurement("sonar_x", now, self.my_name, target.id, x, self.default_meas_variance["sonar_x"], [])
                 sonar_y = Measurement("sonar_y", now, self.my_name, target.id, y, self.default_meas_variance["sonar_y"], [])
+                if target.id == "red_actor_0":
+                    self.red_asset_found = True
             # sonar_z = Measurement("sonar_z", now, self.my_name, target.id, z, self.default_meas_variance["sonar_z"], [])
 
             self.filter.add_meas(sonar_x)
@@ -277,6 +280,8 @@ class ETDDF_Node:
         ne = NetworkEstimate()
         for asset in self.asset2id.keys():
             if "surface" in asset:
+                continue
+            if "red" in asset and not self.red_asset_found:
                 continue
             # else:
             #     print("publishing " + asset + "'s estimate")

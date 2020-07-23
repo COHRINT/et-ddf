@@ -23,5 +23,6 @@
         <param name="landmark_x" value="$(arg landmark_x)" />
         <param name="landmark_y" value="$(arg landmark_y)" />
     </node>
+    <remap from="etddf/estimate/red_actor_0" to="etddf/estimate/red_agent"/>
 
 </launch>
