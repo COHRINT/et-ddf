@@ -1,6 +1,8 @@
 <launch>
     <arg name="my_name" default="bluerov2_3" />
     <arg name="blue_team_names" default="[]" />
+    <arg name="landmark_x" default="0" />
+    <arg name="landmark_y" default="0" />
 
     <!-- not required, list of lists, index of outer 
     list corresponds to index in blue_team_names -->
@@ -18,6 +20,8 @@
         <rosparam param="starting_position" subst_value="True">$(arg starting_position)</rosparam> 
         <rosparam command="load" file="$(arg config_file)" />        
         <rosparam command="load" file="$(find etddf)/config/measurements.yaml" />
+        <param name="landmark_x" value="$(arg landmark_x)" />
+        <param name="landmark_y" value="$(arg landmark_y)" />
     </node>
 
 </launch>

@@ -57,6 +57,7 @@ class ETDDF_Node:
         self.use_control_input = use_control_input
         self.default_meas_variance = default_meas_variance
         self.my_name = my_name
+        self.landmark_pose = [rospy.get_param("~landmark_x"), rospy.get_param("~landmark_y"),0,0]
 
         self.cuprint = CUPrint(rospy.get_name())
         # NED --> ENU
@@ -152,13 +153,18 @@ class ETDDF_Node:
             y = xy_dist * np.sin(bearing_world)
 
             now = rospy.get_rostime()
-            sonar_x = Measurement("sonar_x", now, self.my_name, target.id, x, self.default_meas_variance["sonar_x"], [])
-            sonar_y = Measurement("sonar_y", now, self.my_name, target.id, y, self.default_meas_variance["sonar_y"], [])
-            sonar_z = Measurement("sonar_z", now, self.my_name, target.id, z, self.default_meas_variance["sonar_z"], [])
+            sonar_x, sonar_y = None, None
+            if target.id == "landmark":
+                sonar_x = Measurement("sonar_x", now, self.my_name, "", x, self.default_meas_variance["sonar_x"], self.landmark_pose)
+                sonar_y = Measurement("sonar_y", now, self.my_name, "", y, self.default_meas_variance["sonar_x"], self.landmark_pose)
+            else:
+                sonar_x = Measurement("sonar_x", now, self.my_name, target.id, x, self.default_meas_variance["sonar_x"], [])
+                sonar_y = Measurement("sonar_y", now, self.my_name, target.id, y, self.default_meas_variance["sonar_y"], [])
+            # sonar_z = Measurement("sonar_z", now, self.my_name, target.id, z, self.default_meas_variance["sonar_z"], [])
 
             self.filter.add_meas(sonar_x)
             self.filter.add_meas(sonar_y)
-            self.filter.add_meas(sonar_z)
+            # self.filter.add_meas(sonar_z)
 
     def publish_stats(self, last_update_time):
         self.statistics.seq = self.update_seq
@@ -245,8 +251,8 @@ class ETDDF_Node:
         # Run covariance intersection
         if np.trace(cov) < 1: # Prevent Nav Filter from having zero uncertainty
             cov = np.eye(NUM_OWNSHIP_STATES) * 0.1
-        c_bar, Pcc = self.filter.intersect(mean, cov)
-        self.correct_nav_filter(c_bar, Pcc, odom.header, odom)
+        # c_bar, Pcc = self.filter.intersect(mean, cov)
+        # self.correct_nav_filter(c_bar, Pcc, odom.header, odom)
 
         # TODO partial state update everything
 

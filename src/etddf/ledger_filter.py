@@ -303,12 +303,18 @@ class LedgerFilter:
                 return Velocityx_Explicit(src_id, ros_meas.data, ros_meas.variance, et_delta)
             elif ros_meas.meas_type == "dvl_y":
                 return Velocityy_Explicit(src_id, ros_meas.data, ros_meas.variance, et_delta)
-            elif ros_meas.meas_type == "sonar_x":
+            # Sonar asset
+            elif ros_meas.meas_type == "sonar_x" and not ros_meas.global_pose: 
                 return LinRelx_Explicit(src_id, measured_id, ros_meas.data, ros_meas.variance, et_delta)
-            elif ros_meas.meas_type == "sonar_y":
+            elif ros_meas.meas_type == "sonar_y" and not ros_meas.global_pose:
                 return LinRely_Explicit(src_id, measured_id, ros_meas.data, ros_meas.variance, et_delta)
             elif ros_meas.meas_type == "sonar_z":
                 return LinRelz_Explicit(src_id, measured_id, ros_meas.data, ros_meas.variance, et_delta)
+            # Sonar Landmark
+            elif ros_meas.meas_type == "sonar_x" and ros_meas.global_pose:
+                return GPSx_Explicit(src_id, ros_meas.global_pose[0] - ros_meas.data, ros_meas.variance, et_delta)
+            elif ros_meas.meas_type == "sonar_y" and ros_meas.global_pose:
+                return GPSy_Explicit(src_id, ros_meas.global_pose[1] - ros_meas.data, ros_meas.variance, et_delta)
             else:
                 raise NotImplementedError(str(ros_meas))
         # Implicit Measurement
