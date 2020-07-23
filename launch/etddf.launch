@@ -23,7 +23,6 @@
         <rosparam command="load" file="$(find etddf)/config/measurements.yaml" />
         <rosparam command="load" file="$(arg landmark_file)" />
     </node>
-    <remap from="etddf/estimate/red_actor_0" to="etddf/estimate/red_agent"/>
 
     <!-- Launch the strapdown filter -->
     <include file="$(find etddf)/launch/nav_filter.launch" >
