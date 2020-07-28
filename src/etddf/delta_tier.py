@@ -99,7 +99,7 @@ class DeltaTier:
         elif ros_meas.measured_asset == "":
             measured_id = -1
         else:
-            rospy.logerr_once("ETDDF doesn't recognize: " + ros_meas.measured_asset + " ... ignoring")
+            rospy.logerr("ETDDF doesn't recognize: " + ros_meas.measured_asset + " ... ignoring")
             return
         self.main_filter.add_meas(ros_meas, src_id, measured_id, delta_multiplier, force_fuse)
         for key in self.delta_tiers.keys():

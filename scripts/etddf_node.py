@@ -99,6 +99,7 @@ class ETDDF_Node:
         self.update_lock = threading.Lock()
         self.last_orientation = None
         self.red_asset_found = False
+        self.red_asset_names = rospy.get_param("~red_team_names")
 
         # Depth Sensor
         rospy.Subscriber("mavros/global_position/local", Odometry, self.depth_callback, queue_size=1)
@@ -161,7 +162,7 @@ class ETDDF_Node:
             else:
                 sonar_x = Measurement("sonar_x", now, self.my_name, target.id, x, self.default_meas_variance["sonar_x"], [])
                 sonar_y = Measurement("sonar_y", now, self.my_name, target.id, y, self.default_meas_variance["sonar_y"], [])
-                if target.id == "red_actor_0":
+                if target.id in self.red_asset_names:
                     self.red_asset_found = True
             # sonar_z = Measurement("sonar_z", now, self.my_name, target.id, z, self.default_meas_variance["sonar_z"], [])
 
@@ -315,28 +316,38 @@ class ETDDF_Node:
     def meas_pkg_callback(self, msg):
 
         # Modem update
-        if msg.src_asset == "surface" or msg.src_asset == self.my_name:
+        if msg.src_asset == "surface":
             self.cuprint("Receiving Modem Measurements")
             for meas in msg.measurements:
                 # Approximate the fuse on the next update, so we can get other asset's position immediately
                 if meas.meas_type == "modem_elevation":
-                    rospy.logerr_once("Ignoring Modem Elevation Measurement since we have depth measurements")
+                    rospy.logerr("Ignoring Modem Elevation Measurement since we have depth measurements")
                     continue
                 elif meas.meas_type == "modem_azimuth":
                     meas.global_pose = list(meas.global_pose)
                     meas.global_pose[3] = 0.0
-                    # if meas.measured_asset == self.my_name:
-                    #     self.cuprint("My Azimuth: " + str(meas.data))
-                    #     self.cuprint(str(meas.global_pose))
                     meas.data = - (meas.data * np.pi) / 180 # Convert to radians and flip the sign to convert to ENU
                     
                     meas.variance = self.default_meas_variance["modem_azimuth"]
                 elif meas.meas_type == "modem_range":
                     meas.global_pose = list(meas.global_pose)
                     meas.global_pose[3] = 0.0
-                    # if meas.measured_asset == self.my_name:
-                    #     self.cuprint("My Range: " + str(meas.data))
-                    #     self.cuprint(str(meas.global_pose))
+                    meas.variance = self.default_meas_variance["modem_range"]
+                self.filter.add_meas(meas, force_fuse=True)
+        elif msg.src_asset == self.my_name:
+            self.cuprint("Receiving Modem Measurements")
+            for meas in msg.measurements:
+                # Approximate the fuse on the next update, so we can get other asset's position immediately
+                if meas.meas_type == "modem_elevation":
+                    rospy.logerr("Ignoring Modem Elevation Measurement since we have depth measurements")
+                    continue
+                elif meas.meas_type == "modem_azimuth":
+                    meas.global_pose = list(meas.global_pose)
+                    meas.data = - (meas.data * np.pi) / 180 # Convert to radians and flip the sign to convert to ENU
+                    
+                    meas.variance = self.default_meas_variance["modem_azimuth"]
+                elif meas.meas_type == "modem_range":
+                    meas.global_pose = list(meas.global_pose)
                     meas.variance = self.default_meas_variance["modem_range"]
                 self.filter.add_meas(meas, force_fuse=True)
         else:
