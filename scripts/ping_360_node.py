@@ -43,6 +43,7 @@ class SonarPing:
         self.filtered_sonarpub = rospy.Publisher("sonar_filtered",LaserScan,queue_size=10)
         self.estimatepub = rospy.Publisher("sonar_pose",Odometry,queue_size=10)
         self.visualpub = rospy.Publisher("visual_pub",LaserScan,queue_size=10)
+        self.all_filtered_pub = rospy.Publisher("all_sonar_filitered",LaserScan,queue_size=10)
 
         #Initiate the service to change the settings of the sonar
         rospy.Service("set_sonar_settings",SetSonarSettings,self.set_settings)
@@ -253,6 +254,13 @@ class SonarPing:
             visual_view.range_max = 15
 
             self.visualpub.publish(visual_view)
+
+            total_view = copy.deepcopy(self.sonar)
+            total_view.ranges = self.detect
+            total_view.intensities = intensities
+            total_view.range_max = self.range
+
+            self.all_filtered_pub.publish(total_view)
  
  
  

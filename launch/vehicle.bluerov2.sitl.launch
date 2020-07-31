@@ -11,12 +11,12 @@
   <arg name="roll" default="0.0"/>
   <arg name="pitch" default="0.0"/>
   <arg name="yaw" default="0.0"/>
-  <arg name="use_360" default="False"/>
-  <arg name="ping_range" default="15.0"/>
 
-  <arg name="pole_x" default="10"/>
-  <arg name="pole_y" default="0"/>
-
+  <!-- Args for sonar node -->
+  <arg name="is_landmark" default="false"/>
+  <arg name="landmark_x" default="0.0"/>
+  <arg name="landmark_y" default="0.0"/>
+  <arg name="use_360" default="false"/>
 
   <arg name="schedule_file" default="$(find minau)/config/schedules/schedule_3_assets.json"/>
   <!-- DDF params -->
@@ -24,19 +24,48 @@
   <arg name="blue_team_positions" default="[]" />
   <arg name="red_team_names" default="[]"/>
 
+  <!-- IMU Settings (default values correspond to uuv_simulator default_imu) -->
+  <arg name="mass_imu_sensor" default="0.015"/>
+  <arg name="gyroscope_noise_density" default="0.0003394"/>
+  <arg name="gyroscope_random_walk" default="0.000038785"/>
+  <arg name="gyroscope_bias_correlation_time" default="1000.0"/>
+  <arg name="gyroscope_turn_on_bias_sigma" default="0.0087"/>
+  <arg name="accelerometer_noise_density" default="0.004"/>
+  <arg name="accelerometer_random_walk" default="0.006"/>
+  <arg name="accelerometer_bias_correlation_time" default="300.0"/>
+  <arg name="accelerometer_turn_on_bias_sigma" default="0.1960"/>
+  <arg name="orientation_noise" default="0.01"/>
+  <arg name="enable_local_ned_frame" default="false"/>
+  <arg name="reference_frame" default="world"/>
+  <arg name="update_rate" default="50"/>
+
   <group ns="bluerov2_$(arg asset_id)">
     <param name="asset_id" value="$(arg asset_id)"/>
   
     <!-- Spawn BlueROV2 model in the simulated environment (in ENU world frame) -->
     <include file="$(find bluerov2)/launch/upload_bluerov2.launch">
-      <arg name="x" value="$(arg x)"/>
-      <arg name="y" value="$(arg y)"/>
+      <arg name="x" value="$(arg y)"/>
+      <arg name="y" value="$(arg x)"/>
       <arg name="z" value="$(eval -z)"/>
       <arg name="roll" value="$(arg roll)"/>
       <arg name="pitch" value="$(arg pitch)"/>
-      <arg name="yaw" value="$(eval yaw +0.0)"/>
+      <arg name="yaw" value="$(eval yaw + 1.570796)"/>
       <arg name="mode" value="default"/>
       <arg name="namespace" value="bluerov2_$(arg asset_id)"/>
+
+      <arg name="mass_imu_sensor" default="$(arg mass_imu_sensor)"/>
+      <arg name="gyroscope_noise_density" default="$(arg gyroscope_noise_density)"/>
+      <arg name="gyroscope_random_walk" default="$(arg gyroscope_random_walk)"/>
+      <arg name="gyroscope_bias_correlation_time" default="$(arg gyroscope_bias_correlation_time)"/>
+      <arg name="gyroscope_turn_on_bias_sigma" default="$(arg gyroscope_turn_on_bias_sigma)"/>
+      <arg name="accelerometer_noise_density" default="$(arg accelerometer_noise_density)"/>
+      <arg name="accelerometer_random_walk" default="$(arg accelerometer_random_walk)"/>
+      <arg name="accelerometer_bias_correlation_time" default="$(arg accelerometer_bias_correlation_time)"/>
+      <arg name="accelerometer_turn_on_bias_sigma" default="$(arg accelerometer_turn_on_bias_sigma)"/>
+      <arg name="orientation_noise" default="$(arg orientation_noise)"/>
+      <arg name="enable_local_ned_frame" default="$(arg enable_local_ned_frame)"/>
+      <arg name="reference_frame" default="$(arg reference_frame)"/>
+      <arg name="update_rate" default="$(arg update_rate)"/>
     </include>
 
     <!-- Start the ArduSub FSW for this vehicle instance -->
@@ -59,9 +88,10 @@
     <!-- TODO (EBS): Start the SeaTrac (simulation) driver node -->
     <include file="$(find seatrac_driver)/launch/seatrac_driver.launch">
       <arg name="sim" value="true"/>
-      <arg name="sim_comms_drop" value="true"/>
-      <arg name="sim_tx_rate" value="true"/>
-      <arg name="sim_modem_type" value="x010"/>
+      <arg name="sim_comms_drop" value="false"/>
+      <arg name="sim_tx_rate" value="false"/>
+      <!-- <arg name="sim_modem_type" value="x010"/> -->
+      <arg name="sim_modem_type" value="x150"/>
     </include>
 
     <!-- Define map to world transform (identity)-->
@@ -89,7 +119,7 @@
          true, true, true,
          true, true, true]
       </rosparam>
-      <param name="odom0" value="pose_gt"/>
+      <!-- <param name="odom0" value="pose_gt"/>
       <param name="odom0_differential" value="false"/>
       <param name="odom0_relative" value="false"/>
       <param name="odom0_queue_size" value="10"/>
@@ -99,10 +129,10 @@
          false, false, false,
          false, false, false,
          false, false, false]
-      </rosparam>
+      </rosparam> -->
     </node>
 
-    <!-- Start the MinAu DDF node -->
+    <!-- Start the MinAu DDF node-->
     <include file="$(find etddf)/launch/etddf.launch">
       <arg name="my_name" value="bluerov2_$(arg asset_id)"/>
       <arg name="blue_team_names" value="$(arg blue_team_names)"/>
@@ -110,70 +140,50 @@
       <arg name="red_team_names" value="$(arg red_team_names)" />
       <arg name="starting_position" value="[$(arg x), $(arg y), $(arg z)]" />
     </include>
+
     <!-- Start the MinAu Fleet Communication node -->
     <node name="fleet_communication" pkg="minau" type="fleet_communication_node.py" output="screen">
       <param name="rate" value="20.0"/>
       <param name="schedule_file" value="$(arg schedule_file)"/>
     </node>
+
     <!-- Start the SIMULATED SONAR Processing node -->
     <node name="sonar_processing" pkg="minau" type="sonar_processing_sim_node.py" output="screen">
       <param name="rate" value="1.0"/>
       <param name="fov_bearing_deg" value="130"/>
       <param name="fov_elevation_deg" value="20"/>
       <param name="fov_range_m" value="200"/>
+
       <param name="use_360" value="$(arg use_360)"/>
+      <param name="is_landmark" value="$(arg is_landmark)"/>
+      <param name="landmark_x" value="$(arg landmark_x)"/>
+      <param name="landmark_y" value="$(arg landmark_y)"/>
     </node>
 
+
     <!-- Ping360 nodes -->
-    <!-- <node name="ping360" pkg="etddf" type="ping_360_node.py" output="screen">
-        <param name="range" value="$(arg ping_range)"/>
+    <node name="ping360" pkg="etddf" type="ping_360_node.py" output="screen">
+        <param name="range" value="10"/>
     </node>
 
     <node name="ping360_processing" pkg="etddf" type="process_sonar_node.py" output="screen">
-      <param name="pole_x" value="$(arg pole_x)"/>
-      <param name="pole_y" value="$(arg pole_y)"/>
-    </node> -->
+      <param name="pole_x" value="$(arg landmark_x)"/>
+      <param name="pole_y" value="$(arg landmark_y)"/>
+    </node>
 
     <!-- <node name="ping360_control" pkg="etddf" type="scanner_control_node.py" output="screen">
       <param name="pole_x" value="$(arg pole_x)"/>
       <param name="pole_y" value="$(arg pole_y)"/>
     </node> -->
 
+    <include file="$(find ping360_sonar)/launch/example.launch"/>
 
-    <node pkg="tf" type="static_transform_publisher" name="transform_sonar_frame" args="0 0 0 0 0 0 1 map sonar_frame 10" />
-    <env name="emulated_sonar" value="true" />
-    <node pkg="ping360_sonar" type="ping360_node" name="ping360_node" output="screen">
-        <param name="device" value="/dev/ttyUSB0"/>
-        <param name="baudrate" value="115200"/>
-        <param name="debug" value="False"/>
-        <param name="imgSize" value="500"/>
-        <param name="gain" value="0"/>
-        <param name="step" value="1"/>
-        <param name="numberOfSamples" value="200"/>
-        <param name="transmitFrequency" value="740"/>
-        <param name="sonarRange" value="10"/>
-        <param name="speedOfSound" value="1500"/>
-        <param name="queueSize" value="1"/>
-        <param name="threshold" value="100"/>
-        <param name="enableImageTopic" value="True"/> 
-        <param name="enableScanTopic" value="True"/> 
-        <param name="enableDataTopic" value="True"/> 
-        <param name="maxAngle" value="400"/> 
-        <param name="minAngle" value="0"/> 
-        <param name="oscillate" value="True"/> 
-    </node>
-
-    <!-- DVL -->
-    <node name="dvl_node" pkg="etddf" type="dvl_sensor.py" output="screen">
-      <param name="std_dev" value="0.1"/>
-    </node>
-
-
-    <!-- Start the MinAu UUV Control node for this vehicle instance -->
+    <!-- Start the MinAu UUV Control node for this vehicle instance-->
     <node name="uuv_control" pkg="minau" type="uuv_control_node.py" output="screen">
       <param name="config" value="$(find minau)/config/vehicle.sitl.json"/>
       <param name="rate" value="20.0"/>
     </node>
+    
     <!-- TODO (EBS): Start the MinAu Sensor Manager node -->
 
     <!-- Start the MinAu Plan Manager node for this vehicle instance -->
@@ -186,5 +196,6 @@
     </node>
   </group>
 </launch>
+
 
 
