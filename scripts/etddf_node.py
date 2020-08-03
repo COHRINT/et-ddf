@@ -314,10 +314,9 @@ class ETDDF_Node:
         self.network_pub.publish(ne)
 
     def meas_pkg_callback(self, msg):
-
-        # Modem update
+        # Modem Meas taken by surface
         if msg.src_asset == "surface":
-            self.cuprint("Receiving Modem Measurements")
+            self.cuprint("Receiving Surface Modem Measurements")
             for meas in msg.measurements:
                 # Approximate the fuse on the next update, so we can get other asset's position immediately
                 if meas.meas_type == "modem_elevation":
@@ -325,17 +324,18 @@ class ETDDF_Node:
                     continue
                 elif meas.meas_type == "modem_azimuth":
                     meas.global_pose = list(meas.global_pose)
-                    meas.global_pose[3] = 0.0
-                    meas.data = - (meas.data * np.pi) / 180 # Convert to radians and flip the sign to convert to ENU
-                    
+                    self.cuprint("azimuth: " + str(meas.data))
+                    meas.data = (meas.data * np.pi) / 180
                     meas.variance = self.default_meas_variance["modem_azimuth"]
                 elif meas.meas_type == "modem_range":
                     meas.global_pose = list(meas.global_pose)
-                    meas.global_pose[3] = 0.0
+                    self.cuprint("range: " + str(meas.data))
                     meas.variance = self.default_meas_variance["modem_range"]
                 self.filter.add_meas(meas, force_fuse=True)
+
+        # Modem Meas taken by me
         elif msg.src_asset == self.my_name:
-            self.cuprint("Receiving Modem Measurements")
+            self.cuprint("Receiving Modem Measurements Taken by Me")
             for meas in msg.measurements:
                 # Approximate the fuse on the next update, so we can get other asset's position immediately
                 if meas.meas_type == "modem_elevation":
@@ -343,13 +343,14 @@ class ETDDF_Node:
                     continue
                 elif meas.meas_type == "modem_azimuth":
                     meas.global_pose = list(meas.global_pose)
-                    meas.data = - (meas.data * np.pi) / 180 # Convert to radians and flip the sign to convert to ENU
-                    
+                    meas.data = (meas.data * np.pi) / 180
                     meas.variance = self.default_meas_variance["modem_azimuth"]
                 elif meas.meas_type == "modem_range":
                     meas.global_pose = list(meas.global_pose)
                     meas.variance = self.default_meas_variance["modem_range"]
                 self.filter.add_meas(meas, force_fuse=True)
+
+        # Buffer
         else:
             self.cuprint("receiving buffer")
             self.update_lock.acquire()
