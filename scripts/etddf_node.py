@@ -60,15 +60,6 @@ class ETDDF_Node:
         self.landmark_pose = [rospy.get_param("~landmark_x"), rospy.get_param("~landmark_y"),0,0]
 
         self.cuprint = CUPrint(rospy.get_name())
-        # NED --> ENU
-        tmp = x0[0,0]
-        x0[0,0] = x0[1,0]
-        x0[1,0] = tmp
-        x0[2,0] = -x0[2,0]
-        tmp = x0[3,0]
-        x0[3,0] = x0[4,0]
-        x0[4,0] = tmp
-        x0[5,0] = -x0[5,0]
         
         self.filter = DeltaTier(NUM_OWNSHIP_STATES, \
                                 x0,\
