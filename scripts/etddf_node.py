@@ -108,6 +108,7 @@ class ETDDF_Node:
         rospy.Subscriber("etddf/packages_in", MeasurementPackage, self.meas_pkg_callback, queue_size=1)
 
         if self.use_control_input:
+            self.control_input = None
             rospy.Subscriber("uuv_control/control_status", ControlStatus, self.control_status_callback, queue_size=1)
 
         # IMU Covariance Intersection
@@ -185,8 +186,9 @@ class ETDDF_Node:
         self.update_lock.acquire()
 
         ### Run Prediction ###
-        if self.use_control_input:
-            raise NotImplementedError("using control input not ready yet")
+        ### Run Prediction ###
+        if self.use_control_input and self.control_input is not None:
+            self.filter.predict(self.control_input, self.Q, delta_t_ros.to_sec(), False)
         else:
             self.filter.predict(np.zeros((3,1)), self.Q, delta_t_ros.to_sec(), False)
 
@@ -219,8 +221,8 @@ class ETDDF_Node:
         self.update_lock.acquire()
 
         ### Run Prediction ###
-        if self.use_control_input:
-            raise NotImplementedError("using control input not ready yet")
+        if self.use_control_input and self.control_input is not None:
+            self.filter.predict(self.control_input, self.Q, delta_t_ros.to_sec(), False)
         else:
             self.filter.predict(np.zeros((3,1)), self.Q, delta_t_ros.to_sec(), False)
 
@@ -268,9 +270,13 @@ class ETDDF_Node:
         self.publish_stats(t_now)
     
     def control_status_callback(self, msg):
-        self.meas_lock.acquire()
+        self.update_lock.acquire()
+        if msg.is_setpoint_active and msg.is_heading_velocity_setpoint_active:
+            self.control_input = np.array([[msg.setpoint_velocity.y, msg.setpoint_velocity.z, -msg.setpoint_velocity.z]]).T
+        else:
+            self.control_input = None
         # GRAB CONTROL INPUT
-        self.meas_lock.release()
+        self.update_lock.release()
 
     def depth_callback(self, msg):
         self.meas_lock.acquire()
