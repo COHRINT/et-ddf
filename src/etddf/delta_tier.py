@@ -127,7 +127,7 @@ class DeltaTier:
 
         Pcc = np.linalg.inv(omega_optimal*Pa_inv + (1-omega_optimal)*Pb_inv)
         c_bar = Pcc.dot( omega_optimal*Pa_inv.dot(xa) + (1-omega_optimal)*Pb_inv.dot(xb))
-        return c_bar, Pcc
+        return c_bar.reshape(-1,1), Pcc
 
     def intersect(self, x, P):
         """Runs covariance intersection with main filter's estimate

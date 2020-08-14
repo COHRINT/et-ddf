@@ -20,7 +20,6 @@ np.set_printoptions(suppress=True)
 from copy import deepcopy
 from std_msgs.msg import Header
 from geometry_msgs.msg import PoseWithCovariance, Pose, Point, Quaternion, Twist, Vector3, TwistWithCovariance, PoseWithCovarianceStamped
-from tf.transformations import quaternion_from_euler
 from nav_msgs.msg import Odometry
 from minau.msg import SonarTargetList, SonarTarget
 from cuprint.cuprint import CUPrint
@@ -106,8 +105,27 @@ class ETDDF_Node:
         if rospy.get_param("~measurement_topics/imu_ci") == "None":
             rospy.Timer(rospy.Duration(1 / self.update_rate), self.no_nav_filter_callback)
         else:
-            rospy.Subscriber(rospy.get_param("~measurement_topics/imu_ci"), Odometry, self.nav_filter_callback, queue_size=1)
             self.set_pose_pub = rospy.Publisher("set_pose", PoseWithCovarianceStamped, queue_size=10)
+
+            # Correct the pose of 
+            self.cuprint("Waiting to correct filter")
+            rospy.wait_for_message(rospy.get_param("~measurement_topics/imu_ci"), Odometry)
+            yaw = rospy.get_param("~starting_yaw",0.0)
+            q = tf.transformations.quaternion_from_euler(0, 0, yaw)
+            nav_estimate = Odometry()
+            nav_estimate.pose.pose.orientation.x = q[0]
+            nav_estimate.pose.pose.orientation.y = q[1]
+            nav_estimate.pose.pose.orientation.z = q[2]
+            nav_estimate.pose.pose.orientation.w = q[3]
+            h = Header()
+            h.frame_id = "map"
+            z = np.eye(6) * 0.01
+            for i in range(10):
+                self.correct_nav_filter(x0, z, h, nav_estimate)
+                rospy.sleep(0.1)
+            self.cuprint("Filter Corrected")
+
+            rospy.Subscriber(rospy.get_param("~measurement_topics/imu_ci"), Odometry, self.nav_filter_callback, queue_size=1)
 
         # Sonar Subscription
         if rospy.get_param("~measurement_topics/sonar") != "None":
@@ -121,7 +139,7 @@ class ETDDF_Node:
 
         nav_covpt = np.array(nav_estimate.pose.covariance).reshape(6,6)
 
-        pose = Pose(Point(c_bar[0],c_bar[1],c_bar[2]), \
+        pose = Pose(Point(c_bar[0,0],c_bar[1,0],c_bar[2,0]), \
                     nav_estimate.pose.pose.orientation)
         pose_cov = np.zeros((6,6))
         pose_cov[:3,:3] = Pcc[:3,:3]

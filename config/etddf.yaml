@@ -8,7 +8,8 @@ delta_tiers: [1]
 measurement_topics:
   depth: "mavros/global_position/rel_alt"
   imu_ci: "odometry/filtered"
-  sonar: "sonar_processing/target_list"
+  # sonar: "sonar_processing/target_list"
+  sonar: "None"
 
 ### Buffer space configurations ###
 buffer_space:

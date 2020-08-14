@@ -11,6 +11,7 @@
     <arg name="red_team_names" default="[]" />
     <arg name="config_file" default="$(find etddf)/config/etddf.yaml" />
     <arg name="starting_position_enu" default="[0,0,0]" /> <!-- [x,y,z] -->
+    <arg name="starting_yaw_enu" default="0.0" />
     
     <node name="etddf" pkg="etddf" type="etddf_node.py" output="screen">
         <param name="my_name" value="$(arg my_name)" />
@@ -18,6 +19,7 @@
         <rosparam param="blue_team_names" subst_value="True">$(arg blue_team_names)</rosparam> 
         <rosparam param="red_team_names" subst_value="True">$(arg red_team_names)</rosparam> 
         <rosparam param="starting_position" subst_value="True">$(arg starting_position_enu)</rosparam> 
+        <param name="starting_yaw" value="$(arg starting_yaw_enu)" />
         <rosparam command="load" file="$(arg config_file)" />        
         <rosparam command="load" file="$(find etddf)/config/measurements.yaml" />
         <param name="landmark_x" value="$(arg landmark_x)" />
