@@ -4,25 +4,6 @@
   <!-- Start Gazebo Simulator with open ocean world -->
   <arg name="latitude" default="56.71897669633431"/>
   <arg name="longitude" default="3.515625"/>
-  <!--Changes the start time of the movement of the RexRov-->
-  <arg name="rexStart" default="30"/>
-  <arg name="use_360" default="False"/>
-  <arg name="pole_x" default="10"/>
-  <arg name="pole_y" default="0"/>
-
-  <arg name="use_360" default="False"/>
-  <!-- Arguments for the location of the pier:
-  Moves pier to x, y, z and then rotates pier by yaw.
-  These are the locations of one edge of pier.
-   -->
-  <arg name="pier_x" default="30"/>
-  <arg name="pier_y" default="0"/>
-  <arg name="pier_z" default="-7"/>
-  <arg name="pier_yaw" default="1.57"/>
-
-  <!--Starts Gazebo with open ocean world
-  
-  -->
 
   <arg name="schedule_file" default="$(find minau)/config/schedules/schedule_1_assets_low_latency.json"/>
   <!-- <arg name="schedule_file" default="$(find minau)/config/schedules/schedule_3_assets.json"/> -->
@@ -32,13 +13,13 @@
   </include>
 
   <!-- Asset 3 Starting Position -->
-  <arg name="x_3" value="8.0"/>
-  <arg name="y_3" value="0.0"/>
+  <arg name="x_3" value="0.0"/>
+  <arg name="y_3" value="-6.0"/>
   <arg name="z_3" value="0.0"/>
   <arg name="starting_position_3" value="[$(arg x_3), $(arg y_3), $(arg z_3)]"/>
   <!-- Asset 4 Starting Position -->
-  <arg name="x_4" value="3.0"/>
-  <arg name="y_4" value="0.0"/>
+  <arg name="x_4" value="0.0"/>
+  <arg name="y_4" value="6.0"/>
   <arg name="z_4" value="0.0"/>
   <arg name="starting_position_4" value="[$(arg x_4), $(arg y_4), $(arg z_4)]"/>
 
@@ -57,14 +38,14 @@
   <arg name="use_360" default="true"/>
 
   <!-- Spawn WAM-V mothership model in the simulated environment -->
-  <!-- <include file="$(find minau)/launch/vehicle.wamv.sitl.launch">
+  <include file="$(find minau)/launch/vehicle.wamv.sitl.launch">
     <arg name="asset_id" value="1"/>
     <arg name="ardusub_instance" value="5"/>
     <arg name="ardusub_params" value="$(arg ardusub_params)"/>
     <arg name="latitude" value="$(arg latitude)"/>
-    <arg name="longitude" value="$(arg longitude)"/> -->
+    <arg name="longitude" value="$(arg longitude)"/>
     <!-- The following arguments must be set w.r.t. NED world frame -->
-    <!-- <arg name="x" value="0.0"/>
+    <arg name="x" value="0.0"/>
     <arg name="y" value="0.0"/>
     <arg name="z" value="0.2"/>
     <arg name="roll" value="0.0"/>
@@ -72,18 +53,14 @@
     <arg name="yaw" value="0.0"/>
 
     <arg name="schedule_file" value="$(arg schedule_file)"/>
-  </include> -->
+  </include>
 
   <!-- <node name="spawn_pier" pkg="gazebo_ros" type="spawn_model" args="-file $(find etddf)/models/pier/model.sdf -sdf -model pier -z $(arg pier_z) -x $(arg pier_x) -y $(arg pier_y) -Y $(arg pier_yaw)"/> -->
-  <!-- Spawn BlueROV2 model in the simulated environment -->
-  <include file="$(find etddf)/launch/vehicle.bluerov2.sitl.launch">
-  </include>
-
-    <arg name="x" value="5.0"/>
-    <arg name="y" value="2.0"/>
-    <arg name="z" value="1.5"/>
-  </include>
   
+
+
+
+
   <!-- Spawn BlueROV2 model in the simulated environment -->
   <include file="$(find etddf)/launch/vehicle.bluerov2.sitl.launch">
     <arg name="asset_id" value="3"/>
@@ -92,8 +69,8 @@
     <arg name="latitude" value="$(arg latitude)"/>
     <arg name="longitude" value="$(arg longitude)"/> 
     <!-- The following arguments must be set w.r.t. NED world frame -->
-    <arg name="x" value="$(arg x_3)"/>
-    <arg name="y" value="$(arg y_3)"/>
+    <arg name="x" value="$(arg y_3)"/>
+    <arg name="y" value="$(arg x_3)"/>
     <arg name="z" value="$(arg z_3)"/>
     <arg name="roll" value="0.0"/>
     <arg name="pitch" value="0.0"/>
@@ -117,8 +94,8 @@
     <arg name="latitude" value="$(arg latitude)"/>
     <arg name="longitude" value="$(arg longitude)"/>
     <!-- The following arguments must be set w.r.t. NED world frame -->
-    <arg name="x" value="$(arg x_4)"/>
-    <arg name="y" value="$(arg y_4)"/>
+    <arg name="x" value="$(arg y_4)"/>
+    <arg name="y" value="$(arg x_4)"/>
     <arg name="z" value="$(arg z_4)"/>
     <arg name="roll" value="0.0"/>
     <arg name="pitch" value="0.0"/>
@@ -135,7 +112,7 @@
     <arg name="blue_team_positions" value="[$(arg starting_position_3)]"/>
   </include>
 
-  <node name="spawn_pier" pkg="gazebo_ros" type="spawn_model" args="-file $(find etddf)/models/pier/model.sdf -sdf -model pier -z -7 -x $(arg pier_x) -y $(arg pier_y) -Y $(arg pier_yaw)"/>
+  <!-- <node name="spawn_pier" pkg="gazebo_ros" type="spawn_model" args="-file $(find etddf)/models/pier/model.sdf -sdf -model pier -z -7 -x $(arg pier_x) -y $(arg pier_y) -Y $(arg pier_yaw)"/> -->
   <node name="namespace_node" pkg="minau" type="namespace_provider_node.py" output="screen">
     <param name="red_filter" value="red_actor_([^/]+)"/>
     <param name="blue_filter" value="bluerov2_([^/]+)"/>

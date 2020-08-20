@@ -119,7 +119,7 @@
          true, true, true,
          true, true, true]
       </rosparam>
-      <!-- <param name="odom0" value="pose_gt"/>
+      <param name="odom0" value="pose_gt"/>
       <param name="odom0_differential" value="false"/>
       <param name="odom0_relative" value="false"/>
       <param name="odom0_queue_size" value="10"/>
@@ -129,7 +129,7 @@
          false, false, false,
          false, false, false,
          false, false, false]
-      </rosparam> -->
+      </rosparam>
     </node>
 
     <!-- Start the MinAu DDF node-->
@@ -148,7 +148,7 @@
     </node>
 
     <!-- Start the SIMULATED SONAR Processing node -->
-    <node name="sonar_processing" pkg="minau" type="sonar_processing_sim_node.py" output="screen">
+    <!-- <node name="sonar_processing" pkg="minau" type="sonar_processing_sim_node.py" output="screen">
       <param name="rate" value="1.0"/>
       <param name="fov_bearing_deg" value="130"/>
       <param name="fov_elevation_deg" value="20"/>
@@ -158,25 +158,29 @@
       <param name="is_landmark" value="$(arg is_landmark)"/>
       <param name="landmark_x" value="$(arg landmark_x)"/>
       <param name="landmark_y" value="$(arg landmark_y)"/>
-    </node>
+    </node> -->
 
 
     <!-- Ping360 nodes -->
-    <node name="ping360" pkg="etddf" type="ping_360_node.py" output="screen">
+    <!-- <node name="ping360" pkg="etddf" type="ping_360_node.py" output="screen">
         <param name="range" value="10"/>
     </node>
 
     <node name="ping360_processing" pkg="etddf" type="process_sonar_node.py" output="screen">
       <param name="pole_x" value="$(arg landmark_x)"/>
       <param name="pole_y" value="$(arg landmark_y)"/>
-    </node>
+    </node> -->
 
     <!-- <node name="ping360_control" pkg="etddf" type="scanner_control_node.py" output="screen">
       <param name="pole_x" value="$(arg pole_x)"/>
       <param name="pole_y" value="$(arg pole_y)"/>
     </node> -->
 
-    <include file="$(find ping360_sonar)/launch/example.launch"/>
+    <include file="$(find ping360_sonar)/launch/emulate.launch">
+      <arg name="is_landmark" value="$(arg is_landmark)"/>
+      <arg name="landmark_x" value="$(arg landmark_x)"/>
+      <arg name="landmark_y" value="$(arg landmark_y)"/>
+    </include>
 
     <!-- Start the MinAu UUV Control node for this vehicle instance-->
     <node name="uuv_control" pkg="minau" type="uuv_control_node.py" output="screen">

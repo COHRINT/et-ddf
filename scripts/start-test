@@ -1,9 +1,0 @@
-#!/bin/bash
-source ~/minau/devel/setup.bash
-roslaunch etddf scenario.sitl.ocean.launch &
-rosrun etddf uuvcontrol_start.py &
-sleep 10
-rosrun etddf border_patrol_node.py __ns:=bluerov2_3 &
-rosrun etddf border_patrol_node.py __ns:=bluerov2_4 &
-rosrun etddf enemyMove.py __ns:=rexrov2 &
-

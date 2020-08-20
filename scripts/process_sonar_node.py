@@ -168,7 +168,7 @@ class ProcessSonar:
     def publish_detection(self,id, detection,uuv_class):
         """Publishes the detection with OL message type
 
-        Args:
+        Args:avg
             id (string): asset id
             detection ([float,float,float]): where the detection was
         """

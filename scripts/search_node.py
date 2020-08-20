@@ -10,14 +10,36 @@ from minau.msg import SonarTargetList, SonarTarget
 from minau.srv import ArmControl, SetHeadingVelocity
 from etddf.srv import SetSonarSettings
 from etddf.msg import SonarSettings
+from ping360_sonar.msg import SonarEcho
+import scipy.stats
+import matplotlib.pyplot as plt
 import tf
 import math
+import copy
+import perlin
 
 
 #Open up config file to get the volume we are going to patrol
 # volume_file = rospy.get_param("~volume_file")
 def normalize_angle(angle):
     return np.mod( angle + np.pi, 2*np.pi) - np.pi
+
+sonar_range = 10
+twenty_grad = (20 * np.pi/200.0)
+print(twenty_grad)
+grid = np.zeros((23,23))
+sonar_view = {}
+for x in range(20):
+    sonar_angle = (-200 + 20*x) * (np.pi/200.0)
+    points = []
+    for i in range(23):
+        for j in range(23):
+            ang = np.arctan2(11-j,11-i)
+            rang = np.linalg.norm([11-j,11-i])
+            if rang <= sonar_range:
+                if ang >= sonar_angle and ang <= sonar_angle+twenty_grad:
+                    points.append([11-i,11-j,rang])
+    sonar_view[20*x] = points
 
 def normalize_velocity(v,speed):
     """Takes in the position difference vector and returns velcity vector
@@ -41,111 +63,155 @@ class Volume:
         self.x_range = [vol_dict['volume']['x1'],vol_dict['volume']['x2']]
         self.y_range = [vol_dict['volume']['y1'],vol_dict['volume']['y2']]
         self.z = vol_dict['volume']['z']
+        self.delta = vol_dict['volume']['delta']
+        
 
 class Space:
     def __init__(self,v):
         self.volume = v
-        x_diff = v.x_range[1]-v.x_range[0]
-        y_diff = v.y_range[1]-v.y_range[0]
-        self.range = x_diff/4.
-        if y_diff > x_diff:
-            self.range = y_diff/4.
-        self.discritize_space()
-    def discritize_space(self):
         self.x_diff = self.volume.x_range[1] - self.volume.x_range[0]
         self.y_diff = self.volume.y_range[1] - self.volume.y_range[0]
+        self.x_0 = self.volume.x_range[0]
+        self.y_0 = self.volume.y_range[0]
         self.z = self.volume.z
-        x_blocks = int(self.x_diff*4) + 1
-        y_blocks = int(self.y_diff*4) + 1
-        self.space = np.zeros((x_blocks,y_blocks))
-        self.x_cords = [self.volume.x_range[0] + 0.25*i for i in range(x_blocks)]
-        self.y_cords = [self.volume.y_range[0] + 0.25*i for i in range(y_blocks)]
+        self.plot_count = 1
+        self.range = self.x_diff * self.volume.delta
+        if self.y_diff > self.x_diff:
+            self.range = self.y_diff * self.volume.delta
+        self.discritize_space()
+    def discritize_space(self):
+        x_blocks = int(self.x_diff/self.volume.delta) + 1
+        y_blocks = int(self.y_diff/self.volume.delta) + 1
+        mean_x_1 = (self.volume.x_range[0] + (self.x_diff)/2.0) + 10.0
+        mean_x_2 = self.volume.x_range[0] + (self.x_diff)/2.0
+        mean_y_1 = self.volume.y_range[0] + 3*(self.x_diff)/4.0
+        mean_y_2 = self.volume.x_range[0] + 1*(self.x_diff)/4.0
+        std_dev = self.x_diff/10.0
+
+        distr_1 = scipy.stats.norm(0,std_dev)
+        distr_2 = scipy.stats.norm(0,std_dev)
+        
+        p = perlin.PerlinNoiseFactory(2,unbias=True)
+        delta = 4.0/x_blocks
+
+        self.space = np.ones((x_blocks,y_blocks))*0.5
+        for i in range(x_blocks):
+            for j in range(y_blocks):
+                self.space[i,j] += (p(i*delta,j*delta)+1)/2.0
+
+        self.x_cords = [self.volume.x_range[0] + self.volume.delta*i for i in range(x_blocks)]
+        self.y_cords = [self.volume.y_range[0] + self.volume.delta*i for i in range(y_blocks)]
+
+        # for i in range(len(self.x_cords)):
+        #     for j in range(len(self.y_cords)):
+        #         range_1 = np.linalg.norm([self.x_cords[i]-mean_x_1,self.y_cords[j]-mean_y_1])
+        #         range_2 = np.linalg.norm([self.x_cords[i]-mean_x_2,self.y_cords[j]-mean_y_2])
+        #         self.space[i,j] += distr_1.pdf(range_1) + distr_2.pdf(range_2)
+
+        self.space/=self.space.sum()
         
         
 
 class Search:
-    def __init__(self,space,name):
+    def __init__(self,space,name,half):
+        #0 for top half, 1 for bottom half
+        print(name)
+        self.half = half
         #name in format '/bluerov2_X'
         self.space = space
+        self.need_plot = False
         self.name = name
+        self.range = 10
+        self.truth_yaw = None
+        self.angle_start = None
+        self.angle_count = 0
+        self.angle_scan_begin = 0
+        self.step = 1
+        self.red_found = False
+        self.x = None
+        self.waypoint = None
+        self.lawn = rospy.get_param("~lawn",False)
+        self.visited_x = []
+        self.visited_y = []
 
+        self.target_pos = [-9,-6]
         #Make sure both rovs are armed
         rospy.wait_for_service(self.name+'/uuv_control/arm_control')
-        arm_control = rospy.ServiceProxy(self.name+'/uuv_control/arm_control', ArmControl)
-        resp1 = arm_control()
-    
+        self.arm_control = rospy.ServiceProxy(self.name+'/uuv_control/arm_control', ArmControl)
+        resp1 = self.arm_control()
+        self.prev_dist = 0
         
         #Set up services to set the velocity
         rospy.wait_for_service(self.name+'/uuv_control/set_heading_velocity')
         self.shv = rospy.ServiceProxy(self.name+'/uuv_control/set_heading_velocity', SetHeadingVelocity)
 
-
-        #360 sonar settings with 10 m range
-        settings = SonarSettings()
-        settings.range = 10
-        settings.min_angle = -4
-        settings.max_angle = 4
-
-        #Set up services to set the sonar settings
-        rospy.wait_for_service(self.name+'/set_sonar_settings')
-        self.set_sonar = rospy.ServiceProxy(self.name+'/set_sonar_settings',SetSonarSettings)
-
-        self.set_sonar(settings)
-
         #Subscribes to the necisary topics for the search node for each rov
-        rospy.Subscriber(self.name+"/etddf/estimate/bluerov2_3",Odometry,self.ownship_callback)
-        rospy.Subscriber(self.name+"/bluerov2_3/ping_360_target",SonarTargetList,self.detections)
-        rospy.Subscriber(self.name+"/bluerov2_3/pose_gt",Odometry,self.truth_callback)
-        rospy.Subscriber(self.name+"/bluerov2_3/visual_pub",LaserScan,self.angle_callback)
-        self.truth_yaw = None
+        rospy.Subscriber(self.name+"/etddf/estimate"+self.name,Odometry,self.ownship_callback)
+        rospy.Subscriber(self.name+"/ping_360_target",SonarTargetList,self.detections)
+        rospy.Subscriber(self.name+"/pose_gt",Odometry,self.truth_callback)
+        rospy.Subscriber(self.name+"/ping360_node/sonar/data",SonarEcho,self.angle_callback)
+        self.first = True
 
     def ownship_callback(self,msg):
         self.position = msg.pose.pose.position
         (r,p,self.yaw) = tf.transformations.euler_from_quaternion([msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w])
-    
-    def inview(self,x,y,angles):
-        x_diff = x-self.truth_pos.x
-        y_diff = y-self.truth_pos.y
-        dist = np.linalg.norm([x_diff,y_diff])
-        xy_ang = np.arctan2(y_diff,x_diff)
-        xy_ang -= self.truth_yaw
-        xy_ang = normalize_angle(xy_ang)
-        # print(xy_ang)
-        # print(angles)
-        # exit()
-        if xy_ang-.1 > angles[-1] or xy_ang+.1 < angles[0]:
-            return False
-        if dist < self.range:
-            return True
-        return False
 
     def angle_callback(self,msg):
         #read in from the visual publisher to know where it is looking
         #determine the angle range it has viewed
-        angle_increment = msg.angle_increment
-        angles = [-np.pi+angle_increment*i for i in range(len(msg.ranges))]
-        current_angles = []
-        for i in range(len(msg.ranges)):
-            if msg.ranges[i]!=-1:
-                current_angles.append(angles[i])
-        self.not_seen(current_angles)
+        if self.truth_yaw==None:
+            return
+        self.angle = msg.angle
+        if (self.angle - self.angle_scan_begin)%400 >= 20:
+            self.angle_count+=1
+            # print(self.angle)
+            self.angle_scan_begin = self.angle
+            self.not_seen(self.angle)
+            self.update()
 
-    def not_seen(self,angles):
-        for i in range(len(self.x_cords)):
-            for j in range(len(self.y_cords)):
-                if self.space[i][j] <= 0.01:
-                    if self.inview(self.x_cords[i],self.y_cords[j],angles):
-                        self.space[i][j]=-1
+    
+    def update(self):
+        sp = copy.deepcopy(self.space.space)
+        for i in range(len(self.space.x_cords)):
+            for j in range(len(self.space.y_cords)):
+                sp[i][j] = self.space.space[i][j] * 0.95 + 0.05 * self.neighbor(i,j)
+        self.space.space = sp/sp.sum()
 
+    def neighbor(self,x,y):
+        sum = 0
+        for i in [-1,0,1]:
+            for j in [-1,0,1]:
+                if x+i >= 0 and x+i < len(self.space.space) and y+j>=0 and y+j < len(self.space.space[0]):
+                    sum += self.space.space[i+x,j+y]
+                else:
+                    sum += self.space.space[i][j]*1.03
+        sum-=self.space.space[x,y]
+        return sum/8.0
+
+
+    def not_seen(self,angle):
+        world_ang = ((angle-20) + (self.truth_yaw * 200/np.pi))%400
+        world_ang/=20
+        world_ang = round(world_ang)
+        world_ang = int((world_ang*20)%400)
+        x_idx = round(self.truth_pos.x - self.space.x_0)
+        y_idx = round(self.truth_pos.y - self.space.y_0)
+        for i in range(len(sonar_view[world_ang])):
+            x = int(x_idx+sonar_view[world_ang][i][0])
+            y = int(y_idx+sonar_view[world_ang][i][1])
+            if x >= 0 and x < len(self.space.x_cords):
+                if y >= 0 and y < len(self.space.y_cords):
+                    self.space.space[x,y]*=(1-(0.9-0.07*sonar_view[world_ang][i][2]))
 
     def detections(self,msg):
-        found = False
         for target in msg.targets:
-            if target.id != 'red_asset':
-                continue
-            else:
-                found = True
+            # print(target.id)
+            # if target.id != 'red_asset':
+            #     continue
+            # else:
+            #     self.red_found = True
                 self.spotted(target)
+    
     def spotted(self,target):
         range_to = target.range_m
         bearing = target.bearing_rad
@@ -153,71 +219,165 @@ class Search:
         bearing = normalize_angle(bearing)
         x = self.truth_pos.x + range_to*np.cos(bearing)
         y = self.truth_pos.y + range_to*np.sin(bearing)
+        d = np.linalg.norm([x-self.target_pos[0],y-self.target_pos[1]])
+        print(d)
+        if d > 2:
+            return
+        self.red_found = True
         x_close = None
         y_close = None
-        for i in range(len(self.x_cords)):
-            if np.norm(self.x_cords[i]-x) < .25:
+        for i in range(len(self.space.x_cords)):
+            if np.linalg.norm(self.space.x_cords[i]-x) < .5:
                 x_close = i
                 break
-        for i in range(len(self.y_cords)):
-            if np.norm(self.y_cords[i]-y) < .25:
+        for i in range(len(self.space.y_cords)):
+            if np.linalg.norm(self.space.y_cords[i]-y) < .5:
                 y_close = i
                 break
-        self.space[x_close][y_close] = 1
+        self.space.space[x_close][y_close] = 0
+        self.space.space = self.space.space*0.2/(self.space.space.sum())
+        self.space.space[x_close][y_close] = 0.8
+        self.need_plot = True
 
     def truth_callback(self,msg):
         self.truth_pos = msg.pose.pose.position
         (r,p,self.truth_yaw) = tf.transformations.euler_from_quaternion([msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w])
-    def update(self):
-        self.space *= .95
+
+    def new_waypoint(self):
+        if not self.lawn:
+            if self.half == 0:
+                dir = 1
+            else:
+                dir = -1
+            max_x = 0
+            max_y = dir
+            total_max = 0
+            for i in range(len(self.space.x_cords)):
+                for j in range(int(len(self.space.y_cords)/2)):
+                    total = 0
+                    # for k in range(21):
+                    #     if k+i-10 >=0 and k+i-10 < len(self.space.x_cords):
+                    #         total += self.space.space[k+i-10,dir*(j+1)]
+                    # for k in range(21):
+                    #     if dir*(j+1) + k -10 >=0 and dir*(j+1) + k -10 <len(self.space.y_cords):
+                    #         total+= self.space.space[i,dir*(j+1) + k -10]
+                    # if total > total_max:
+                    if self.space.space[i,dir*(j+1)] > self.space.space[max_x,max_y]:
+                        max_x,max_y = i,dir*(j+1)
+                        # total_max = total
+            self.waypoint = [self.space.x_cords[max_x],self.space.y_cords[max_y],self.space.z]
+        else:
+            if self.x == None:
+                self.x1 = self.space.x_cords[0] +5
+                self.x2 = self.space.x_cords[-1] -5
+                self.y1 = self.space.y_cords[0]
+                self.y2 = self.space.y_cords[-1]
+                y_diff = (self.y2-self.y1)/2
+                self.moveX = True
+                self.x = True
+                self.y = True      #true for positive
+
+                self.y1 = self.y1 + (y_diff)*self.half + 5
+                self.y2 = self.y1 + y_diff -10
+                self.waypoint = [self.x1,self.y1,self.space.z]
+                return
+
+            if self.moveX:
+                if self.x:
+                    self.waypoint[0] = self.x2
+                    self.x = False
+                else:
+                    self.waypoint[0] = self.x1
+                    self.x = True
+                self.moveX = False
+                return
+
+            self.moveX = True
+            if self.y:
+                self.waypoint[1] += 15
+                print(self.waypoint[1])
+                print(self.y2)
+                if self.waypoint[1] >= self.y2:
+                    self.waypoint[1] = self.y2
+                    self.y = False
+                return
+            self.waypoint[1] -= 15
+            if self.waypoint[1] <= self.y1:
+                self.waypoint[1] = self.y1
+                self.y = True
+
+    def plot(self, still_looking):
+        X,Y = np.meshgrid(self.space.x_cords,self.space.y_cords)
+        fig,ax=plt.subplots(1,1)
+        levels = np.linspace(0,0.007,15)
+        cp = ax.contourf(X, Y, self.space.space.transpose())
+        fig.colorbar(cp) # Add a colorbar to a plot
+        ax.set_title(self.name)
+        ax.set_xlabel('x (m)')
+        ax.set_ylabel('y (m)')
+        if still_looking:
+            # self.visited_x.append(self.truth_pos.x)
+            # self.visited_y.append(self.truth_pos.y)
+            # plt.plot(self.visited_x,self.visited_y,'bo')
+            plt.plot(self.waypoint[0],self.waypoint[1],'ro')
+        name = 'space_' + str(self.space.plot_count) +'.png'
+        self.space.plot_count +=1
+        plt.savefig(name)
+
+
+
     def run(self):
         rate = rospy.Rate(1)
-        while self.truth_yaw_3==None or self.truth_yaw_4==None:
+        while self.truth_yaw==None:
             rate.sleep()
-        x_edges = [self.x_cords[0]+0.25*self.x_diff,self.x_cords[0]+0.75*self.x_diff]
-        y_edges = [self.y_cords[0]+0.25*self.y_diff,self.y_cords[0]+0.75*self.y_diff]
-        z_level = self.z
-        sonar_settings = SonarSettings()
-        sonar_settings.range = self.range
-        sonar_settings.min_angle = -4
-        sonar_settings.max_angle = 4
-        self.set_sonar_3(sonar_settings)
-        self.set_sonar_4(sonar_settings)
-        waypoints = [[x_edges[0],y_edges[0],z_level],[x_edges[1],y_edges[0],z_level],[x_edges[1],y_edges[1],z_level],[x_edges[0],y_edges[1],z_level]]
-        curr_waypt_3 = 0
-        curr_waypt_4 = 2
-        while not rospy.is_shutdown():
-            x_diff_3 = waypoints[curr_waypt_3][0]-self.truth_pos_3.x
-            y_diff_3 = waypoints[curr_waypt_3][1]-self.truth_pos_3.y
-            z_diff_3 = waypoints[curr_waypt_3][2]-self.truth_pos_3.z
-            v_3 = Vector3(y_diff_3,x_diff_3,-z_diff_3)
-            v_3 = normalize_velocity(v_3,0.4)
-            ang_3 = np.arctan2(x_diff_3,y_diff_3)
-            # self.shv_3(ang_3*(180/np.pi),v_3)
-            dist_3 = math.sqrt(x_diff_3**2+y_diff_3**2+z_diff_3**2)
-            if dist_3 < 0.5:
-                curr_waypt_3 = (curr_waypt_3+1)%4
-            print("Dist_3 error: "+ str(dist_3))
-
-            x_diff_4 = waypoints[curr_waypt_4][0]-self.truth_pos_4.x
-            y_diff_4 = waypoints[curr_waypt_4][1]-self.truth_pos_4.y
-            z_diff_4 = waypoints[curr_waypt_4][2]-self.truth_pos_4.z
-            v_4 = Vector3(y_diff_4,x_diff_4,-z_diff_4)
-            v_4 = normalize_velocity(v_4,0.4)
-            ang_4 = np.arctan2(x_diff_4,y_diff_4)
-            # self.shv_4(ang_4*(180/np.pi),v_4)
-            dist_4 = math.sqrt(x_diff_4**2+y_diff_4**2+z_diff_4**2)
-            if dist_4 < 0.5:
-                curr_waypt_4 = (curr_waypt_4+1)%4
-            print("Dist_4 error: "+ str(dist_4))
-            print('')
-            np.set_printoptions(precision=3)
-            print(self.space[:][:])
-            print('')
+        #first waypoint
+        if self.first:
+            self.new_waypoint()
+            self.need_plot = True
+            self.first = False
+        x_diff = self.waypoint[0]-self.truth_pos.x
+        y_diff = self.waypoint[1]-self.truth_pos.y
+        z_diff = self.waypoint[2]-self.truth_pos.z
+        v = Vector3(y_diff,x_diff,-z_diff)
+        v = normalize_velocity(v,0.4)
+        ang = np.arctan2(x_diff,y_diff)
+        dist = math.sqrt(x_diff**2+y_diff**2+z_diff**2)
+        if dist < 0.5:
+            # print('Reached Target ' + self.name)
+            v_0 = Vector3(0,0,0)
+            self.shv(0,v_0)
+            if self.angle_start == None:
+                print('Reached Target ' + self.name)
+                print(self.angle)
+                self.angle_start = self.angle_count
+            elif self.angle_count>=self.angle_start+20:
+                self.update()
+                print('Yo!')
+                self.need_plot = True
+                self.new_waypoint()
+                print('New Waypoint for ' + self.name+' : ')
+                print(self.angle)
+                print(self.waypoint)
+                self.angle_start=None
+        else:
+            if np.linalg.norm(self.prev_dist-dist) < 0.001:
+                self.arm_control()
+                rate.sleep()
+            self.prev_dist = dist
+            self.shv(ang*(180/np.pi),v)
+        # print(self.waypoint)
+        # print("Dist error for " + self.name + ":" + str(dist))
 
 
-            self.update()
-            rate.sleep()
+
+def plot(s):
+    X,Y = np.meshgrid(s.x_cords,s.y_cords)
+    fig,ax=plt.subplots(1,1)
+    levels = np.linspace(0,0.007,15)
+    cp = ax.contourf(X, Y, s.space.transpose())
+    fig.colorbar(cp) # Add a colorbar to a plot
+    name =  'first.png'
+    plt.savefig(name)
 
 if __name__ == "__main__":
     rospy.init_node("search_node")
@@ -226,10 +386,25 @@ if __name__ == "__main__":
         volume = yaml.load(file, Loader=yaml.FullLoader)
     v = Volume(volume)
     space = Space(v)
-    s3 = Search(space,'/bluerov2_3')
-    s4 = Search(space,'/bluerov2_4')
-    s3.run()
-    s4.run()
-    rate = rospy.Rate(1)
-    while not rospy.is_shutdown():
+    plot(space)
+    s3 = Search(space,'/bluerov2_3',0)
+    s4 = Search(space,'/bluerov2_4',1)
+    initial_time = rospy.get_rostime()
+    print(initial_time)
+    rate = rospy.Rate(20)
+    while not (s3.red_found or s4.red_found) and (not rospy.is_shutdown()):
+        if s3.need_plot:
+            s3.plot(True)
+            s3.need_plot = False
+            continue
+        if s4.need_plot:
+            s4.plot(True)
+            s4.need_plot = False
+            continue
+        s3.run()
+        s4.run()
         rate.sleep()
+    print "=============================================="
+    s3.plot(False)
+    print('Total time')
+    print(rospy.get_rostime()-initial_time)
