@@ -1,0 +1,207 @@
+<launch>
+  <arg name="asset_id" default="0"/>
+  <arg name="ardusub_instance" default="0"/>
+  <arg name="ardusub_params" default="$(find minau)/config/ardusub_sitl_no_gps.param"/>
+  <arg name="latitude" default="0.0"/>
+  <arg name="longitude" default="0.0"/>
+  <!-- xyz and rpy to be defined in NED coordinate frame -->
+  <arg name="x" default="0.0"/>
+  <arg name="y" default="0.0"/>
+  <arg name="z" default="0.0"/>
+  <arg name="roll" default="0.0"/>
+  <arg name="pitch" default="0.0"/>
+  <arg name="yaw" default="0.0"/>
+  <arg name="yaw_enu" value="$(eval 1.57 - yaw)" />
+  <arg name="starting_odom_enu" value="[$(arg y), $(arg x), -$(arg z),
+                                    0, 0, $(arg yaw_enu),
+                                    0, 0, 0,
+                                    0, 0, 0
+                                    0, 0, 0]"/>
+
+  <!-- Args for sonar node -->
+  <arg name="is_landmark" default="false"/>
+  <arg name="landmark_x" default="0.0"/>
+  <arg name="landmark_y" default="0.0"/>
+  <arg name="use_360" default="false"/>
+  <arg name="sonar_360_scan_range_m" default="10.0" />
+
+  <arg name="schedule_file" default="$(find minau)/config/schedules/schedule_3_assets.json"/>
+  <arg name="plan_filename" default=""/>
+  
+  <!-- DDF params -->
+  <arg name="blue_team_names" default="[]"/>
+  <arg name="blue_team_positions" default="[]" />
+  <arg name="red_team_names" default="[]"/>
+
+  <!-- IMU Settings (default values correspond to uuv_simulator default_imu) -->
+  <arg name="mass_imu_sensor" default="0.015"/>
+  <arg name="gyroscope_noise_density" default="0.0003394"/>
+  <arg name="gyroscope_random_walk" default="0.000038785"/>
+  <arg name="gyroscope_bias_correlation_time" default="1000.0"/>
+  <arg name="gyroscope_turn_on_bias_sigma" default="0.0087"/>
+  <arg name="accelerometer_noise_density" default="0.004"/>
+  <arg name="accelerometer_random_walk" default="0.006"/>
+  <arg name="accelerometer_bias_correlation_time" default="300.0"/>
+  <arg name="accelerometer_turn_on_bias_sigma" default="0.1960"/>
+  <arg name="orientation_noise" default="0.01"/>
+  <arg name="enable_local_ned_frame" default="false"/>
+  <arg name="reference_frame" default="world"/>
+  <arg name="update_rate" default="50"/>
+
+  <group ns="bluerov2_$(arg asset_id)">
+    <param name="asset_id" value="$(arg asset_id)"/>
+  
+    <!-- Spawn BlueROV2 model in the simulated environment (in ENU world frame) -->
+    <include file="$(find bluerov2)/launch/upload_bluerov2.launch">
+      <arg name="x" value="$(arg y)"/>
+      <arg name="y" value="$(arg x)"/>
+      <arg name="z" value="$(eval -z)"/>
+      <arg name="roll" value="$(arg roll)"/>
+      <arg name="pitch" value="$(arg pitch)"/>
+      <arg name="yaw" value="$(eval 1.570796 - yaw)"/>
+      <arg name="mode" value="default"/>
+      <arg name="namespace" value="bluerov2_$(arg asset_id)"/>
+
+      <arg name="mass_imu_sensor" default="$(arg mass_imu_sensor)"/>
+      <arg name="gyroscope_noise_density" default="$(arg gyroscope_noise_density)"/>
+      <arg name="gyroscope_random_walk" default="$(arg gyroscope_random_walk)"/>
+      <arg name="gyroscope_bias_correlation_time" default="$(arg gyroscope_bias_correlation_time)"/>
+      <arg name="gyroscope_turn_on_bias_sigma" default="$(arg gyroscope_turn_on_bias_sigma)"/>
+      <arg name="accelerometer_noise_density" default="$(arg accelerometer_noise_density)"/>
+      <arg name="accelerometer_random_walk" default="$(arg accelerometer_random_walk)"/>
+      <arg name="accelerometer_bias_correlation_time" default="$(arg accelerometer_bias_correlation_time)"/>
+      <arg name="accelerometer_turn_on_bias_sigma" default="$(arg accelerometer_turn_on_bias_sigma)"/>
+      <arg name="orientation_noise" default="$(arg orientation_noise)"/>
+      <arg name="enable_local_ned_frame" default="$(arg enable_local_ned_frame)"/>
+      <arg name="reference_frame" default="$(arg reference_frame)"/>
+      <arg name="update_rate" default="$(arg update_rate)"/>
+    </include>
+
+    <!-- Start the ArduSub FSW for this vehicle instance -->
+    <node name="sitl" pkg="minau" type="run_sitl.sh" args="$(find minau)/src/ardupilot/ArduSub $(arg ardusub_params) gazebo-bluerov2 $(arg ardusub_instance) $(arg latitude) $(arg longitude) $(arg yaw)" output="screen"/>
+
+    <!-- Start the bridge between UUV Simulator and Ardupilot SITL for this vehicle -->
+    <node name="bridge" pkg="minau" type="uuv_simulator_ardupilot_bridge.py" output="screen">
+      <param name="num_thrusters" value="6"/>
+      <param name="ardupilot_addr" value="127.0.0.1"/>
+      <param name="ardupilot_port" value="$(eval 9003 + 10 * ardusub_instance)"/>
+      <param name="bridge_addr" value="127.0.0.1"/>
+      <param name="bridge_port" value="$(eval 9002 + 10 * ardusub_instance)"/>
+    </node>
+
+    <!-- Start the MAVROS node for this vehicle instance -->
+    <include file="$(find minau)/launch/mavros.launch">
+      <arg name="fcu_url" value="$(eval 'udp://0.0.0.0:'+str(14550 + 10 * ardusub_instance)+'@127.0.0.1:'+str(14555 + 10 * ardusub_instance))"/>
+    </include>
+
+    <!-- TODO (EBS): Start the SeaTrac (simulation) driver node -->
+    <include file="$(find seatrac_driver)/launch/seatrac_driver.launch">
+      <arg name="sim" value="true"/>
+      <arg name="sim_comms_drop" value="false"/>
+      <arg name="sim_tx_rate" value="false"/>
+      <!-- <arg name="sim_modem_type" value="x010"/> -->
+      <arg name="sim_modem_type" value="x150"/>
+    </include>
+
+    <!-- Define map to world transform (identity)-->
+    <node pkg="tf2_ros" type="static_transform_publisher" name="map_to_world_tf_publisher"
+          args="0.0 0.0 0.0 0.0 0.0 0.0 1.0 map world"/>
+
+    <!-- Start the EKF localization node -->
+    <node name="ekf_map" pkg="robot_localization" type="ekf_localization_node">
+      <rosparam param="blue_team_names" subst_value="True">$(arg starting_odom_enu)</rosparam> 
+      <param name="frequency" value="20.0"/>
+      <param name="sensor_timeout" value="1.0"/>
+      <param name="publish_tf" value="false"/>
+      <param name="publish_acceleration" value="false"/>
+      <param name="map_frame" value="map"/>
+      <param name="odom_frame" value="bluerov2_$(arg asset_id)/odom"/>
+      <param name="base_link_frame" value="bluerov2_$(arg asset_id)/base_link"/>
+      <param name="world_frame" value="map"/>
+      <param name="imu0" value="imu"/>
+      <param name="imu0_differential" value="true"/>
+      <param name="imu0_relative" value="false"/>
+      <param name="imu0_remove_gravitational_acceleration" value="true"/>
+      <rosparam param="imu0_config">
+        [false, false, false,
+         false, false, false,
+         false, false, false,
+         true, true, true,
+         true, true, true]
+      </rosparam>
+      <param name="odom0" value="pose_gt"/>
+      <param name="odom0_differential" value="false"/>
+      <param name="odom0_relative" value="false"/>
+      <param name="odom0_queue_size" value="10"/>
+      <rosparam param="odom0_config">
+        [true, true, true,
+         true, true, true,
+         false, false, false,
+         false, false, false,
+         false, false, false]
+      </rosparam>
+    </node>
+
+    <!-- Start the MinAu DDF node-->
+    <!-- <include file="$(find etddf)/launch/etddf.launch">
+      <arg name="my_name" value="bluerov2_$(arg asset_id)"/>
+      <arg name="blue_team_names" value="$(arg blue_team_names)"/>
+      <arg name="blue_team_positions_enu" value="$(arg blue_team_positions)"/>
+      <arg name="red_team_names" value="$(arg red_team_names)" />
+      <arg name="starting_position_enu" value="[$(arg y), $(arg x), -$(arg z)]" />
+      <arg name="landmark_x" value="$(arg landmark_x)"/>
+      <arg name="landmark_y" value="$(arg landmark_y)"/>
+    </include> -->
+
+    <!-- Start the MinAu Fleet Communication node -->
+    <!-- <node name="fleet_communication" pkg="minau" type="fleet_communication_node.py" output="screen">
+      <param name="rate" value="20.0"/>
+      <param name="schedule_file" value="$(arg schedule_file)"/>
+    </node> -->
+
+    <!-- Start the SIMULATED SONAR Processing node -->
+    <node name="sonar_processing" pkg="minau" type="sonar_processing_sim_node.py" output="screen">
+      <param name="rate" value="1.0"/>
+      <param name="fov_bearing_deg" value="130"/>
+      <param name="fov_elevation_deg" value="20"/>
+
+
+      <param name="fov_range_m" value="$(arg sonar_360_scan_range_m)"/>
+      <param name="use_360" value="$(arg use_360)"/>
+      <param name="is_landmark" value="$(arg is_landmark)"/>
+      <param name="landmark_x" value="$(arg landmark_x)"/>
+      <param name="landmark_y" value="$(arg landmark_y)"/>
+    </node>
+
+    <!-- Sonar Control Node -->
+    <!-- <include file="$(find ping360_sonar)/launch/sonar_control.launch">
+      <arg name="landmark_x" value="$(arg landmark_x)" />
+      <arg name="landmark_y" value="$(arg landmark_y)" />
+      <arg name="red_team_names" value="$(arg red_team_names)" />
+      <arg name="360_scan_range_m" value="$(arg sonar_360_scan_range_m)" />
+    </include> -->
+
+    <!-- Start the MinAu UUV Control node for this vehicle instance-->
+    <!-- <node name="uuv_control" pkg="minau" type="uuv_control_node.py" output="screen">
+      <param name="config" value="$(find minau)/config/vehicle.sitl.json"/>
+      <param name="rate" value="20.0"/>
+    </node> -->
+    
+    <!-- TODO (EBS): Start the MinAu Sensor Manager node -->
+
+    <!-- Start the MinAu Plan Manager node for this vehicle instance -->
+    <node name="plan_manager" pkg="minau" type="plan_manager_node.py" output="screen">
+      <param name="rate" value="20.0"/>
+      <param name="publish_plan_markers" value="true"/>
+      <param name="localization_fix/duration" value="10.0"/>
+      <param name="localization_fix/heading" value="0.0"/>
+      <param name="localization_fix/depth" value="1.5"/>
+    </node>
+
+    <node name="sonar_state_manager" pkg="minau" type="sonar_state_manager_node.py" output="screen">
+      <param name="rate_hz" value="1.0"/>
+      <param name="plan_filename" value="$(arg plan_filename)"/>
+      <rosparam param="red_team_names" subst_value="True">$(arg red_team_names)</rosparam> 
+    </node>
+  </group>
+</launch>

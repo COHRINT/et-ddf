@@ -1,0 +1,65 @@
+buffer_space:
+  bookend: 1
+  bookstart: 1
+  capacity: 32
+  final_time: 0
+default_starting_position:
+  x: 0.0
+  x_vel: 0.0
+  y: 0.0
+  y_vel: 0.0
+  z: 1.0
+  z_vel: 0.0
+delta_tiers:
+- 1
+initial_uncertainty:
+  known_starting_position:
+    x: 0.0
+    x_vel: 0.0
+    y: 0.0
+    y_vel: 0.0
+    z: 0.0
+    z_vel: 0.0
+  ownship:
+    x: 0.0
+    x_vel: 0.0
+    y: 0.0
+    y_vel: 0.0
+    z: 0.0
+    z_vel: 0.0
+  unknown_starting_position:
+    x: 1000
+    x_vel: 1.0
+    y: 1000
+    y_vel: 1.0
+    z: 8
+    z_vel: 1.0
+measurement_topics:
+  depth: mavros/global_position/rel_alt
+  dvl: None
+  imu_ci: None
+  sonar: None
+process_noise:
+  blueteam:
+    x: 0.0
+    x_vel: 0.0
+    y: 0.0
+    y_vel: 0.0
+    z: 0.0
+    z_vel: 0.0
+  ownship:
+    x: 0.01
+    x_vel: 5.0e-06
+    y: 0.01
+    y_vel: 5.0e-06
+    z: 0.01
+    z_vel: 5.0e-06
+  redteam:
+    x: 0.1
+    x_vel: 0.05
+    y: 0.1
+    y_vel: 0.05
+    z: 0.1
+    z_vel: 0.05
+update_rate: 10
+use_control_input: false

@@ -1,0 +1,146 @@
+<launch>
+  <arg name="ardusub_params" default="$(find minau)/config/ardusub_sitl_no_gps.param"/>
+  
+  <!-- Start Gazebo Simulator with open ocean world -->
+  <arg name="latitude" default="56.71897669633431"/>
+  <arg name="longitude" default="3.515625"/>
+
+  <arg name="schedule_file" default="$(find minau)/config/schedules/schedule_1_assets.json"/>
+  <arg name="plan_filename" default="$(find minau)/config/mission_description_reservoir.xml"/>
+  <!-- <arg name="schedule_file" default="$(find minau)/config/schedules/schedule_3_assets.json"/> -->
+
+  <arg name="blue_asset_id_1" default="3"/>
+  <arg name="blue_asset_id_2" default="4"/>
+  <arg name="red_asset_id" default="1"/>
+
+  <include file="$(find uuv_gazebo_worlds)/launch/ocean_waves.launch">
+    <arg name="paused" value="true"/>
+  </include>
+
+  <!-- Asset 3 Starting Position NED -->
+  <arg name="x_3" value="8.0"/>
+  <arg name="y_3" value="0.0"/>
+  <arg name="z_3" value="0.0"/>
+  <arg name="starting_position_3_enu" value="[$(arg y_3), $(arg x_3), -$(arg z_3)]"/>
+  <!-- Asset 4 Starting Position NED -->
+  <arg name="x_4" value="8.0"/>
+  <arg name="y_4" value="-3.0"/>
+  <arg name="z_4" value="0.0"/>
+  <arg name="starting_position_4_enu" value="[$(arg y_4), $(arg x_4), -$(arg z_4)]"/>
+
+  <!-- Red Asset Starting Position -->
+  <arg name="red_x" default="10.0"/>
+  <arg name="red_y" default="10.0"/>
+  <arg name="red_z" default="0.0"/>
+  <arg name="starting_position_red" value="[$(arg red_y), $(arg red_x), -$(arg red_z)]"/>
+
+  <!-- Pier location in ENU -->
+  <arg name="pier_x" default="-3"/>
+  <arg name="pier_y" default="-15"/>
+  <arg name="pier_z" default="-7"/>
+  <arg name="pier_yaw" default="0"/>
+
+  <!-- Pole location in ENU -->
+  <arg name="pole_x" default="-1.5"/>
+  <arg name="pole_y" default="11.5"/>
+  <arg name="pole_z" default="-5"/>
+
+  <arg name="sonar_360_scan_range_m" default="10.0" />
+  <arg name="is_landmark" default="true"/>
+  <arg name="use_360" default="true"/>
+
+  <!-- Start the SIMULATED Modem Processing node -->
+  <include file="$(find minau)/launch/topside_beacon.sitl.launch">
+    <arg name="asset_id" value="1"/>
+    <arg name="schedule_file" value="$(arg schedule_file)"/>
+    <arg name="sim_asset_file" value="false"/>
+    <arg name="sim_global_pose" value="false" />
+    <arg name="beacon_pose_x" value="0.0"/>
+    <arg name="beacon_pose_y" value="0.0"/>
+    <arg name="beacon_pose_z" value="0.0"/>
+    <arg name="beacon_pose_yaw" value="0.0"/>
+  </include>
+
+  <!-- RED ACTOR -->
+  <include file="$(find minau)/launch/vehicle.red_actor.sitl.launch">
+    <arg name="asset_id" value="$(arg red_asset_id)"/>
+    <arg name="ardusub_params" value="$(arg ardusub_params)"/>
+    <arg name="latitude" value="$(arg latitude)"/>
+    <arg name="longitude" value="$(arg longitude)"/>
+    <!-- The following arguments must be set w.r.t. NED world frame -->
+    <arg name="x" value="$(arg red_x)"/>
+    <arg name="y" value="$(arg red_y)"/>
+    <arg name="z" value="$(arg red_z)"/>
+    <arg name="roll" value="0.0"/>
+    <arg name="pitch" value="0.0"/>
+    <arg name="yaw" value="1.57"/>
+
+    <arg name="schedule_file" value="$(arg schedule_file)"/>
+  </include>
+
+  <include file="$(find etddf)/launch/vehicle.bluerov2.sitl.launch">
+    <arg name="asset_id" value="$(arg blue_asset_id_2)"/>
+    <arg name="ardusub_instance" value="1"/>
+    <arg name="ardusub_params" value="$(arg ardusub_params)"/>
+    <arg name="latitude" value="$(arg latitude)"/>
+    <arg name="longitude" value="$(arg longitude)"/>
+    <!-- The following arguments must be set w.r.t. NED world frame -->
+    <arg name="x" value="$(arg x_4)"/>
+    <arg name="y" value="$(arg y_4)"/>
+    <arg name="z" value="$(arg z_4)"/>
+    <arg name="roll" value="0.0"/>
+    <arg name="pitch" value="0.0"/>
+    <arg name="yaw" value="-1.57"/>
+
+    <arg name="is_landmark" value="$(arg is_landmark)"/>
+    <arg name="landmark_x" value="$(arg pole_x)"/>
+    <arg name="landmark_y" value="$(arg pole_y)"/>
+    <arg name="use_360" value="$(arg use_360)"/>
+
+    <arg name="schedule_file" value="$(arg schedule_file)"/>
+    <!-- DDF params -->
+    <!-- <arg name="blue_team_names" value="[bluerov2_3]" /> -->
+    <arg name="blue_team_names" value="[bluerov2_4]" />
+    <arg name="blue_team_positions" value="[$(arg starting_position_3_enu)]"/>
+    <!-- <arg name="red_team_names" default="[red_actor_$(arg red_asset_id)]" /> -->
+    <!-- <arg name="sonar_360_scan_range_m" value="$(arg sonar_360_scan_range_m)" />-->
+    <arg name="plan_filename" value="$(arg plan_filename)"/>
+  </include>
+
+  <include file="$(find etddf)/launch/vehicle.bluerov2.sitl.launch">
+    <arg name="asset_id" value="$(arg blue_asset_id_1)"/>
+    <arg name="ardusub_instance" value="0"/>
+    <arg name="ardusub_params" value="$(arg ardusub_params)"/>
+    <arg name="latitude" value="$(arg latitude)"/>
+    <arg name="longitude" value="$(arg longitude)"/>
+    <!-- The following arguments must be set w.r.t. NED world frame -->
+    <arg name="x" value="$(arg x_3)"/>
+    <arg name="y" value="$(arg y_3)"/>
+    <arg name="z" value="$(arg z_3)"/>
+    <arg name="roll" value="0.0"/>
+    <arg name="pitch" value="0.0"/>
+    <arg name="yaw" value="-1.57"/>
+
+    <arg name="is_landmark" value="$(arg is_landmark)"/>
+    <arg name="landmark_x" value="$(arg pole_x)"/>
+    <arg name="landmark_y" value="$(arg pole_y)"/>
+    <arg name="use_360" value="$(arg use_360)"/>
+
+    <arg name="schedule_file" value="$(arg schedule_file)"/>
+    <!-- DDF params -->
+    <!-- <arg name="blue_team_names" value="[bluerov2_3]" /> -->
+    <arg name="blue_team_names" value="[bluerov2_4]" />
+    <arg name="blue_team_positions" value="[$(arg starting_position_4_enu)]"/>
+    <!-- <arg name="red_team_names" default="[red_actor_$(arg red_asset_id)]" />
+    <arg name="sonar_360_scan_range_m" value="$(arg sonar_360_scan_range_m)" />-->
+    <arg name="plan_filename" value="$(arg plan_filename)"/> 
+  </include>
+
+  <!-- <node name="spawn_pier" pkg="gazebo_ros" type="spawn_model" args="-file $(find etddf)/models/pier/model.sdf -sdf -model pier -z $(arg pier_z) -x $(arg pier_x) -y $(arg pier_y) -Y $(arg pier_yaw)"/>
+  <node name="spawn_pole" pkg="gazebo_ros" type="spawn_model" args="-file $(find minau)/models/lamp_post/model.sdf -sdf -model pole -z $(arg pole_z) -x $(arg pole_x) -y $(arg pole_y)"/> -->
+
+  <node name="namespace_node" pkg="minau" type="namespace_provider_node.py" output="screen">
+    <param name="red_filter" value="red_actor_([^/]+)"/>
+    <param name="blue_filter" value="bluerov2_([^/]+)"/>
+  </node>
+</launch>

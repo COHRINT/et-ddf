@@ -1,0 +1,41 @@
+<launch>
+    <arg name="pos3" default="[0,0,0]"/>
+    <arg name="pos4" default="[0,0,0]"/>
+    <arg name="schedule_file" default="$(find minau)/config/schedules/schedule_1_assets.json"/>
+    <group ns="bluerov2_3">    
+        <node name="uuv_control" pkg="minau" type="uuv_control_node.py" output="screen">
+            <param name="config" value="$(find minau)/config/vehicle.sitl.json"/>
+            <param name="rate" value="20.0"/>
+        </node>
+        <include file="$(find etddf)/launch/etddf.launch">
+            <arg name="my_name" value="bluerov2_3"/>
+            <arg name="blue_team_names" value="[bluerov2_4]"/>
+            <arg name="blue_team_positions_enu" value="[$(arg pos4)]"/>
+            <arg name="red_team_names" value="[red_actor_1]" />
+            <arg name="starting_position_enu" value="[$(arg pos3)]" />
+            <arg name="config_file" default="$(find etddf)/config/etddf_temp.yaml" />
+        </include>
+        <node name="fleet_communication" pkg="minau" type="fleet_communication_node.py" output="screen">
+            <param name="rate" value="20.0"/>
+            <param name="schedule_file" value="$(arg schedule_file)"/>
+        </node>
+    </group>
+    <group ns="bluerov2_4">    
+        <node name="uuv_control" pkg="minau" type="uuv_control_node.py" output="screen">
+            <param name="config" value="$(find minau)/config/vehicle.sitl.json"/>
+            <param name="rate" value="20.0"/>
+        </node>
+        <include file="$(find etddf)/launch/etddf.launch">
+            <arg name="my_name" value="bluerov2_4"/>
+            <arg name="blue_team_names" value="[bluerov2_4]"/>
+            <arg name="blue_team_positions_enu" value="[$(arg pos3)]"/>
+            <arg name="red_team_names" value="[red_actor_1]" />
+            <arg name="starting_position_enu" value="[$(arg pos4)]" />
+            <arg name="config_file" default="$(find etddf)/config/etddf_temp.yaml" />
+        </include>
+        <node name="fleet_communication" pkg="minau" type="fleet_communication_node.py" output="screen">
+            <param name="rate" value="20.0"/>
+            <param name="schedule_file" value="$(arg schedule_file)"/>
+        </node>
+    </group>
+</launch>

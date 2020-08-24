@@ -124,6 +124,11 @@ class ETDDF_Node:
         self.data_x, self.data_y = None, None
         # rospy.Subscriber("pose_gt", Odometry, self.gps_callback, queue_size=1)
     
+
+        # DVL Subscription
+        if rospy.get_param("~measurement_topics/dvl") != "None":
+            rospy.Subscriber(rospy.get_param("~measurement_topics/dvl"),Vector3,self.dvl_callback)
+
         # Initialize Buffer Service
         # rospy.Service('etddf/get_measurement_package', GetMeasurementPackage, self.get_meas_pkg_callback)
         self.cuprint("loaded")
@@ -139,6 +144,14 @@ class ETDDF_Node:
         self.last_orientation_dot = odom.twist.twist.angular
         self.last_orientation_dot_cov = np.array(odom.twist.covariance).reshape(6,6)
         self.meas_lock.release()
+
+    def dvl_callback(self,vel):
+        now = rospy.get_rostime()
+        dvl_x = Measurement("dvl_x", now, self.my_name, self.my_name, vel.x, self.default_meas_variance["dvl_x"], [])
+        dvl_y = Measurement("dvl_y", now, self.my_name, self.my_name, vel.y, self.default_meas_variance["dvl_y"], [])
+
+        self.filter.add_meas(dvl_x)
+        self.filter.add_meas(dvl_y)
 
     def sonar_callback(self, sonar_list):
 
