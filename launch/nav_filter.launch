@@ -1,0 +1,13 @@
+<launch>
+
+    <arg name="strapdown_config_file" default="$(find etddf)/config/strapdown.yaml" />
+    <arg name="starting_position_enu" default="[0,0,0]" /> <!-- [x,y,z] -->
+    <arg name="starting_yaw_enu" default="0.0" />
+
+    <node name="strapdown" pkg="etdff" type="strapdown_ins.py" output="screen">
+        <rosparam command="load" file="$(arg strapdown_config_file)" />
+        <rosparam param="starting_position" subst_value="True">$(arg starting_position_enu)</rosparam> 
+        <param name="starting_yaw" value="$(arg starting_yaw_enu)" />
+    </node>
+
+</launch>
