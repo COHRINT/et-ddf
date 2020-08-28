@@ -41,16 +41,23 @@ class StrapdownINS:
         self.pub = rospy.Publisher("strapdown/estimate", Odometry, queue_size=10)
         self.last_depth = None
         self.data_x, self.data_y = None, None
+        self.dvl_x, self.dvl_y = None, None
         self.skip_multiplexer = 0
         rospy.sleep(rospy.get_param("~wait_on_startup"))
-        rospy.Subscriber("mavros/global_position/rel_alt", Float64, self.depth_callback)
+        # rospy.Subscriber("mavros/global_position/rel_alt", Float64, self.depth_callback)
+        rospy.Subscriber("baro", Float64, self.depth_callback)
+        rospy.Subscriber("dvl", Vector3, self.dvl_callback)
         rospy.Subscriber("pose_gt", Odometry, self.gps_callback)
         rospy.Subscriber("imu", Imu, self.propagate)
         rospy.loginfo("Loaded")
 
+    def dvl_callback(self, msg):
+        self.dvl_x = msg.x
+        self.dvl_y = msg.y
+
     def gps_callback(self, msg):
         self.skip_multiplexer += 1
-        if self.skip_multiplexer % 50 == 0:
+        if self.skip_multiplexer % 400 == 0:
             self.data_x = msg.pose.pose.position.x
             self.data_y = msg.pose.pose.position.y
 
@@ -211,8 +218,8 @@ class StrapdownINS:
 
         self.update_lock.release()
 
-        if self.skip_multiplexer > 1000:
-            self.publish_estimate(imu_measurement.header.seq, imu_measurement.header.stamp, np.zeros(3), np.eye(3)*0.001)
+        # if self.skip_multiplexer > 1000:
+        self.publish_estimate(imu_measurement.header.seq, imu_measurement.header.stamp, np.zeros(3), np.eye(3)*0.001)
 
     def update(self, compass_meas, compass_meas_cov):
         
@@ -240,7 +247,7 @@ class StrapdownINS:
         if self.last_depth is not None:
             H = np.zeros((1,16))
             H[0,2] = 1
-            R = 0.3
+            R = 0.01
             tmp = np.dot( np.dot(H, self.P), H.T) + R
             K = np.dot(self.P, np.dot( H.T, np.linalg.inv( tmp )) )
             self.x = self.x + np.dot(K,self.last_depth-self.x[2]).reshape(NUM_STATES)
@@ -271,15 +278,12 @@ class StrapdownINS:
             self.data_x = None
             self.data_y = None
 
-        # Artificially give some zero velocity measurements for the first 30s
-        if self.skip_multiplexer < 2000:
-            if self.skip_multiplexer > 1000:
-                rospy.loginfo_once("Ready to dive")
+        if self.dvl_x is not None and self.dvl_y is not None:
             H = np.zeros((2,16))
             H[0, 3] = 1
             H[1, 4] = 1
             R = np.eye(2) * 0.01
-            meas = np.array([[0.0, 0.0]]).T
+            meas = np.array([[self.dvl_x, self.dvl_y]]).T
             pred = np.array([[self.x[3], self.x[4]]]).T
             tmp = np.dot( np.dot(H, self.P), H.T) + R
             K = np.dot(self.P, np.dot( H.T, np.linalg.inv( tmp )) )
@@ -289,8 +293,29 @@ class StrapdownINS:
             self.P = 0.5*self.P + 0.5*self.P.T
             # renormalize quaternion attitude
             self.x[6:10] = self.x[6:10]/np.linalg.norm(self.x[6:10])
-        else:
-            rospy.loginfo_once("Fake DVL meas done")
+            self.dvl_x = None
+            self.dvl_y = None
+
+        # Artificially give some zero velocity measurements for the first 30s
+        # if self.skip_multiplexer < 2000:
+        #     if self.skip_multiplexer > 1000:
+        #         rospy.loginfo_once("################################Ready to dive###################################")
+        #     H = np.zeros((2,16))
+        #     H[0, 3] = 1
+        #     H[1, 4] = 1
+        #     R = np.eye(2) * 0.01
+        #     meas = np.array([[0.0, 0.0]]).T
+        #     pred = np.array([[self.x[3], self.x[4]]]).T
+        #     tmp = np.dot( np.dot(H, self.P), H.T) + R
+        #     K = np.dot(self.P, np.dot( H.T, np.linalg.inv( tmp )) )
+        #     self.x = self.x + np.dot(K,meas-pred).reshape(NUM_STATES)
+        #     self.P = np.dot(np.eye(16)-np.dot(K,H),self.P)
+        #     # enforce symmetry
+        #     self.P = 0.5*self.P + 0.5*self.P.T
+        #     # renormalize quaternion attitude
+        #     self.x[6:10] = self.x[6:10]/np.linalg.norm(self.x[6:10])
+        # else:
+        #     rospy.loginfo_once("Fake DVL meas done")
 
     #     if measurement_type == 'GPS':
     #         H = np.zeros((3,16))
