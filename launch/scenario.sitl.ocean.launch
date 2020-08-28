@@ -46,7 +46,7 @@
   <arg name="pole_z" default="-5"/>
 
   <arg name="sonar_360_scan_range_m" default="10.0" />
-  <arg name="is_landmark" default="true"/>
+  <arg name="is_landmark" default="false"/>
   <arg name="use_360" default="true"/>
 
   <!-- Start the SIMULATED Modem Processing node -->
@@ -62,7 +62,7 @@
   </include>
 
   <!-- RED ACTOR -->
-  <include file="$(find minau)/launch/vehicle.red_actor.sitl.launch">
+  <include file="$(find etddf)/launch/vehicle.red_actor.sitl.launch">
     <arg name="asset_id" value="$(arg red_asset_id)"/>
     <arg name="ardusub_params" value="$(arg ardusub_params)"/>
     <arg name="latitude" value="$(arg latitude)"/>

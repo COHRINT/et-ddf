@@ -22,7 +22,7 @@
   <arg name="is_landmark" default="false"/>
   <arg name="landmark_x" default="0.0"/>
   <arg name="landmark_y" default="0.0"/>
-  <arg name="use_360" default="false"/>
+  <arg name="use_360" default="true"/>
   <arg name="sonar_360_scan_range_m" default="10.0" />
 
   <arg name="schedule_file" default="$(find minau)/config/schedules/schedule_3_assets.json"/>
@@ -190,13 +190,13 @@
     <!-- TODO (EBS): Start the MinAu Sensor Manager node -->
 
     <!-- Start the MinAu Plan Manager node for this vehicle instance -->
-    <node name="plan_manager" pkg="minau" type="plan_manager_node.py" output="screen">
+    <!-- <node name="plan_manager" pkg="minau" type="plan_manager_node.py" output="screen">
       <param name="rate" value="20.0"/>
       <param name="publish_plan_markers" value="true"/>
       <param name="localization_fix/duration" value="10.0"/>
       <param name="localization_fix/heading" value="0.0"/>
       <param name="localization_fix/depth" value="1.5"/>
-    </node>
+    </node> -->
 
     <node name="sonar_state_manager" pkg="minau" type="sonar_state_manager_node.py" output="screen">
       <param name="rate_hz" value="1.0"/>

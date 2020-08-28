@@ -1,5 +1,5 @@
-Test_Group_Name,Test_Name,Number_Tests_dep,Mins_Per_Test_dep,Map_Dim_x_dep,Map_Dim_y_dep,Map_Dim_z_dep,IMU_Data,DVL_Data,Sonar_Data,Number_Red_WayPts_dep
-phase2_0,control,3,2,5,10,5,FALSE,FALSE,FALSE,2
-phase2_0,dvl_test,0,0,0,0,0,FALSE,TRUE,FALSE,2
-phase2_0,sonar_imu_test,0,0,0,0,0,TRUE,FALSE,TRUE,2
-phase2_0,dvl_sonar_imu_test,0,0,0,0,0,TRUE,TRUE,TRUE,2
+Test_Group_Name,Test_Name,Number_Tests_dep,Mins_Per_Test_dep,Map_Dim_x_dep,Map_Dim_y_dep,Map_Dim_z_dep,IMU_Data,DVL_Data,Sonar_Data
+phase2_0,control,3,2,10,10,5,FALSE,FALSE,FALSE
+phase2_0,dvl_test,0,0,0,0,0,FALSE,TRUE,FALSE
+phase2_0,sonar_imu_test,0,0,0,0,0,TRUE,FALSE,TRUE
+phase2_0,dvl_sonar_imu_test,0,0,0,0,0,TRUE,TRUE,TRUE

@@ -8,7 +8,7 @@ default_starting_position:
   x_vel: 0.0
   y: 0.0
   y_vel: 0.0
-  z: 1.0
+  z: 0.0
   z_vel: 0.0
 delta_tiers:
 - 1
@@ -48,11 +48,11 @@ process_noise:
     z: 0.0
     z_vel: 0.0
   ownship:
-    x: 0.01
+    x: 0.001
     x_vel: 5.0e-06
-    y: 0.01
+    y: 0.001
     y_vel: 5.0e-06
-    z: 0.01
+    z: 0.001
     z_vel: 5.0e-06
   redteam:
     x: 0.1

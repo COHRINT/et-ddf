@@ -16,6 +16,7 @@ import sys
 import time
 from gazebo_msgs.msg import ModelState
 from gazebo_msgs.srv import SetModelState
+from std_msgs.msg import Bool
 
 
 def normalize_angle(angle):
@@ -85,12 +86,12 @@ def set_model_state(model_name, pose):
             rospy.logerr("Service call failed: %s", e)
         time.sleep(0.1)
 
-initial_point = Pose()
-initial_point.position.x = float(waypts[0][0])
-initial_point.position.y = float(waypts[0][1])
-initial_point.position.z = float(waypts[0][2])
-nameS = rospy.get_namespace()
-set_model_state(nameS[1:-1],initial_point)
+# initial_point = Pose()
+# initial_point.position.x = float(waypts[0][0])
+# initial_point.position.y = float(waypts[0][1])
+# initial_point.position.z = float(waypts[0][2])
+# nameS = rospy.get_namespace()
+# set_model_state(nameS[1:-1],initial_point)
 
 rospy.init_node("waypoint_mover")
 # arm a single bluerov
@@ -120,17 +121,24 @@ while not rospy.is_shutdown():
         diff_z = -float(target_waypt[2]) + wp.pose.pose.pose.position.z
         dist = np.linalg.norm([diff_x, diff_y,diff_z])
         if dist < 1:
-            waypt_num = (waypt_num + 1) % len(waypts)
+            #teleport red rov to next waypoint and send them off again
+            waypt_num = (waypt_num + 2) % len(waypts)
+            initial_point = Pose()
+            initial_point.position.x = float(waypts[waypt_num-1][0])
+            initial_point.position.y = float(waypts[waypt_num-1][1])
+            initial_point.position.z = float(waypts[waypt_num-1][2])
+            nameS = rospy.get_namespace()
+            set_model_state(nameS[1:-1],initial_point)
 
         # Get New control
         target_waypt = waypts[waypt_num]
         diff_x = float(target_waypt[0]) - wp.pose.pose.pose.position.x
         diff_y = float(target_waypt[1]) - wp.pose.pose.pose.position.y
         diff_z = -float(target_waypt[2]) + wp.pose.pose.pose.position.z
-        print("target_waypt: " + str(target_waypt))
-        print("x_diff: " + str(diff_x))
-        print("y_diff: " + str(diff_y))
-        print("z_diff: " + str(diff_z))
+        # print("target_waypt: " + str(target_waypt))
+        # print("x_diff: " + str(diff_x))
+        # print("y_diff: " + str(diff_y))
+        # print("z_diff: " + str(diff_z))
 
         ang = np.arctan2(diff_x, diff_y) # NED
         v3 = Vector3(diff_y,diff_x,diff_z)

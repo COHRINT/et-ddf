@@ -17,6 +17,7 @@ from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Pose, Twist
 from gazebo_msgs.msg import ModelState
 from gazebo_msgs.srv import SetModelState
+from std_msgs.msg import Bool
 
 
 class repeatTester:
@@ -39,8 +40,8 @@ class repeatTester:
         for row in reader:
             self.config.append(row)
 
-        self.first_3 = [0,6,-1]
-        self.first_4 = [0,-6,-1]
+        self.first_3 = [0,-6,-1]
+        self.first_4 = [0,6,-1]
 
         #extracts data and asigns it to variables
         self.config_names=[]
@@ -62,7 +63,7 @@ class repeatTester:
         self.dim_x = float(self.config[0]['Map_Dim_x_dep'])
         self.dim_y = float(self.config[0]['Map_Dim_y_dep'])
         self.dim_z = float(self.config[0]['Map_Dim_z_dep'])
-        self.num_waypts = int(self.config[0]['Number_Red_WayPts_dep'])
+        self.num_waypts = 50
         self.printIntro()
         self.generateWay()
     def time(self):
@@ -78,19 +79,26 @@ class repeatTester:
         print('\n\nTest groups: '+str(self.num_groups))
         print('Total tests to execute: '+str(self.total_tests))
         print('Expected Duration: '+self.time()+'\n\n')
-    def waypoint(self,inside):
-        waypt = [random.random()*2*self.dim_x-self.dim_x,random.random()*self.dim_y*2-self.dim_y,-1]
-        if inside:
+    def waypoint(self):
+        #[1,2,3,4] --> [up,down,left,right]
+        dir = random.randint(1,4)
+        waypt = []
+        if dir == 1:
+            waypt.append([random.random()*2*self.dim_x-self.dim_x,random.random()*5+self.dim_y,-1])
+            waypt.append([random.random()*2*self.dim_x-self.dim_x,-(random.random()*5+self.dim_y),-1])
             return waypt
-        if waypt[0] > 0:
-            waypt[0]+= self.dim_x
-        else:
-            waypt[0]-= self.dim_x
-        if waypt[1] > 0:
-            waypt[1]+= self.dim_y
-        else:
-            waypt[1]-= self.dim_y
-        return waypt
+        if dir == 2:
+            waypt.append([random.random()*2*self.dim_x-self.dim_x,-(random.random()*5+self.dim_y),-1])
+            waypt.append([random.random()*2*self.dim_x-self.dim_x,(random.random()*5+self.dim_y),-1])
+            return waypt
+        if dir == 3:
+            waypt.append([-(random.random()*5+self.dim_x),random.random()*self.dim_y*2-self.dim_y,-1])
+            waypt.append([(random.random()*5+self.dim_x),(2*random.random()*self.dim_y-self.dim_y),-1])
+            return waypt
+        if dir == 4:
+            waypt.append([(random.random()*5+self.dim_x),random.random()*self.dim_y*2-self.dim_y,-1])
+            waypt.append([-(random.random()*5+self.dim_x),(2*random.random()*self.dim_y-self.dim_y),-1])
+            return waypt
     def generateWay(self):
         """
         Generates the waypoints for the red asset and writes them to csv files.
@@ -99,15 +107,15 @@ class repeatTester:
         self.first_red = []
         for i in range(self.num_groups):
             waypoints = []
-            waypoints.append(self.waypoint(False))
-            self.first_red.append(waypoints[0])
             for j in range(self.num_waypts):
-                waypoints.append(self.waypoint(True))
-            waypoints.append(self.waypoint(False))
+                waypt = self.waypoint()
+                waypoints.append(waypt[0])
+                waypoints.append(waypt[1])
+            self.first_red.append(waypoints[0])
             fileName = 'waypoints_'+str(i)+'.csv'
             fileName = self.data_loc + '/waypoints/'+fileName
             f = open(fileName,'w')
-            for j in range(self.num_waypts+2):
+            for j in range(self.num_waypts):
                 f.write(str(waypoints[j][0])+','+str(waypoints[j][1])+','+str(waypoints[j][2])+'\n')
             f.close()
     def setup_config(self,config_num):
@@ -162,42 +170,56 @@ class repeatTester:
         This is the function that runs all the tests and bags all the data.
         """
         #this is where all the scripts and launch files are ran
-        print(1)
         dirTo = self.data_loc+'/'+self.test_group_name
         os.mkdir(dirTo)
         for j in range(self.num_configs):
-            print(2)
             self.setup_config(j)
             for i in range(self.num_groups):
                 print('\n\nExecuting '+self.test_group_name+'/'+self.config_names[j]+' #'+str(i+1)+' ('+str((i+1)+3*j)+'/'+str(self.total_tests)+') | Time Remaining: '+self.time()+'\n\n')
-                # exit()
-                print('teleporing')
                 self.teleport(i)
-                print('uuv and etddf')
                 # self.remaining_time -= self.mins_per
-                # time.sleep(10)
                 pos3 = 'pos3:='+str(self.first_3)
                 pos4 = 'pos4:='+str(self.first_4)
                 args2 = ['roslaunch','etddf','uuv_etddf.launch',pos3,pos4]
-                # FNULL = open(os.devnull, 'w')
+
+                fileFor3 = self.data_loc+'/waypoints/'+'waypoints_'+str(i)+'.csv'
+                args3 = ['rosrun','etddf','waypoint_move.py','__ns:=red_actor_1',fileFor3]
+
+                args4 = ['rosrun','etddf','search.py','_x:='+str(self.dim_x),'_y:='+str(self.dim_y)]
+
+                bagfile_name = self.config_names[j]+'_'+str(i+1)
+                args5 = 'rosbag record -O '+bagfile_name+' /bluerov2_3/pose_gt \
+                                                           /bluerov2_4/pose_gt \
+                                                           /red_actor_1/pose_gt \
+                                                           /bluerov2_3/etddf/estimate/network \
+                                                           /bluerov2_4/etddf/estimate/network \
+                                                           /bluerov2_3/etddf/statistics \
+                                                           /bluerov2_4/etddf/statistics'
+
                 proc2 = subprocess.Popen(args2)
                 time.sleep(10)
+                proc5 = subprocess.Popen(args5,stdin=subprocess.PIPE, shell=True, cwd=dirTo)
+                proc3 =  subprocess.Popen(args3)
+                proc4 = subprocess.Popen(args4)
+                
+                rate = rospy.Rate(10)
+                rospy.sleep(120)
+
+                terminate_ros_node("/record")
+                proc3.terminate()
+                proc4.terminate()
+                proc2.terminate()
+                time.sleep(10)
+
+
+                # FNULL = open(os.devnull, 'w')
                 # # proc2 = subprocess.Popen(args2,stdout=FNULL,stderr=subprocess.STDOUT)
                 # time.sleep(10)
                 # # ,'/bluerov2_4/pose_gt','/bluerov2_3/etddf/estimate/network','/bluerov2_4/etddf/estimate/network'
-                # bagfile_name = self.config_names[j]+'_'+str(i+1)
                 # args5 = 'rosbag record -O '+bagfile_name+' /bluerov2_3/pose_gt /bluerov2_4/pose_gt /bluerov2_3/etddf/estimate/network /bluerov2_4/etddf/estimate/network /bluerov2_3/etddf/statistics /bluerov2_4/etddf/statistics'
-                fileFor3 = self.data_loc+'/waypoints/'+'waypoints_'+str(i)+'.csv'
-                print('waypoint')
-                args3 = ['rosrun','etddf','waypoint_move.py','__ns:=red_actor_1',fileFor3]
                 # # proc3 =  subprocess.Popen(args3,stdout=FNULL,stderr=subprocess.STDOUT)
-                proc3 =  subprocess.Popen(args3)
-                time.sleep(50)
-                return
                 # fileFor4 = 'waypoints_'+str(i+self.num_groups)+'.csv'
-                # args4 = ['rosrun','etddf','waypoint_move.py','__ns:=bluerov2_4',fileFor4]
                 # # proc4 = subprocess.Popen(args4,stdout=FNULL,stderr=subprocess.STDOUT)
-                # proc4 = subprocess.Popen(args4)
                 # # print(dirTo)
                 # proc5 = subprocess.Popen(args5,stdin=subprocess.PIPE, shell=True, cwd=dirTo)
                 # print('Hello')
@@ -206,9 +228,6 @@ class repeatTester:
                 # # time.sleep(30)
                 # terminate_ros_node("/record")
                 # # time.sleep(10)
-                # proc3.terminate()
-                # proc4.terminate()
-                # proc2.terminate()
         print('All tests complete')
         print('Data located in data/'+self.test_group_name)
 
