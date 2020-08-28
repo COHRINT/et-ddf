@@ -26,4 +26,11 @@
         <param name="landmark_y" value="$(arg landmark_y)" />
     </node>
 
+    <!-- Launch the strapdown filter -->
+    <!-- <include file="$(find etddf)/launch/nav_filter.launch" >
+        <arg name="starting_position_enu" value="$(arg starting_position_enu)" />
+        <arg name="starting_yaw_enu" value="$(arg starting_yaw_enu)" />
+        <arg name="wait_on_startup" value="10" />
+    </include> -->
+
 </launch>

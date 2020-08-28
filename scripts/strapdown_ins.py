@@ -42,13 +42,15 @@ class StrapdownINS:
         self.last_depth = None
         self.data_x, self.data_y = None, None
         self.skip_multiplexer = 0
-        rospy.Subscriber("/bluerov2_4/mavros/global_position/rel_alt", Float64, self.depth_callback)
-        rospy.Subscriber("/bluerov2_4/imu", Imu, self.propagate)
+        rospy.sleep(rospy.get_param("~wait_on_startup"))
+        rospy.Subscriber("mavros/global_position/rel_alt", Float64, self.depth_callback)
+        rospy.Subscriber("pose_gt", Odometry, self.gps_callback)
+        rospy.Subscriber("imu", Imu, self.propagate)
         rospy.loginfo("Loaded")
 
     def gps_callback(self, msg):
         self.skip_multiplexer += 1
-        if self.skip_multiplexer % 50 == 0:
+        if self.skip_multiplexer % 300 == 0:
             self.data_x = msg.pose.pose.position.x
             self.data_y = msg.pose.pose.position.y
 
@@ -112,8 +114,8 @@ class StrapdownINS:
         b_wz = self.x[15]
 
         # IMU Measurements
-        a_x = imu_measurement.linear_acceleration.x
-        a_y = imu_measurement.linear_acceleration.y
+        a_x = -imu_measurement.linear_acceleration.x
+        a_y = -imu_measurement.linear_acceleration.y
         a_z = imu_measurement.linear_acceleration.z - G_ACCEL
         w_x = imu_measurement.angular_velocity.x
         w_y = imu_measurement.angular_velocity.y
@@ -209,7 +211,8 @@ class StrapdownINS:
 
         self.update_lock.release()
 
-        self.publish_estimate(imu_measurement.header.seq, imu_measurement.header.stamp, np.zeros(3), np.eye(3)*0.001)
+        if self.skip_multiplexer > 1000:
+            self.publish_estimate(imu_measurement.header.seq, imu_measurement.header.stamp, np.zeros(3), np.eye(3)*0.001)
 
     def update(self, compass_meas, compass_meas_cov):
         
@@ -222,7 +225,7 @@ class StrapdownINS:
 
         meas = np.array([[compass_meas.x, compass_meas.y, compass_meas.z, compass_meas.w]]).T
         pred = self.x[6:10].reshape(-1,1)
-        R = 0.001
+        R = 0.01
         tmp = np.dot( np.dot(H, self.P), H.T) + R
         K = np.dot(self.P, np.dot( H.T, np.linalg.inv( tmp )) )
         innovation = meas-pred
@@ -255,7 +258,7 @@ class StrapdownINS:
             H[1,1] = 1
             R = 0.01
             meas = np.array([[self.data_x, self.data_y]]).T
-            pred = np.array([[self.x[0], self.x[1]]).T
+            pred = np.array([[self.x[0], self.x[1]]]).T
             tmp = np.dot( np.dot(H, self.P), H.T) + R
             K = np.dot(self.P, np.dot( H.T, np.linalg.inv( tmp )) )
             self.x = self.x + np.dot(K,meas-pred).reshape(NUM_STATES)
@@ -265,7 +268,28 @@ class StrapdownINS:
             # renormalize quaternion attitude
             self.x[6:10] = self.x[6:10]/np.linalg.norm(self.x[6:10])
 
-            self.last_depth = None
+            self.data_x = None
+            self.data_y = None
+
+        # Artificially give some zero velocity measurements for the first 30s
+        if self.skip_multiplexer < 1000:
+            H = np.zeros((3,16))
+            H[0, 3] = 1
+            H[1, 4] = 1
+            H[2, 5] = 1
+            R = 0.01
+            meas = np.array([[0.0, 0.0, 0.0]]).T
+            pred = np.array([[self.x[3], self.x[4], self.x[5]]]).T
+            tmp = np.dot( np.dot(H, self.P), H.T) + R
+            K = np.dot(self.P, np.dot( H.T, np.linalg.inv( tmp )) )
+            self.x = self.x + np.dot(K,meas-pred).reshape(NUM_STATES)
+            self.P = np.dot(np.eye(16)-np.dot(K,H),self.P)
+            # enforce symmetry
+            self.P = 0.5*self.P + 0.5*self.P.T
+            # renormalize quaternion attitude
+            self.x[6:10] = self.x[6:10]/np.linalg.norm(self.x[6:10])
+        else:
+            rospy.loginfo_once("Fake DVL meas done")
 
     #     if measurement_type == 'GPS':
     #         H = np.zeros((3,16))
@@ -323,19 +347,27 @@ class StrapdownINS:
     
 
 def get_initial_estimate():
-    starting_position = rospy.get_param("starting_position")
-    starting_yaw = rospy.get_param("starting_yaw")
+    starting_position = rospy.get_param("~starting_position")
+    starting_yaw = rospy.get_param("~starting_yaw")
+    initial_uncertainty = rospy.get_param("~initial_uncertainty/ownship")
     quaternion = tf.transformations.quaternion_from_euler(0, 0, starting_yaw)
     state = np.zeros(NUM_STATES)
     state[0:3] = starting_position[0:3]
     state[5:9] = np.array(quaternion)
     uncertainty = np.zeros((NUM_STATES, NUM_STATES))
-    uncertainty[6:10, 6:10] = np.eye(4) * 0.1
+    uncertainty[0,0] = initial_uncertainty["x"]
+    uncertainty[1,1] = initial_uncertainty["y"]
+    uncertainty[2,2] = initial_uncertainty["z"]
+    uncertainty[3,3] = initial_uncertainty["x_vel"]
+    uncertainty[4,4] = initial_uncertainty["y_vel"]
+    uncertainty[5,5] = initial_uncertainty["z_vel"]
+    uncertainty[6:10, 6:10] = np.eye(4) * initial_uncertainty["quat"]
+    uncertainty[10:16, 10:16] = np.eye(6) * initial_uncertainty["bias"]
     return state, uncertainty
 
 def get_process_noise():
     Q = np.zeros((NUM_STATES, NUM_STATES))
-    ownship_Q = rospy.get_param("/strapdown/process_noise/ownship")
+    ownship_Q = rospy.get_param("~process_noise/ownship")
     Q[0,0] = ownship_Q["x"]
     Q[1,1] = ownship_Q["y"]
     Q[2,2] = ownship_Q["z"]
