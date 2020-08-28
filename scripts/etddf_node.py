@@ -20,7 +20,6 @@ np.set_printoptions(suppress=True)
 from copy import deepcopy
 from std_msgs.msg import Header
 from geometry_msgs.msg import PoseWithCovariance, Pose, Point, Quaternion, Twist, Vector3, TwistWithCovariance, PoseWithCovarianceStamped
-from tf.transformations import quaternion_from_euler
 from nav_msgs.msg import Odometry
 from minau.msg import SonarTargetList, SonarTarget
 from cuprint.cuprint import CUPrint
@@ -57,17 +56,9 @@ class ETDDF_Node:
         self.use_control_input = use_control_input
         self.default_meas_variance = default_meas_variance
         self.my_name = my_name
+        self.landmark_pose = [rospy.get_param("~landmark_x"), rospy.get_param("~landmark_y"),0,0]
 
         self.cuprint = CUPrint(rospy.get_name())
-        # NED --> ENU
-        tmp = x0[0,0]
-        x0[0,0] = x0[1,0]
-        x0[1,0] = tmp
-        x0[2,0] = -x0[2,0]
-        tmp = x0[3,0]
-        x0[3,0] = x0[4,0]
-        x0[4,0] = tmp
-        x0[5,0] = -x0[5,0]
         
         self.filter = DeltaTier(NUM_OWNSHIP_STATES, \
                                 x0,\
@@ -97,6 +88,8 @@ class ETDDF_Node:
         self.meas_lock = threading.Lock()
         self.update_lock = threading.Lock()
         self.last_orientation = None
+        self.red_asset_found = False
+        self.red_asset_names = rospy.get_param("~red_team_names")
 
         # Depth Sensor
         rospy.Subscriber("mavros/global_position/local", Odometry, self.depth_callback, queue_size=1)
@@ -105,14 +98,34 @@ class ETDDF_Node:
         rospy.Subscriber("etddf/packages_in", MeasurementPackage, self.meas_pkg_callback, queue_size=1)
 
         if self.use_control_input:
+            self.control_input = None
             rospy.Subscriber("uuv_control/control_status", ControlStatus, self.control_status_callback, queue_size=1)
 
         # IMU Covariance Intersection
         if rospy.get_param("~measurement_topics/imu_ci") == "None":
             rospy.Timer(rospy.Duration(1 / self.update_rate), self.no_nav_filter_callback)
         else:
-            rospy.Subscriber(rospy.get_param("~measurement_topics/imu_ci"), Odometry, self.nav_filter_callback, queue_size=1)
             self.set_pose_pub = rospy.Publisher("set_pose", PoseWithCovarianceStamped, queue_size=10)
+
+            # Correct the pose of 
+            self.cuprint("Waiting to correct filter")
+            rospy.wait_for_message(rospy.get_param("~measurement_topics/imu_ci"), Odometry)
+            yaw = rospy.get_param("~starting_yaw",0.0)
+            q = tf.transformations.quaternion_from_euler(0, 0, yaw)
+            nav_estimate = Odometry()
+            nav_estimate.pose.pose.orientation.x = q[0]
+            nav_estimate.pose.pose.orientation.y = q[1]
+            nav_estimate.pose.pose.orientation.z = q[2]
+            nav_estimate.pose.pose.orientation.w = q[3]
+            h = Header()
+            h.frame_id = "map"
+            z = np.eye(6) * 0.01
+            for i in range(10):
+                self.correct_nav_filter(x0, z, h, nav_estimate)
+                rospy.sleep(0.1)
+            self.cuprint("Filter Corrected")
+
+            rospy.Subscriber(rospy.get_param("~measurement_topics/imu_ci"), Odometry, self.nav_filter_callback, queue_size=1)
 
         # Sonar Subscription
         if rospy.get_param("~measurement_topics/sonar") != "None":
@@ -126,7 +139,7 @@ class ETDDF_Node:
 
         nav_covpt = np.array(nav_estimate.pose.covariance).reshape(6,6)
 
-        pose = Pose(Point(c_bar[0],c_bar[1],c_bar[2]), \
+        pose = Pose(Point(c_bar[0,0],c_bar[1,0],c_bar[2,0]), \
                     nav_estimate.pose.pose.orientation)
         pose_cov = np.zeros((6,6))
         pose_cov[:3,:3] = Pcc[:3,:3]
@@ -152,13 +165,20 @@ class ETDDF_Node:
             y = xy_dist * np.sin(bearing_world)
 
             now = rospy.get_rostime()
-            sonar_x = Measurement("sonar_x", now, self.my_name, target.id, x, self.default_meas_variance["sonar_x"], [])
-            sonar_y = Measurement("sonar_y", now, self.my_name, target.id, y, self.default_meas_variance["sonar_y"], [])
-            sonar_z = Measurement("sonar_z", now, self.my_name, target.id, z, self.default_meas_variance["sonar_z"], [])
+            sonar_x, sonar_y = None, None
+            if target.id == "landmark":
+                sonar_x = Measurement("sonar_x", now, self.my_name, "", x, self.default_meas_variance["sonar_x"], self.landmark_pose)
+                sonar_y = Measurement("sonar_y", now, self.my_name, "", y, self.default_meas_variance["sonar_x"], self.landmark_pose)
+            else:
+                sonar_x = Measurement("sonar_x", now, self.my_name, target.id, x, self.default_meas_variance["sonar_x"], [])
+                sonar_y = Measurement("sonar_y", now, self.my_name, target.id, y, self.default_meas_variance["sonar_y"], [])
+                if target.id in self.red_asset_names:
+                    self.red_asset_found = True
+            # sonar_z = Measurement("sonar_z", now, self.my_name, target.id, z, self.default_meas_variance["sonar_z"], [])
 
             self.filter.add_meas(sonar_x)
             self.filter.add_meas(sonar_y)
-            self.filter.add_meas(sonar_z)
+            # self.filter.add_meas(sonar_z)
 
     def publish_stats(self, last_update_time):
         self.statistics.seq = self.update_seq
@@ -175,8 +195,9 @@ class ETDDF_Node:
         self.update_lock.acquire()
 
         ### Run Prediction ###
-        if self.use_control_input:
-            raise NotImplementedError("using control input not ready yet")
+        ### Run Prediction ###
+        if self.use_control_input and self.control_input is not None:
+            self.filter.predict(self.control_input, self.Q, delta_t_ros.to_sec(), False)
         else:
             self.filter.predict(np.zeros((3,1)), self.Q, delta_t_ros.to_sec(), False)
 
@@ -209,8 +230,8 @@ class ETDDF_Node:
         self.update_lock.acquire()
 
         ### Run Prediction ###
-        if self.use_control_input:
-            raise NotImplementedError("using control input not ready yet")
+        if self.use_control_input and self.control_input is not None:
+            self.filter.predict(self.control_input, self.Q, delta_t_ros.to_sec(), False)
         else:
             self.filter.predict(np.zeros((3,1)), self.Q, delta_t_ros.to_sec(), False)
 
@@ -245,8 +266,8 @@ class ETDDF_Node:
         # Run covariance intersection
         if np.trace(cov) < 1: # Prevent Nav Filter from having zero uncertainty
             cov = np.eye(NUM_OWNSHIP_STATES) * 0.1
-        c_bar, Pcc = self.filter.intersect(mean, cov)
-        self.correct_nav_filter(c_bar, Pcc, odom.header, odom)
+        # c_bar, Pcc = self.filter.intersect(mean, cov)
+        # self.correct_nav_filter(c_bar, Pcc, odom.header, odom)
 
         # TODO partial state update everything
 
@@ -258,9 +279,13 @@ class ETDDF_Node:
         self.publish_stats(t_now)
     
     def control_status_callback(self, msg):
-        self.meas_lock.acquire()
+        self.update_lock.acquire()
+        if msg.is_setpoint_active and msg.is_heading_velocity_setpoint_active:
+            self.control_input = np.array([[msg.setpoint_velocity.y, msg.setpoint_velocity.z, -msg.setpoint_velocity.z]]).T
+        else:
+            self.control_input = None
         # GRAB CONTROL INPUT
-        self.meas_lock.release()
+        self.update_lock.release()
 
     def depth_callback(self, msg):
         self.meas_lock.acquire()
@@ -271,6 +296,8 @@ class ETDDF_Node:
         ne = NetworkEstimate()
         for asset in self.asset2id.keys():
             if "surface" in asset:
+                continue
+            if "red" in asset and not self.red_asset_found:
                 continue
             # else:
             #     print("publishing " + asset + "'s estimate")
@@ -302,32 +329,43 @@ class ETDDF_Node:
         self.network_pub.publish(ne)
 
     def meas_pkg_callback(self, msg):
-
-        # Modem update
-        if msg.src_asset == "surface" or msg.src_asset == self.my_name:
-            self.cuprint("Receiving Modem Measurements")
+        # Modem Meas taken by surface
+        if msg.src_asset == "surface":
+            self.cuprint("Receiving Surface Modem Measurements")
             for meas in msg.measurements:
                 # Approximate the fuse on the next update, so we can get other asset's position immediately
                 if meas.meas_type == "modem_elevation":
-                    rospy.logerr_once("Ignoring Modem Elevation Measurement since we have depth measurements")
+                    rospy.logerr("Ignoring Modem Elevation Measurement since we have depth measurements")
                     continue
                 elif meas.meas_type == "modem_azimuth":
                     meas.global_pose = list(meas.global_pose)
-                    meas.global_pose[3] = 0.0
-                    # if meas.measured_asset == self.my_name:
-                    #     self.cuprint("My Azimuth: " + str(meas.data))
-                    #     self.cuprint(str(meas.global_pose))
-                    meas.data = - (meas.data * np.pi) / 180 # Convert to radians and flip the sign to convert to ENU
-                    
+                    self.cuprint("azimuth: " + str(meas.data))
+                    meas.data = (meas.data * np.pi) / 180
                     meas.variance = self.default_meas_variance["modem_azimuth"]
                 elif meas.meas_type == "modem_range":
                     meas.global_pose = list(meas.global_pose)
-                    meas.global_pose[3] = 0.0
-                    # if meas.measured_asset == self.my_name:
-                    #     self.cuprint("My Range: " + str(meas.data))
-                    #     self.cuprint(str(meas.global_pose))
+                    self.cuprint("range: " + str(meas.data))
                     meas.variance = self.default_meas_variance["modem_range"]
                 self.filter.add_meas(meas, force_fuse=True)
+
+        # Modem Meas taken by me
+        elif msg.src_asset == self.my_name:
+            self.cuprint("Receiving Modem Measurements Taken by Me")
+            for meas in msg.measurements:
+                # Approximate the fuse on the next update, so we can get other asset's position immediately
+                if meas.meas_type == "modem_elevation":
+                    rospy.logerr("Ignoring Modem Elevation Measurement since we have depth measurements")
+                    continue
+                elif meas.meas_type == "modem_azimuth":
+                    meas.global_pose = list(meas.global_pose)
+                    meas.data = (meas.data * np.pi) / 180
+                    meas.variance = self.default_meas_variance["modem_azimuth"]
+                elif meas.meas_type == "modem_range":
+                    meas.global_pose = list(meas.global_pose)
+                    meas.variance = self.default_meas_variance["modem_range"]
+                self.filter.add_meas(meas, force_fuse=True)
+
+        # Buffer
         else:
             self.cuprint("receiving buffer")
             self.update_lock.acquire()

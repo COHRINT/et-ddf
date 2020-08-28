@@ -99,7 +99,7 @@ class DeltaTier:
         elif ros_meas.measured_asset == "":
             measured_id = -1
         else:
-            rospy.logerr_once("ETDDF doesn't recognize: " + ros_meas.measured_asset + " ... ignoring")
+            rospy.logerr("ETDDF doesn't recognize: " + ros_meas.measured_asset + " ... ignoring")
             return
         self.main_filter.add_meas(ros_meas, src_id, measured_id, delta_multiplier, force_fuse)
         for key in self.delta_tiers.keys():
@@ -127,7 +127,7 @@ class DeltaTier:
 
         Pcc = np.linalg.inv(omega_optimal*Pa_inv + (1-omega_optimal)*Pb_inv)
         c_bar = Pcc.dot( omega_optimal*Pa_inv.dot(xa) + (1-omega_optimal)*Pb_inv.dot(xb))
-        return c_bar, Pcc
+        return c_bar.reshape(-1,1), Pcc
 
     def intersect(self, x, P):
         """Runs covariance intersection with main filter's estimate

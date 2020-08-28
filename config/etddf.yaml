@@ -8,7 +8,8 @@ delta_tiers: [1]
 measurement_topics:
   depth: "mavros/global_position/rel_alt"
   imu_ci: "odometry/filtered"
-  sonar: "None" #"sonar_processing/target_list"
+  # sonar: "sonar_processing/target_list"
+  sonar: "None"
 
 ### Buffer space configurations ###
 buffer_space:
@@ -23,7 +24,7 @@ use_control_input: False
 default_starting_position:
   x: 0.0
   y: 0.0
-  z: 1.0
+  z: 0.0
   x_vel: 0.0
   y_vel: 0.0
   z_vel: 0.0
@@ -31,9 +32,9 @@ default_starting_position:
 ### Process Noise Configurations ###
 process_noise:
   ownship:
-    x: 0.01
-    y: 0.01
-    z: 0.01
+    x: 0.001
+    y: 0.001
+    z: 0.001
     x_vel: 0.000005
     y_vel: 0.000005
     z_vel: 0.000005
