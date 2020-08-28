@@ -50,7 +50,7 @@ class StrapdownINS:
 
     def gps_callback(self, msg):
         self.skip_multiplexer += 1
-        if self.skip_multiplexer % 300 == 0:
+        if self.skip_multiplexer % 50 == 0:
             self.data_x = msg.pose.pose.position.x
             self.data_y = msg.pose.pose.position.y
 
@@ -256,7 +256,7 @@ class StrapdownINS:
             H = np.zeros((2,16))
             H[0,0] = 1
             H[1,1] = 1
-            R = 0.01
+            R = np.eye(2) * 0.1
             meas = np.array([[self.data_x, self.data_y]]).T
             pred = np.array([[self.x[0], self.x[1]]]).T
             tmp = np.dot( np.dot(H, self.P), H.T) + R
@@ -272,14 +272,15 @@ class StrapdownINS:
             self.data_y = None
 
         # Artificially give some zero velocity measurements for the first 30s
-        if self.skip_multiplexer < 1000:
-            H = np.zeros((3,16))
+        if self.skip_multiplexer < 2000:
+            if self.skip_multiplexer > 1000:
+                rospy.loginfo_once("Ready to dive")
+            H = np.zeros((2,16))
             H[0, 3] = 1
             H[1, 4] = 1
-            H[2, 5] = 1
-            R = 0.01
-            meas = np.array([[0.0, 0.0, 0.0]]).T
-            pred = np.array([[self.x[3], self.x[4], self.x[5]]]).T
+            R = np.eye(2) * 0.01
+            meas = np.array([[0.0, 0.0]]).T
+            pred = np.array([[self.x[3], self.x[4]]]).T
             tmp = np.dot( np.dot(H, self.P), H.T) + R
             K = np.dot(self.P, np.dot( H.T, np.linalg.inv( tmp )) )
             self.x = self.x + np.dot(K,meas-pred).reshape(NUM_STATES)
