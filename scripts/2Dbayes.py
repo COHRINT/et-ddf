@@ -16,7 +16,7 @@ def sonarScans(num_ang):
                 rng = np.linalg.norm([x,y])
                 if rng < 10:
                     ang = np.arctan2(y,x)
-                    if ang >= i*delta and ang <= (i+1)*delta:
+                    if ang%(2*np.pi) >= (i*delta) and ang%(2*np.pi) <= ((i+1)*delta):
                         scans[i].append([x,y,rng])
     return scans
 
@@ -29,45 +29,28 @@ def sonarScans(num_ang):
 
 def defineModels(bel,scans):
     #p_obs(x_t,y_t|bx_t,by_t,sonar_ang_t)
-    p_obs = np.ones(shape=(bel.shape[0],bel.shape[1],bel.shape[0],bel.shape[1],20))
+    p_obs = np.ones(shape=(2*sonar_range+1,2*sonar_range+1,len(scans)))
 
     #this is my accuracy model, I assume accuracy linearly decreases with distance
     #first is intercept and 2nd is slope
     acc = [.1,.8/10]
 
-    #Loop through all the possible places the bluerov could be with and its scan angle
-    for i in range(p_obs.shape[0]):
-        for j in range(p_obs.shape[1]):
-            for k in range(p_obs.shape[4]):
-                #change the probability for all scans in the range that are within the grid
-                for scan in scans[k]:
-                    if i+scan[0] >=0 and i+scan[0] < bel.shape[0]:
-                        if j+scan[1]>=0 and j+scan[1]< bel.shape[1]:
-                            p_obs[i+scan[0],j+scan[1],i,j,k] = acc[0] + acc[1]*scan[2]
-                #normalize
-                p_obs[:,:,i,j,k] /= p_obs[:,:,i,j,k].sum()
-
-
-
+    #Loop through all the possible scans the bluerov could be doing
+    for k in range(len(scans)):
+        #change the probability for all scans in the range that are within the grid
+        for i in range(len(scans[k])):
+            p_obs[scans[k][i][0]+10,scans[k][i][1]+10,k] = acc[0] + acc[1]*scans[k][i][2]
+    
 
 
     #p_dynm(x_t+1,y_t+1|x_t,y_t)
-    p_dynm = np.zeros(shape=(bel.shape[0],bel.shape[1],bel.shape[0],bel.shape[1]))
+    p_outside = 0.001     #probability it is out of space, deals with last row of p_dynm
+    p_dynm = np.array([[0.01,0.01,0.01],
+                       [0.01,0.92,0.01],
+                       [0.01,0.01,0.01],
+                       [p_outside/(2*bel.shape[0]+2*bel.shape[1]),0,0]])
+    p_dynm[:3,:]/=p_dynm[:3,:].sum()
     
-    #loop through all the states at time t and and assign probabilites of where it could be at t+1
-    for i in range(p_dynm.shape[0]):
-        for j in range(p_dynm.shape[1]):
-            p_dynm[max(0,i-1),j,i,j] = 0.05    #left
-            p_dynm[max(0,i-1),max(0,j-1),i,j] = 0.05     #left and up
-            p_dynm[max(0,i-1),min(p_dynm.shape[1]-1,j+1),i,j] = 0.05  #left and down
-            p_dynm[i,max(0,j-1),i,j] = 0.05     #up
-            p_dynm[i,min(p_dynm.shape[1]-1,j+1),i,j] = 0.05  #down
-            p_dynm[min(p_dynm.shape[0]-1,i+1),j,i,j] = 0.05   #right
-            p_dynm[min(p_dynm.shape[0]-1,i+1),max(0,j-1),i,j] = 0.05     #right and up
-            p_dynm[min(p_dynm.shape[0]-1,i+1),min(p_dynm.shape[1]-1,j+1),i,j] = 0.05  # right and down
-
-            p_dynm[i,j,i,j] = 0.6   #doesn't move
-            p_dynm[:,:,i,j] /= p_dynm[:,:,i,j].sum()    #renormalize
     return p_obs,p_dynm
 
 
@@ -82,10 +65,14 @@ def bayes(bel,z,p_dyn,p_obs):
             #more than one space so we only have to check neighbors
             for x in range(-1,2):
                 for y in range(-1,2):
-                    if i+x >= 0 and i+x < bel.shape[0]:
-                        if j+y>=0 and j+y < bel.shape[1]:
-                            belBar[i,j] += p_dyn[i,j,i+x,j+y]*bel[i+x,j+y]
-            newBel[i,j] = belBar[i,j] * p_obs[i,j,z[0],z[1],z[2]]
+                    if i+x >= 0 and i+x < bel.shape[0] and j+y>=0 and j+y < bel.shape[1]:
+                        belBar[i,j] += p_dyn[x+1,y+1]*bel[i+x,j+y]
+                    else:
+                        belBar[i,j] += p_dyn[3,0]
+            if np.linalg.norm([i-z[0],j-z[1]]) <=10:
+                newBel[i,j] = belBar[i,j] * p_obs[i-z[0]+10,j-z[1]+10,z[2]]
+            else:
+                newBel[i,j] = belBar[i,j]
     newBel /= newBel.sum()
     return newBel
 
@@ -94,6 +81,7 @@ def bayes(bel,z,p_dyn,p_obs):
 def simulate(bel,state,plotting=False):
     scans = sonarScans(20)
     p_obs,p_dyn = defineModels(bel,scans)
+
     
     if(plotting):
         fig,ax = plt.subplots()
@@ -109,6 +97,8 @@ def simulate(bel,state,plotting=False):
             x = np.array(range(40))
             X,Y = np.meshgrid(x,x)
             cp = plt.contourf(X, Y, bel.transpose())
+            if i ==0:
+                fig.colorbar(cp)
 
             ax.set_title('Contour Plot')
             plt.pause(0.05)

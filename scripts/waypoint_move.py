@@ -103,7 +103,7 @@ try:
     # print(resp1)
 except rospy.ServiceException, e:
     print "Arm Control Service call failed: %s"%e
-
+vel = rospy.get_param("~vel",0.5)
 wp = Waypoint()
 
 #start with second waypoint
@@ -142,7 +142,7 @@ while not rospy.is_shutdown():
 
         ang = np.arctan2(diff_x, diff_y) # NED
         v3 = Vector3(diff_y,diff_x,diff_z)
-        v3 = normalize_velocity(v3,0.5)
+        v3 = normalize_velocity(v3,vel)
 
 
         # Set Heading Velocity

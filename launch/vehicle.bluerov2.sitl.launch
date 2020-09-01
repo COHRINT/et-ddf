@@ -129,7 +129,7 @@
          true, true, true,
          true, true, true]
       </rosparam>
-      <param name="odom0" value="pose_gt"/>
+      <!-- <param name="odom0" value="pose_gt"/>
       <param name="odom0_differential" value="false"/>
       <param name="odom0_relative" value="false"/>
       <param name="odom0_queue_size" value="10"/>
@@ -139,7 +139,7 @@
          false, false, false,
          false, false, false,
          false, false, false]
-      </rosparam>
+      </rosparam> -->
     </node>
 
     <!-- Start the MinAu DDF node-->

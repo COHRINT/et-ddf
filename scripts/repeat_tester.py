@@ -63,6 +63,8 @@ class repeatTester:
         self.dim_x = float(self.config[0]['Map_Dim_x_dep'])
         self.dim_y = float(self.config[0]['Map_Dim_y_dep'])
         self.dim_z = float(self.config[0]['Map_Dim_z_dep'])
+        self.red_vel = float(self.config[0]['Red_Vel_dep'])
+        self.blue_vel = float(self.config[0]['Blue_Vel_dep'])
         self.num_waypts = 50
         self.printIntro()
         self.generateWay()
@@ -183,9 +185,9 @@ class repeatTester:
                 args2 = ['roslaunch','etddf','uuv_etddf.launch',pos3,pos4]
 
                 fileFor3 = self.data_loc+'/waypoints/'+'waypoints_'+str(i)+'.csv'
-                args3 = ['rosrun','etddf','waypoint_move.py','__ns:=red_actor_1',fileFor3]
+                args3 = ['rosrun','etddf','waypoint_move.py','__ns:=red_actor_1',fileFor3,'_vel:='+str(self.red_vel)]
 
-                args4 = ['rosrun','etddf','search.py','_x:='+str(self.dim_x),'_y:='+str(self.dim_y)]
+                args4 = ['rosrun','etddf','search.py','_x:='+str(self.dim_x),'_y:='+str(self.dim_y),'_vel:='+str(self.blue_vel)]
 
                 bagfile_name = self.config_names[j]+'_'+str(i+1)
                 args5 = 'rosbag record -O '+bagfile_name+' /bluerov2_3/pose_gt \
