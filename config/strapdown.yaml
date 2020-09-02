@@ -1,12 +1,19 @@
+measurement_topics: # TODO add support for both simulated depth and hardware actual sensor
+  depth: "None" #"mavros/global_position/rel_alt"
+  imu_ci: "strapdown/intersection"
+  sonar: "None" # "sonar_processing/target_list"
+
 process_noise:
   ownship:
     x: 0.0
     y: 0.0
     z: 0.0
     quat: 0.001 # Scaled by 100 in the code
-    x_vel: 0.0001
-    y_vel: 0.0001
-    z_vel: 0.0001
+    yaw: 0.1
+    x_vel: 0.00001
+    y_vel: 0.00001
+    z_vel: 0.001
+    yaw_vel: 0.01
     accel_bias: 0.0001 # m/s^3/sqrt(Hz), scaled by 3 in code
     gyro_bias: 0.000001 # m/s^3/sqrt(Hz), scaled by 7 in code
 initial_uncertainty:
@@ -15,8 +22,10 @@ initial_uncertainty:
     y: 2.0
     z: 2.0
     quat: 1.0
+    yaw: 1.0
     bias: 1.0
     x_vel: 1.0
     y_vel: 1.0
     z_vel: 1.0
+    yaw_vel: 1.0
     

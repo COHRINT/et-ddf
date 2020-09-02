@@ -14,8 +14,17 @@ import numpy as np
 from scipy.linalg import block_diag, sqrtm
 import tf
 import threading
-
 import sys
+from etddf.msg import PositionVelocity
+from cuprint.cuprint import CUPrint
+
+__author__ = "Luke Barbier"
+__copyright__ = "Copyright 2020, COHRINT Lab"
+__email__ = "luke.barbier@colorado.edu"
+__status__ = "Development"
+__license__ = "MIT"
+__maintainer__ = "Luke Barbier"
+__version__ = "2.0"
 
 G_ACCEL = 9.80665 # gravitational acceleration [m/s/s]
 NUM_STATES = 16
@@ -30,7 +39,8 @@ class StrapdownINS:
     ----------
 
     """
-    def __init__(self, x0, P0, Q, default_meas_variance):
+    def __init__(self, x0, P0, Q, default_meas_variance, strapdown=True):
+        self.cuprint = CUPrint(rospy.get_name())
 
         self.last_update_time = None
         self.update_lock = threading.Lock()
@@ -39,17 +49,34 @@ class StrapdownINS:
         self.P = P0
         self.Q = Q
         self.pub = rospy.Publisher("strapdown/estimate", Odometry, queue_size=10)
+        self.ci_pub = rospy.Publisher("strapdown/intersection", PositionVelocity, queue_size=1)
         self.last_depth = None
+        self.last_intersection = None
         self.data_x, self.data_y = None, None
         self.dvl_x, self.dvl_y = None, None
         self.skip_multiplexer = 0
         rospy.sleep(rospy.get_param("~wait_on_startup"))
-        # rospy.Subscriber("mavros/global_position/rel_alt", Float64, self.depth_callback)
-        rospy.Subscriber("baro", Float64, self.depth_callback)
-        rospy.Subscriber("dvl", Vector3, self.dvl_callback)
-        rospy.Subscriber("pose_gt", Odometry, self.gps_callback)
-        rospy.Subscriber("imu", Imu, self.propagate)
-        rospy.loginfo("Loaded")
+        # rospy.Subscriber("mavros/global_position/rel_alt", Float64, self.depth_callback, queue_size=1)
+        rospy.Subscriber("baro", Float64, self.depth_callback, queue_size=1)
+        rospy.Subscriber("dvl", Vector3, self.dvl_callback, queue_size=1)
+        rospy.Subscriber("pose_gt", Odometry, self.gps_callback, queue_size=1)
+
+        if strapdown:
+            rospy.Subscriber("imu", Imu, self.propagate_strap, queue_size=1)
+        else:
+            rospy.Subscriber("imu", Imu, self.propagate_normal, queue_size=1)
+        # rospy.Subscriber("strapdown/intersection_result", PositionVelocity, self.intersection_result)
+        self.cuprint("loaded")
+
+    def publish_intersection(self):
+        position = Vector3(self.x[0], self.x[1], self.x[2])
+        velocity = Vector3(self.x[3], self.x[4], self.x[5])
+        cov = list(self.P[:6,:6].flatten())
+        msg = PositionVelocity(position, velocity, cov)
+        self.ci_pub.publish(msg)
+
+    def intersection_result(self, msg):
+        self.last_intersection = msg
 
     def dvl_callback(self, msg):
         self.dvl_x = msg.x
@@ -57,14 +84,33 @@ class StrapdownINS:
 
     def gps_callback(self, msg):
         self.skip_multiplexer += 1
-        if self.skip_multiplexer % 400 == 0:
-            self.data_x = msg.pose.pose.position.x
-            self.data_y = msg.pose.pose.position.y
+        if self.skip_multiplexer % 300 == 0:
+            self.data_x = msg.pose.pose.position.x + np.random.normal(0, scale=0.05)
+            self.data_y = msg.pose.pose.position.y + np.random.normal(0, scale=0.05)
 
     def depth_callback(self, msg):
         self.last_depth = msg.data
 
-    def publish_estimate(self, update_seq, timestamp, angular_velocity, angular_velocity_cov):
+    def publish_estimate(self, update_seq, timestamp):
+        quat = tf.transformations.quaternion_from_euler(0, 0, self.x[3])
+        pose = Pose(Point(self.x[0], self.x[1], self.x[2]), \
+            Quaternion(quat[0], quat[1], quat[2], quat[3]))
+        pose_cov = np.zeros((6,6))
+        pose_cov[:3,:3] = self.P[:3,:3]
+        pose_cov[5,5] = self.P[3,3]
+        pwc = PoseWithCovariance(pose, list(pose_cov.flatten()))
+
+        tw = Twist(Vector3(self.x[4], self.x[5], self.x[6]), \
+            Vector3(0, 0, self.x[7]))
+        twist_cov = np.zeros((6,6))
+        twist_cov[:3,:3] = self.P[4:7, 4:7]
+        twist_cov[5,5] = self.P[7,7]
+        twc = TwistWithCovariance(tw, list(twist_cov.flatten()))
+        h = Header(update_seq, timestamp, "map")
+        o = Odometry(h, "map", pwc, twc)
+        self.pub.publish(o)
+
+    def publish_estimate_strapdown(self, update_seq, timestamp, angular_velocity, angular_velocity_cov):
         pose = Pose(Point(self.x[0], self.x[1], self.x[2]), \
             Quaternion(self.x[6], self.x[7], self.x[8], self.x[9]))
         pose_cov = np.zeros((6,6))
@@ -80,7 +126,49 @@ class StrapdownINS:
         o = Odometry(h, "map", pwc, twc)
         self.pub.publish(o)
 
-    def propagate(self,imu_measurement):
+    def normalize_angle_states(self):
+        self.x[3] = np.mod( self.x[3] + np.pi, 2*np.pi) - np.pi
+
+    def propagate_normal(self, imu_measurement):
+        if self.last_update_time is None:
+            self.last_update_time = imu_measurement.header.stamp
+
+            # Instantiate the filter at the first compass meas
+            _, _, yaw = tf.transformations.euler_from_quaternion([imu_measurement.orientation.x,\
+                                                                imu_measurement.orientation.y, \
+                                                                imu_measurement.orientation.z,\
+                                                                imu_measurement.orientation.w])
+            self.x[3] = yaw
+            self.P[3,3] = 0.1
+            return
+        else:
+            delta_t_ros =  imu_measurement.header.stamp - self.last_update_time
+            self.last_update_time = imu_measurement.header.stamp
+            dt = delta_t_ros.to_sec()
+        self.update_lock.acquire()
+
+        x = self.x.reshape(-1,1)
+
+        A = np.eye(NUM_STATES)
+        num_base_states = 4
+        for d in range(num_base_states):
+            A[d, num_base_states + d] = dt
+        x_new = A.dot(x)
+        self.x = x_new.reshape(-1)
+        self.normalize_angle_states()
+
+        self.P = A.dot( self.P.dot( A.T )) + self.Q
+
+        # Update
+        self.update(imu_measurement.orientation, imu_measurement.orientation_covariance)
+
+        self.update_lock.release()
+
+        # if self.skip_multiplexer > 1000:
+        self.publish_estimate(imu_measurement.header.seq, imu_measurement.header.stamp)
+        
+
+    def propagate_strap(self,imu_measurement):
         """
         Propagate state and covariance forward in time by dt using process model
         and IMU measurement.
@@ -121,8 +209,8 @@ class StrapdownINS:
         b_wz = self.x[15]
 
         # IMU Measurements
-        a_x = -imu_measurement.linear_acceleration.x
-        a_y = -imu_measurement.linear_acceleration.y
+        a_x = imu_measurement.linear_acceleration.x
+        a_y = imu_measurement.linear_acceleration.y
         a_z = imu_measurement.linear_acceleration.z - G_ACCEL
         w_x = imu_measurement.angular_velocity.x
         w_y = imu_measurement.angular_velocity.y
@@ -214,14 +302,88 @@ class StrapdownINS:
         self.x[6:10] = self.x[6:10]/np.linalg.norm(self.x[6:10])
 
         # Update
-        self.update(imu_measurement.orientation, imu_measurement.orientation_covariance)
+        self.update_strapdown(imu_measurement.orientation, imu_measurement.orientation_covariance)
 
         self.update_lock.release()
 
-        # if self.skip_multiplexer > 1000:
-        self.publish_estimate(imu_measurement.header.seq, imu_measurement.header.stamp, np.zeros(3), np.eye(3)*0.001)
+        if self.skip_multiplexer > 1000:
+            self.publish_estimate_strapdown(imu_measurement.header.seq, imu_measurement.header.stamp, np.zeros(3), np.eye(3)*0.001)
 
     def update(self, compass_meas, compass_meas_cov):
+        H = np.zeros((1,NUM_STATES))
+        H[0,3] = 1
+        _, _, yaw_meas = tf.transformations.euler_from_quaternion([compass_meas.x,\
+            compass_meas.y, compass_meas.z, compass_meas.w])
+        meas = np.array([[yaw_meas]]).T
+        pred = np.array([[self.x[3]]])
+        R = 0.1
+        tmp = np.dot( np.dot(H, self.P), H.T) + R
+        K = np.dot(self.P, np.dot( H.T, np.linalg.inv( tmp )) )
+        innovation = meas-pred
+        self.x = self.x + np.dot(K, innovation).reshape(NUM_STATES)
+        self.normalize_angle_states()
+        self.P = np.dot(np.eye(NUM_STATES)-np.dot(K,H),self.P)
+
+        # Update depth
+        if self.last_depth is not None:
+            H = np.zeros((1,NUM_STATES))
+            H[0,2] = 1
+            R = 0.1
+            tmp = np.dot( np.dot(H, self.P), H.T) + R
+            K = np.dot(self.P, np.dot( H.T, np.linalg.inv( tmp )) )
+            self.x = self.x + np.dot(K,self.last_depth-self.x[2]).reshape(NUM_STATES)
+            self.P = np.dot(np.eye(NUM_STATES)-np.dot(K,H),self.P)
+            self.last_depth = None
+
+        if self.data_x is not None and self.data_y is not None:
+            H = np.zeros((2,NUM_STATES))
+            H[0,0] = 1
+            H[1,1] = 1
+            R = np.eye(2) * 0.1
+            meas = np.array([[self.data_x, self.data_y]]).T
+            pred = np.array([[self.x[0], self.x[1]]]).T
+            tmp = np.dot( np.dot(H, self.P), H.T) + R
+            K = np.dot(self.P, np.dot( H.T, np.linalg.inv( tmp )) )
+            self.x = self.x + np.dot(K,meas-pred).reshape(NUM_STATES)
+            self.P = np.dot(np.eye(NUM_STATES)-np.dot(K,H),self.P)
+
+            self.data_x = None
+            self.data_y = None
+
+        if self.dvl_x is not None and self.dvl_y is not None:
+            H = np.zeros((2,NUM_STATES))
+            H[0, 4] = 1
+            H[1, 5] = 1
+            R = np.eye(2) * 0.025
+            meas = np.array([[self.dvl_x, self.dvl_y]]).T
+            pred = np.array([[self.x[4], self.x[5]]]).T
+            tmp = np.dot( np.dot(H, self.P), H.T) + R
+            K = np.dot(self.P, np.dot( H.T, np.linalg.inv( tmp )) )
+            self.x = self.x + np.dot(K,meas-pred).reshape(NUM_STATES)
+            self.P = np.dot(np.eye(NUM_STATES)-np.dot(K,H),self.P)
+            self.dvl_x = None
+            self.dvl_y = None
+
+        if self.last_intersection != None:
+            self.cuprint("Received CI result, correcting")
+            pos = [self.last_intersection.position.x, self.last_intersection.position.y, self.last_intersection.position.z]
+            vel = [self.last_intersection.velocity.x, self.last_intersection.velocity.y, self.last_intersection.velocity.z]
+            c_bar = np.array([pos[0], pos[1], pos[2], vel[0], vel[1], vel[2]]).reshape(-1,1)
+            Pcc = np.array(self.last_intersection.covariance).reshape(6,6)
+            x_prior = np.delete(self.x[:7], 3).reshape(-1,1) # remove yaw, yaw_vel
+            P_prior = self.P[:7, :7]
+            # Remove yaw
+            P_prior = np.delete(P_prior, 3, 0)
+            P_prior = np.delete(P_prior, 3, 1)
+
+            self.psci(x_prior, P_prior, c_bar, Pcc)
+            # self.normalize_angle_states()
+            self.last_intersection = None
+        else:
+            self.publish_intersection()
+        self.normalize_angle_states()
+
+    def update_strapdown(self, compass_meas, compass_meas_cov):
         
         # _, _, yaw_meas = tf.transformations.euler_from_quaternion([compass_meas.x,\
         #     compass_meas.y, compass_meas.z, compass_meas.w])
@@ -247,7 +409,7 @@ class StrapdownINS:
         if self.last_depth is not None:
             H = np.zeros((1,16))
             H[0,2] = 1
-            R = 0.01
+            R = 0.1
             tmp = np.dot( np.dot(H, self.P), H.T) + R
             K = np.dot(self.P, np.dot( H.T, np.linalg.inv( tmp )) )
             self.x = self.x + np.dot(K,self.last_depth-self.x[2]).reshape(NUM_STATES)
@@ -282,7 +444,7 @@ class StrapdownINS:
             H = np.zeros((2,16))
             H[0, 3] = 1
             H[1, 4] = 1
-            R = np.eye(2) * 0.01
+            R = np.eye(2) * 0.025
             meas = np.array([[self.dvl_x, self.dvl_y]]).T
             pred = np.array([[self.x[3], self.x[4]]]).T
             tmp = np.dot( np.dot(H, self.P), H.T) + R
@@ -295,6 +457,19 @@ class StrapdownINS:
             self.x[6:10] = self.x[6:10]/np.linalg.norm(self.x[6:10])
             self.dvl_x = None
             self.dvl_y = None
+
+        if self.last_intersection != None:
+            self.cuprint("Received CI result, correcting")
+            pos = [self.last_intersection.position.x, self.last_intersection.position.y, self.last_intersection.position.z]
+            vel = [self.last_intersection.velocity.x, self.last_intersection.velocity.y, self.last_intersection.velocity.z]
+            c_bar = np.array([pos[0], pos[1], pos[2], vel[0], vel[1], vel[2]]).reshape(-1,1)
+            Pcc = np.array(self.last_intersection.covariance).reshape(6,6)
+            x_prior = self.x[:6].reshape(-1,1)
+            P_prior = self.P[:6, :6]
+            self.psci_strapdown(x_prior, P_prior, c_bar, Pcc) # LOOK BACK IN HISTORY
+            self.last_intersection = None
+        else:
+            self.publish_intersection()
 
         # Artificially give some zero velocity measurements for the first 30s
         # if self.skip_multiplexer < 2000:
@@ -317,62 +492,68 @@ class StrapdownINS:
         # else:
         #     rospy.loginfo_once("Fake DVL meas done")
 
-    #     if measurement_type == 'GPS':
-    #         H = np.zeros((3,16))
-    #         H[0:3,0:3] = np.eye(3)
-    #         R = self.sensors['GPS'].noise
-    #         h = self.x[0:3]
-    #         # self.gps_residuals = np.concatenate((self.gps_residuals,measurement-h))
-    #     elif measurement_type == 'Depth':
-    #         H = np.zeros((1,16))
-    #         H[0,2] = 1
-    #         R = self.sensors['Depth'].noise
-    #         h = self.x[2]
-    #         # self.depth_residuals = np.concatenate((self.depth_residuals,measurement-h))
-    #     elif measurement_type == 'GPS_x':
-    #         H = np.zeros((1,16))
-    #         H[0,0] = 1
-    #         R = self.sensors['GPS'].noise[0,0]
-    #         h = self.x[0]
-    #     elif measurement_type == 'GPS_y':
-    #         H = np.zeros((1,16))
-    #         H[0,1] = 1
-    #         R = self.sensors['GPS'].noise[1,1]
-    #         h = self.x[1]
-    #     elif measurement_type == 'GPS_z':
-    #         H = np.zeros((1,16))
-    #         H[0,2] = 1
-    #         R = self.sensors['GPS'].noise[2,2]
-    #         h = self.x[2]
-        # elif measurement_type == 'Compass':
-            # H = np.zeros((1,16))
-            # H[0:4,6:10] = np.eye(4)
-            
+    def psci(self, x_prior, P_prior, c_bar, Pcc):
+        x = self.x.reshape(-1,1)
+        P = self.P
 
-    #     elif measurement_type == 'DVL':
-    #         H = np.zeros((3,16))
-    #         H[0:3,3:6] = np.eye(3)
-    #         R = self.sensors['DVL'].noise
-    #         h = self.x[3:6]
-    #     elif measurement_type == 'Magnetometer':
-    #         H = np.zeros((4,16))
-    #         H[0:4,6:10] = np.eye(4)
-    #         R = np.sqrt(np.diag(self.sensors['Magnetometer'].noise))[0]**2*np.eye(4)
-    #         h = self.x[6:10]
-    #         measurement = self.euler2quat(measurement)
-
-    #     # compute the Kalman gain for the measurement
-    
+        D_inv = np.linalg.inv(P_prior) - np.linalg.inv(Pcc)
+        D_inv_d = np.dot( np.linalg.inv(P_prior), x_prior) - np.dot( np.linalg.inv(Pcc), c_bar)
         
-    #     try:
-    #         assert(K.shape == (self.x.shape[0],H.shape[0]))
-    #     except AssertionError:
-    #         print('K is the wrong shape!: Is {}, should be {}'.format(K.shape,(self.x.shape[0],H.shape[0])))
-    #         raise AssertionError
+        trans = np.zeros((8,6)) # Transformation Matrix
+        trans[:3,:3] = np.eye(3)
+        trans[4:7,3:6] = np.eye(3)
 
-    
+        info_vector = np.dot(trans, D_inv_d)
+        info_matrix = np.dot(trans, D_inv).dot(trans.T)
+
+        posterior_cov = np.linalg.inv( np.linalg.inv( P ) + info_matrix )
+        tmp = np.dot(np.linalg.inv( P ), x) + info_vector
+        posterior_state = np.dot( posterior_cov, tmp )
+
+        self.x = posterior_state.reshape(-1)
+        self.P = posterior_cov
+
+    def psci_strapdown(self, x_prior, P_prior, c_bar, Pcc):
+        x = self.x.reshape(-1,1)
+        P = self.P
+
+        D_inv = np.linalg.inv(P_prior) - np.linalg.inv(Pcc)
+        D_inv_d = np.dot( np.linalg.inv(P_prior), x_prior) - np.dot( np.linalg.inv(Pcc), c_bar)
+
+        info_vector = np.zeros( x.shape )
+        info_vector[:6] = D_inv_d
+
+        info_matrix = np.zeros( P.shape )
+        info_matrix[:6,:6] = D_inv
+
+        posterior_cov = np.linalg.inv( np.linalg.inv( P ) + info_matrix )
+        tmp = np.dot(np.linalg.inv( P ), x) + info_vector
+        posterior_state = np.dot( posterior_cov, tmp )
+
+        self.x = posterior_state.reshape(-1)
+        self.P = posterior_cov
+
 
 def get_initial_estimate():
+    starting_position = rospy.get_param("~starting_position")
+    starting_yaw = rospy.get_param("~starting_yaw")
+    initial_uncertainty = rospy.get_param("~initial_uncertainty/ownship")
+    state = np.zeros(NUM_STATES)
+    state[0:3] = starting_position[0:3]
+    state[3] = starting_yaw
+    uncertainty = np.zeros((NUM_STATES, NUM_STATES))
+    uncertainty[0,0] = initial_uncertainty["x"]
+    uncertainty[1,1] = initial_uncertainty["y"]
+    uncertainty[2,2] = initial_uncertainty["z"]
+    uncertainty[3,3] = initial_uncertainty["yaw"]
+    uncertainty[4,4] = initial_uncertainty["x_vel"]
+    uncertainty[5,5] = initial_uncertainty["y_vel"]
+    uncertainty[6,6] = initial_uncertainty["z_vel"]
+    uncertainty[7,7] = initial_uncertainty["yaw_vel"]
+    return state, uncertainty
+
+
+def get_initial_estimate_strapdown():
     starting_position = rospy.get_param("~starting_position")
     starting_yaw = rospy.get_param("~starting_yaw")
     initial_uncertainty = rospy.get_param("~initial_uncertainty/ownship")
@@ -397,6 +578,19 @@ def get_process_noise():
     Q[0,0] = ownship_Q["x"]
     Q[1,1] = ownship_Q["y"]
     Q[2,2] = ownship_Q["z"]
+    Q[3,3] = ownship_Q["yaw"]
+    Q[3,3] = ownship_Q["x_vel"]
+    Q[4,4] = ownship_Q["y_vel"]
+    Q[5,5] = ownship_Q["z_vel"]
+    Q[7,7] = ownship_Q["yaw_vel"]
+    return Q
+
+def get_procdess_noise_strapdown():
+    Q = np.zeros((NUM_STATES, NUM_STATES))
+    ownship_Q = rospy.get_param("~process_noise/ownship")
+    Q[0,0] = ownship_Q["x"]
+    Q[1,1] = ownship_Q["y"]
+    Q[2,2] = ownship_Q["z"]
     Q[3,3] = ownship_Q["x_vel"]
     Q[4,4] = ownship_Q["y_vel"]
     Q[5,5] = ownship_Q["z_vel"]
@@ -416,62 +610,19 @@ def get_default_meas_variance():
 if __name__ == "__main__":
     rospy.init_node("strapdown")
 
-    x0, P0 = get_initial_estimate()
-    Q = get_process_noise()
+    # strapdown = rospy.get_param("~strapdown")
+    strapdown = False
+    if strapdown:
+        x0, P0 = get_initial_estimate_strapdown()
+        Q = get_process_noise_strapdown()
+    else:
+        NUM_STATES = 8
+        x0, P0 = get_initial_estimate()
+        Q = get_process_noise()
+    
     # default_meas_variance = get_default_meas_variance()
     default_meas_variance = {}
     # use_control_input = rospy.get_param("~use_control_input")
 
-    s = StrapdownINS(x0, P0, Q, default_meas_variance)
+    s = StrapdownINS(x0, P0, Q, default_meas_variance, strapdown)
     rospy.spin()
-"""
-That propagate functions looks fine
-
-
-I'll have 8h tomorrow to:
-1) Get the navigation filter working: add compass, GPS, DVL
-2) Make it work with ETDDF & the PSCI
-3) Record some data navigating single vehicle autonomously
-4) Run experiment tracking team members (may need to write a measurement buffer transporter)
-5) Run experiment tracking red agent
-6) Repeat experiment, collect some figures
-7) Work with Robert to debug sharing of measurements
-8) MONEY: Run experiment with tracking 8 agents using delta tiering vs CI (doesn't even need red agent)
----> Nisar would be very interested in this
-
-Trim the fat
-Add RK4 integration
-I'm probably going to need to tune the gyro + accelerometer noise
-Test deadreckoning with perfect acceleration measurements, add magnetometer measurements (no noise)
-Add in some biases w/ periodic truth measurements
-move this file to etddf repo
-Add covariance intersection support (take in an odom message)
-Run the test
-
-Do covariance intersection on the strapdown side
-
-FIRST:
-Take in no noise GYRO + Accel data, see how well it does deadreckoning (if it does well halleyluyah!)
-Add in compass data, see if we still get good results
-TEST
-SECOND: (<20min)
-Add in noise see how well it does
-TEST
-
-TEST out sonar on the bluerov
-
-have etddf take in pose_gt (components as GPS)
-Now do CI with PS-CI
-TEST, we should the nav filter perform excellently
-
-THIRD:
-Do PS-CI on the etddf side
-Have etddf publish at 1-2Hz
-Test it all out
-Tie nav filter to uuv control
-
-FOURTH:
-Put it on hardware and check our velocity estimates
-
-Slow down ETDDF to publish at 1-2Hz
-"""

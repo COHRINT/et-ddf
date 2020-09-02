@@ -145,17 +145,57 @@ class DeltaTier:
         # Slice out overlapping states in main filter
         begin_ind = my_id*self.num_ownship_states
         end_ind = (my_id+1)*self.num_ownship_states
-        x_main = self.main_filter.filter.x_hat[begin_ind:end_ind].reshape(-1,1)
-        P_main = self.main_filter.filter.P[begin_ind:end_ind,begin_ind:end_ind]
-        P_main = P_main.reshape(self.num_ownship_states, self.num_ownship_states)
+        x_prior = self.main_filter.filter.x_hat[begin_ind:end_ind].reshape(-1,1)
+        P_prior = self.main_filter.filter.P[begin_ind:end_ind,begin_ind:end_ind]
+        P_prior = P_prior.reshape(self.num_ownship_states, self.num_ownship_states)
         
-        c_bar, Pcc = DeltaTier.run_covariance_intersection(x, P, x_main, P_main)
+        c_bar, Pcc = DeltaTier.run_covariance_intersection(x, P, x_prior, P_prior)
 
         # Update main filter states
-        self.main_filter.filter.x_hat[begin_ind:end_ind] = c_bar
-        self.main_filter.filter.P[begin_ind:end_ind,begin_ind:end_ind] = Pcc
+        if Pcc.shape != self.main_filter.filter.P.shape:
+            self.psci(x_prior, P_prior, c_bar, Pcc)
+        else:
+            self.main_filter.filter.x_hat = c_bar
+            self.main_filter.filter.P = Pcc
 
         return c_bar, Pcc
+
+    def psci(self, x_prior, P_prior, c_bar, Pcc):
+        """ Partial State Update all other states of the filter using the result of CI
+
+        Arguments:
+            x_prior {np.ndarray} -- This filter's prior estimate (over common states)
+            P_prior {np.ndarray} -- This filter's prior covariance 
+            c_bar {np.ndarray} -- intersected estimate
+            Pcc {np.ndarray} -- intersected covariance
+
+        Returns:
+            None
+            Updates self.main_filter.filter.x_hat and P, the delta tier's primary estimate
+        """
+        x = self.main_filter.filter.x_hat
+        P = self.main_filter.filter.P
+
+        D_inv = np.linalg.inv(P_prior) - np.linalg.inv(Pcc)
+        D_inv_d = np.dot( np.linalg.inv(P_prior), x_prior) - np.dot( np.linalg.inv(Pcc), c_bar)
+        
+        my_id = self.asset2id[self.my_name]
+        begin_ind = my_id*self.num_ownship_states
+        end_ind = (my_id+1)*self.num_ownship_states
+
+        info_vector = np.zeros( x.shape )
+        info_vector[begin_ind:end_ind] = D_inv_d
+
+        info_matrix = np.zeros( P.shape )
+        info_matrix[begin_ind:end_ind, begin_ind:end_ind] = D_inv
+
+        posterior_cov = np.linalg.inv( np.linalg.inv( P ) + info_matrix )
+        tmp = np.dot(np.linalg.inv( P ), x) + info_vector
+        posterior_state = np.dot( posterior_cov, tmp )
+
+        self.main_filter.filter.x_hat = posterior_state
+        self.main_filter.filter.P = posterior_cov
+
 
     def catch_up(self, delta_multiplier, shared_buffer):
         """Updates main estimate and common estimate using the shared buffer

@@ -129,21 +129,22 @@ def convert_numpy8(cov_msg):
                                                         cov_msg.pose.pose.orientation.y, \
                                                         cov_msg.pose.pose.orientation.z, \
                                                         cov_msg.pose.pose.orientation.w])
-    x[3,0] = yaw
+    x[3,0] = yaw # * (180 / np.pi)
     x[4,0] = cov_msg.twist.twist.linear.x
     x[5,0] = cov_msg.twist.twist.linear.y
     x[6,0] = cov_msg.twist.twist.linear.z
     x[7,0] = cov_msg.twist.twist.angular.z
     tmp = np.array(cov_msg.pose.covariance).reshape(6,6)
     P[:3,:3] = tmp[:3,:3]
-    P[3,3] = 0.01
+    P[3,3] = tmp[5,5]
     tmp = np.array(cov_msg.twist.covariance).reshape(6,6)
     P[4:7,4:7] = tmp[:3,:3]
-    P[7,7] = 0.1
+    P[7,7] = tmp[5,5]
     return x,P
 
 parser = argparse.ArgumentParser(description='Bag Analysis Node')
 parser.add_argument("-b", "--bag", type=str, help="Bag File to Analyze", required=True)
+parser.add_argument("-e", "--etddf", type=bool, help="Analyze ETDDF (True) or Strapdown (False)",default=False, required=False)
 args = parser.parse_args()
 
 
@@ -152,9 +153,12 @@ synced_3of3 = []
 synced_times = []
 last_pose_gt = None
 last_pose_gt_time = None
-# etddf_topic = '/'+ASSET_NAME + '/etddf/estimate/' + ASSET_NAME
-# etddf_topic = '/'+ASSET_NAME + '/etddf/strapdown/estimate'
-etddf_topic = '/bluerov2_4/odometry/filtered'
+
+if args.etddf == True:
+    etddf_topic = '/'+ASSET_NAME + '/etddf/estimate/' + ASSET_NAME
+else:
+    etddf_topic = '/'+ASSET_NAME + '/strapdown/estimate'
+# etddf_topic = '/bluerov2_4/odometry/filtered'
 for topic, msg, t in bag.read_messages(topics=[etddf_topic, '/' + ASSET_NAME+ '/pose_gt']):
     if topic == etddf_topic and last_pose_gt is not None:
         synced_3of3.append([msg, last_pose_gt])
