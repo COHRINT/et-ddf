@@ -127,7 +127,10 @@ class StrapdownINS:
         self.pub.publish(o)
 
     def normalize_angle_states(self):
-        self.x[3] = np.mod( self.x[3] + np.pi, 2*np.pi) - np.pi
+        self.x[3] = self.normalize_angle(self.x[3])
+        
+    def normalize_angle(self, angle):
+        return np.mod( angle + np.pi, 2*np.pi) - np.pi
 
     def propagate_normal(self, imu_measurement):
         if self.last_update_time is None:
@@ -314,12 +317,10 @@ class StrapdownINS:
         H[0,3] = 1
         _, _, yaw_meas = tf.transformations.euler_from_quaternion([compass_meas.x,\
             compass_meas.y, compass_meas.z, compass_meas.w])
-        meas = np.array([[yaw_meas]]).T
-        pred = np.array([[self.x[3]]])
         R = 0.1
         tmp = np.dot( np.dot(H, self.P), H.T) + R
         K = np.dot(self.P, np.dot( H.T, np.linalg.inv( tmp )) )
-        innovation = meas-pred
+        innovation = self.normalize_angle(yaw_meas-self.x[3])
         self.x = self.x + np.dot(K, innovation).reshape(NUM_STATES)
         self.normalize_angle_states()
         self.P = np.dot(np.eye(NUM_STATES)-np.dot(K,H),self.P)
