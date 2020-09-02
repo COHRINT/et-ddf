@@ -17,6 +17,7 @@ add_message_files(
    AssetEstimate.msg
    NetworkEstimate.msg
    EtddfStatistics.msg
+   PositionVelocity.msg
 )
 
 add_service_files(

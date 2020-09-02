@@ -12,13 +12,13 @@ from etddf.delta_tier import DeltaTier
 import rospy
 import threading
 from minau.msg import ControlStatus
-from etddf.msg import Measurement, MeasurementPackage, NetworkEstimate, AssetEstimate, EtddfStatistics
+from etddf.msg import Measurement, MeasurementPackage, NetworkEstimate, AssetEstimate, EtddfStatistics, PositionVelocity
 from etddf.srv import GetMeasurementPackage
 import numpy as np
 import tf
 np.set_printoptions(suppress=True)
 from copy import deepcopy
-from std_msgs.msg import Header
+from std_msgs.msg import Header, Float64
 from geometry_msgs.msg import PoseWithCovariance, Pose, Point, Quaternion, Twist, Vector3, TwistWithCovariance, PoseWithCovarianceStamped
 from nav_msgs.msg import Odometry
 from minau.msg import SonarTargetList, SonarTarget
@@ -30,7 +30,7 @@ __email__ = "luke.barbier@colorado.edu"
 __status__ = "Development"
 __license__ = "MIT"
 __maintainer__ = "Luke Barbier"
-__version__ = "1.2.2"
+__version__ = "2.0"
 
 NUM_OWNSHIP_STATES = 6
 
@@ -92,7 +92,8 @@ class ETDDF_Node:
         self.red_asset_names = rospy.get_param("~red_team_names")
 
         # Depth Sensor
-        rospy.Subscriber("mavros/global_position/local", Odometry, self.depth_callback, queue_size=1)
+        if rospy.get_param("~measurement_topics/depth") == "None":
+            rospy.Subscriber(rospy.get_param("~measurement_topics/depth"), Float64, self.depth_callback, queue_size=1)
 
         # Modem & Measurement Packages
         rospy.Subscriber("etddf/packages_in", MeasurementPackage, self.meas_pkg_callback, queue_size=1)
@@ -105,27 +106,9 @@ class ETDDF_Node:
         if rospy.get_param("~measurement_topics/imu_ci") == "None":
             rospy.Timer(rospy.Duration(1 / self.update_rate), self.no_nav_filter_callback)
         else:
-            self.set_pose_pub = rospy.Publisher("set_pose", PoseWithCovarianceStamped, queue_size=10)
-
-            # Correct the pose of 
-            self.cuprint("Waiting to correct filter")
-            rospy.wait_for_message(rospy.get_param("~measurement_topics/imu_ci"), Odometry)
-            yaw = rospy.get_param("~starting_yaw",0.0)
-            q = tf.transformations.quaternion_from_euler(0, 0, yaw)
-            nav_estimate = Odometry()
-            nav_estimate.pose.pose.orientation.x = q[0]
-            nav_estimate.pose.pose.orientation.y = q[1]
-            nav_estimate.pose.pose.orientation.z = q[2]
-            nav_estimate.pose.pose.orientation.w = q[3]
-            h = Header()
-            h.frame_id = "map"
-            z = np.eye(6) * 0.01
-            for i in range(10):
-                self.correct_nav_filter(x0, z, h, nav_estimate)
-                rospy.sleep(0.1)
-            self.cuprint("Filter Corrected")
-
-            rospy.Subscriber(rospy.get_param("~measurement_topics/imu_ci"), Odometry, self.nav_filter_callback, queue_size=1)
+            self.intersection_pub = rospy.Publisher("strapdown/intersection_result", PositionVelocity, queue_size=1)
+            rospy.Subscriber(rospy.get_param("~measurement_topics/imu_ci"), PositionVelocity, self.nav_filter_callback, queue_size=1)
+            rospy.Subscriber(rospy.get_param("~measurement_topics/imu_est"), Odometry, self.orientation_estimate_callback, queue_size=1)
 
         # Sonar Subscription
         if rospy.get_param("~measurement_topics/sonar") != "None":
@@ -135,18 +118,10 @@ class ETDDF_Node:
         # rospy.Service('etddf/get_measurement_package', GetMeasurementPackage, self.get_meas_pkg_callback)
         self.cuprint("loaded")
 
-    def correct_nav_filter(self, c_bar, Pcc, header, nav_estimate):
-
-        nav_covpt = np.array(nav_estimate.pose.covariance).reshape(6,6)
-
-        pose = Pose(Point(c_bar[0,0],c_bar[1,0],c_bar[2,0]), \
-                    nav_estimate.pose.pose.orientation)
-        pose_cov = np.zeros((6,6))
-        pose_cov[:3,:3] = Pcc[:3,:3]
-        pose_cov[3:,3:] = nav_covpt[3:,3:]
-        pwc = PoseWithCovariance(pose, list(pose_cov.flatten()))
-        pwcs = PoseWithCovarianceStamped(header, pwc)
-        self.set_pose_pub.publish(pwcs)
+    def orientation_estimate_callback(self, odom):
+        self.meas_lock.acquire()
+        self.last_orientation = odom.pose.pose.orientation
+        self.meas_lock.release()
 
     def sonar_callback(self, sonar_list):
 
@@ -155,8 +130,10 @@ class ETDDF_Node:
             if self.last_orientation is None: # No orientation, no linearization of the sonar measurement
                 return
             # Convert quaternions to Euler angles.
+            self.meas_lock.acquire()
             (r, p, y) = tf.transformations.euler_from_quaternion([self.last_orientation.x, \
                 self.last_orientation.y, self.last_orientation.z, self.last_orientation.w])
+            self.meas_lock.release()
             bearing_world = y + target.bearing_rad
 
             z = target.range_m * np.sin(target.elevation_rad)
@@ -219,8 +196,8 @@ class ETDDF_Node:
         self.update_lock.release()
         self.publish_stats(t_now)
 
-    def nav_filter_callback(self, odom):
-
+    def nav_filter_callback(self, pv_msg):
+        
         # Update at specified rate
         t_now = rospy.get_rostime()
         delta_t_ros =  t_now - self.last_update_time
@@ -251,28 +228,22 @@ class ETDDF_Node:
         ### Covariancee Intersect ###
 
         # Turn odom estimate into numpy
-        mean = np.array([[ odom.pose.pose.position.x, \
-                        odom.pose.pose.position.y, \
-                        odom.pose.pose.position.z, \
-                        odom.twist.twist.linear.x, \
-                        odom.twist.twist.linear.y, \
-                        odom.twist.twist.linear.z ]]).T
-        cov_point = np.array(odom.pose.covariance).reshape(6,6)
-        cov_twist = np.array(odom.twist.covariance).reshape(6,6)
-        cov = np.zeros((NUM_OWNSHIP_STATES, NUM_OWNSHIP_STATES))
-        cov[:3, :3] = cov_point[:3,:3]
-        cov[3:, 3:] = cov_twist[3:,3:]
+        mean = np.array([[pv_msg.position.x, pv_msg.position.y, pv_msg.position.z, \
+                        pv_msg.velocity.x, pv_msg.velocity.y, pv_msg.velocity.z]]).T
+        cov = np.array(pv_msg.covariance).reshape(6,6)
 
         # Run covariance intersection
         if np.trace(cov) < 1: # Prevent Nav Filter from having zero uncertainty
             cov = np.eye(NUM_OWNSHIP_STATES) * 0.1
-        # c_bar, Pcc = self.filter.intersect(mean, cov)
-        # self.correct_nav_filter(c_bar, Pcc, odom.header, odom)
+        c_bar, Pcc = self.filter.intersect(mean, cov)
 
-        # TODO partial state update everything
+        position = Vector3(c_bar[0,0], c_bar[1,0], c_bar[2,0])
+        velocity = Vector3(c_bar[3,0], c_bar[4,0], c_bar[5,0])
+        covariance = list(Pcc.flatten())
+        new_pv_msg = PositionVelocity(position, velocity, covariance)
+        self.intersection_pub.publish(new_pv_msg)
 
-        self.last_orientation = odom.pose.pose.orientation
-        self.publish_estimates(t_now, odom)
+        self.publish_estimates(t_now)
         self.last_update_time = t_now
         self.update_seq += 1
         self.update_lock.release()
@@ -289,10 +260,10 @@ class ETDDF_Node:
 
     def depth_callback(self, msg):
         self.meas_lock.acquire()
-        self.last_depth_meas = msg.pose.pose.position.z
+        self.last_depth_meas = msg.data
         self.meas_lock.release()
 
-    def publish_estimates(self, timestamp, nav_estimate):
+    def publish_estimates(self, timestamp):
         ne = NetworkEstimate()
         for asset in self.asset2id.keys():
             if "surface" in asset:
@@ -303,21 +274,19 @@ class ETDDF_Node:
             #     print("publishing " + asset + "'s estimate")
 
             # Construct Odometry Msg for Asset
-            nav_covpt = np.array(nav_estimate.pose.covariance).reshape(6,6)
-            nav_covtw = np.array(nav_estimate.twist.covariance).reshape(6,6)
 
             mean, cov = self.filter.get_asset_estimate(asset)
             pose = Pose(Point(mean[0],mean[1],mean[2]), \
-                        nav_estimate.pose.pose.orientation)
+                        Quaternion(0,0,0,1))
             pose_cov = np.zeros((6,6))
             pose_cov[:3,:3] = cov[:3,:3]
-            pose_cov[3:,3:] = nav_covpt[3:,3:]
+            pose_cov[3:,3:] = np.eye(3) * -1
             pwc = PoseWithCovariance(pose, list(pose_cov.flatten()))
 
-            tw = Twist(Vector3(mean[3],mean[4],mean[5]), nav_estimate.twist.twist.angular)
+            tw = Twist(Vector3(mean[3],mean[4],mean[5]), Vector3(0,0,0))
             twist_cov = np.zeros((6,6))
             twist_cov[:3,:3] = cov[3:6,3:6]
-            twist_cov[3:,3:] = nav_covtw[3:,3:]
+            twist_cov[3:, 3:] = np.eye(3) * -1
             twc = TwistWithCovariance(tw, list(twist_cov.flatten()))
             h = Header(self.update_seq, timestamp, "map")
             o = Odometry(h, "map", pwc, twc)
