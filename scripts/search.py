@@ -126,13 +126,18 @@ class Search:
                 self.spotted(target)
     
     def spotted(self,target):
-
+        print('Spotted')
+        print(self.name)
         range_to = target.range_m
         bearing = target.bearing_rad
-        bearing += self.yaw
+        bearing += self.truth_yaw
         bearing = normalize_angle(bearing)
-        x = self.position.x + range_to*np.cos(bearing)
-        y = self.position.y + range_to*np.sin(bearing)
+        x = self.truth_pos.x + range_to*np.cos(bearing)
+        y = self.truth_pos.y + range_to*np.sin(bearing)
+        print(self.waypoint)
+        self.waypoint = [x,y,self.truth_pos.z]
+
+
         self.red_found = True
         x_close = None
         y_close = None
@@ -299,7 +304,7 @@ if __name__ == "__main__":
     initial_time = rospy.get_rostime()
     print(initial_time)
     rate = rospy.Rate(20)
-    while not (s3.red_found or s4.red_found) and (not rospy.is_shutdown()):
+    while (not rospy.is_shutdown()):
         if PLOTTING:
             if s3.need_plot:
                 s3.plot(True)

@@ -45,9 +45,9 @@ def defineModels(bel,scans):
 
     #p_dynm(x_t+1,y_t+1|x_t,y_t)
     p_outside = 0.001     #probability it is out of space, deals with last row of p_dynm
-    p_dynm = np.array([[0.01,0.01,0.01],
-                       [0.01,0.92,0.01],
-                       [0.01,0.01,0.01],
+    p_dynm = np.array([[0.0,0.05,0.0],
+                       [0.05,0.8,0.05],
+                       [0.0,0.05,0.0],
                        [p_outside/(2*bel.shape[0]+2*bel.shape[1]),0,0]])
     p_dynm[:3,:]/=p_dynm[:3,:].sum()
     
@@ -86,13 +86,23 @@ def simulate(bel,state,plotting=False):
     if(plotting):
         fig,ax = plt.subplots()
     
-    z = [5,5,0]
-    
+
+
+    pos1 = [[5,5],[20,5],[35,5],[35,15],[20,15],[5,15]]
+    pos2 = [[5,35],[20,35],[35,35],[35,25],[20,25],[5,25]]
+
+    posnum = 0
+    ang = 0
     for i in range(200):
         print(i)
+        z1 = [pos1[posnum][0],pos1[posnum][1],ang]
+        z2 = [pos2[posnum][0],pos2[posnum][1],ang]
 
-        bel = bayes(bel,z,p_dyn,p_obs)
-        z[2] = (z[2]+1)%20
+        bel = bayes(bel,z1,p_dyn,p_obs)
+        bel = bayes(bel,z2,p_dyn,p_obs)
+        if ang == 19:
+            posnum+=1
+        ang = (ang+1)%20
         if(plotting):
             x = np.array(range(40))
             X,Y = np.meshgrid(x,x)
