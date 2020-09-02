@@ -30,7 +30,7 @@
     <include file="$(find etddf)/launch/nav_filter.launch" >
         <arg name="starting_position_enu" value="$(arg starting_position_enu)" />
         <arg name="starting_yaw_enu" value="$(arg starting_yaw_enu)" />
-        <arg name="wait_on_startup" value="20" />
+        <arg name="wait_on_startup" value="0" />
     </include>
 
 </launch>

@@ -364,19 +364,23 @@ class StrapdownINS:
             self.dvl_x = None
             self.dvl_y = None
 
-        # if self.last_intersection != None:
-        #     self.cuprint("Received CI result, correcting")
-        #     pos = [self.last_intersection.position.x, self.last_intersection.position.y, self.last_intersection.position.z]
-        #     vel = [self.last_intersection.velocity.x, self.last_intersection.velocity.y, self.last_intersection.velocity.z]
-        #     c_bar = np.array([pos[0], pos[1], pos[2], vel[0], vel[1], vel[2]]).reshape(-1,1)
-        #     Pcc = np.array(self.last_intersection.covariance).reshape(6,6)
-        #     x_prior = self.x[:6].reshape(-1,1)
-        #     P_prior = self.P[:6, :6]
-        #     self.psci(x_prior, P_prior, c_bar, Pcc)
-        #     # self.normalize_angle_states()
-        #     self.last_intersection = None
-        # else:
-        #     self.publish_intersection()
+        if self.last_intersection != None:
+            self.cuprint("Received CI result, correcting")
+            pos = [self.last_intersection.position.x, self.last_intersection.position.y, self.last_intersection.position.z]
+            vel = [self.last_intersection.velocity.x, self.last_intersection.velocity.y, self.last_intersection.velocity.z]
+            c_bar = np.array([pos[0], pos[1], pos[2], vel[0], vel[1], vel[2]]).reshape(-1,1)
+            Pcc = np.array(self.last_intersection.covariance).reshape(6,6)
+            x_prior = np.delete(self.x[:7], 3).reshape(-1,1) # remove yaw, yaw_vel
+            P_prior = self.P[:7, :7]
+            # Remove yaw
+            P_prior = np.delete(P_prior, 3, 0)
+            P_prior = np.delete(P_prior, 3, 1)
+
+            self.psci(x_prior, P_prior, c_bar, Pcc)
+            # self.normalize_angle_states()
+            self.last_intersection = None
+        else:
+            self.publish_intersection()
         self.normalize_angle_states()
 
     def update_strapdown(self, compass_meas, compass_meas_cov):
@@ -462,7 +466,7 @@ class StrapdownINS:
             Pcc = np.array(self.last_intersection.covariance).reshape(6,6)
             x_prior = self.x[:6].reshape(-1,1)
             P_prior = self.P[:6, :6]
-            self.psci(x_prior, P_prior, c_bar, Pcc)
+            self.psci_strapdown(x_prior, P_prior, c_bar, Pcc) # LOOK BACK IN HISTORY
             self.last_intersection = None
         else:
             self.publish_intersection()
@@ -495,11 +499,32 @@ class StrapdownINS:
         D_inv = np.linalg.inv(P_prior) - np.linalg.inv(Pcc)
         D_inv_d = np.dot( np.linalg.inv(P_prior), x_prior) - np.dot( np.linalg.inv(Pcc), c_bar)
         
+        trans = np.zeros((8,6)) # Transformation Matrix
+        trans[:3,:3] = np.eye(3)
+        trans[4:7,3:6] = np.eye(3)
+
+        info_vector = np.dot(trans, D_inv_d)
+        info_matrix = np.dot(trans, D_inv).dot(trans.T)
+
+        posterior_cov = np.linalg.inv( np.linalg.inv( P ) + info_matrix )
+        tmp = np.dot(np.linalg.inv( P ), x) + info_vector
+        posterior_state = np.dot( posterior_cov, tmp )
+
+        self.x = posterior_state.reshape(-1)
+        self.P = posterior_cov
+
+    def psci_strapdown(self, x_prior, P_prior, c_bar, Pcc):
+        x = self.x.reshape(-1,1)
+        P = self.P
+
+        D_inv = np.linalg.inv(P_prior) - np.linalg.inv(Pcc)
+        D_inv_d = np.dot( np.linalg.inv(P_prior), x_prior) - np.dot( np.linalg.inv(Pcc), c_bar)
+
         info_vector = np.zeros( x.shape )
         info_vector[:6] = D_inv_d
 
         info_matrix = np.zeros( P.shape )
-        info_matrix[:6, :6] = D_inv
+        info_matrix[:6,:6] = D_inv
 
         posterior_cov = np.linalg.inv( np.linalg.inv( P ) + info_matrix )
         tmp = np.dot(np.linalg.inv( P ), x) + info_vector

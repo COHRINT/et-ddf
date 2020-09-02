@@ -7,7 +7,7 @@ process_noise:
   ownship:
     x: 0.0
     y: 0.0
-    z: 0.01
+    z: 0.0
     quat: 0.001 # Scaled by 100 in the code
     yaw: 0.1
     x_vel: 0.00001

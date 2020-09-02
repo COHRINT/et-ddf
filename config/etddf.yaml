@@ -6,7 +6,7 @@ delta_tiers: [1]
 
 ## Measurement topics
 measurement_topics:
-  depth: "None" #"mavros/global_position/rel_alt"
+  depth: "baro"
   imu_ci: "strapdown/intersection"
   imu_est: "strapdown/estimate"
   sonar: "None" # "sonar_processing/target_list"

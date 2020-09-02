@@ -92,7 +92,7 @@ class ETDDF_Node:
         self.red_asset_names = rospy.get_param("~red_team_names")
 
         # Depth Sensor
-        if rospy.get_param("~measurement_topics/depth") == "None":
+        if rospy.get_param("~measurement_topics/depth") != "None":
             rospy.Subscriber(rospy.get_param("~measurement_topics/depth"), Float64, self.depth_callback, queue_size=1)
 
         # Modem & Measurement Packages
@@ -113,10 +113,17 @@ class ETDDF_Node:
         # Sonar Subscription
         if rospy.get_param("~measurement_topics/sonar") != "None":
             rospy.Subscriber(rospy.get_param("~measurement_topics/sonar"), SonarTargetList, self.sonar_callback)
-
+        
+        self.data_x, self.data_y = None, None
+        rospy.Subscriber("pose_gt", Odometry, self.gps_callback, queue_size=1)
+    
         # Initialize Buffer Service
         # rospy.Service('etddf/get_measurement_package', GetMeasurementPackage, self.get_meas_pkg_callback)
         self.cuprint("loaded")
+
+    def gps_callback(self, msg):
+        self.data_x = msg.pose.pose.position.x + np.random.normal(0, scale=0.05)
+        self.data_y = msg.pose.pose.position.y + np.random.normal(0, scale=0.05)
 
     def orientation_estimate_callback(self, odom):
         self.meas_lock.acquire()
@@ -221,6 +228,14 @@ class ETDDF_Node:
             z = Measurement("depth", t_now, self.my_name,"", z_data, z_r, []) # Flip z data to transform enu -> NED
             self.filter.add_meas(z)
             self.last_depth_meas = None
+        if self.data_x != None:
+            x = Measurement("gps_x", t_now, self.my_name,"", self.data_x, 0.1, [])
+            self.filter.add_meas(x)
+            self.data_x = None
+        if self.data_y != None:
+            y = Measurement("gps_y", t_now, self.my_name,"", self.data_y, 0.1, [])
+            self.filter.add_meas(y)
+            self.data_y = None
 
         # correction
         self.filter.correct(t_now)
@@ -235,13 +250,13 @@ class ETDDF_Node:
         # Run covariance intersection
         if np.trace(cov) < 1: # Prevent Nav Filter from having zero uncertainty
             cov = np.eye(NUM_OWNSHIP_STATES) * 0.1
-        c_bar, Pcc = self.filter.intersect(mean, cov)
+        # c_bar, Pcc = self.filter.intersect(mean, cov)
 
-        position = Vector3(c_bar[0,0], c_bar[1,0], c_bar[2,0])
-        velocity = Vector3(c_bar[3,0], c_bar[4,0], c_bar[5,0])
-        covariance = list(Pcc.flatten())
-        new_pv_msg = PositionVelocity(position, velocity, covariance)
-        self.intersection_pub.publish(new_pv_msg)
+        # position = Vector3(c_bar[0,0], c_bar[1,0], c_bar[2,0])
+        # velocity = Vector3(c_bar[3,0], c_bar[4,0], c_bar[5,0])
+        # covariance = list(Pcc.flatten())
+        # new_pv_msg = PositionVelocity(position, velocity, covariance)
+        # self.intersection_pub.publish(new_pv_msg)
 
         self.publish_estimates(t_now)
         self.last_update_time = t_now
