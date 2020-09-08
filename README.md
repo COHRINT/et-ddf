@@ -62,6 +62,50 @@ Measurement configuration can be found in config/measurements.py.
 Filter and general Delta Tiering configurations can be adjusted in config/etddf.yaml.
 
 
+## Repeat Tester
+Sets up scenario where 2 blue_rovs are patrolling an area, searching for the red_actor as it passes through the space. During each test the red_actor will pass all the way through the area. At the end of the test the blue_rovs and red_actor will respawn and the test will be rerun with different settings depending on the settings specified in the csv.
+
+Configuration for the repeat tester can be found in config/repeat.csv.
+
+Any Configuration Group ending in _dep will be the same for all tests.
+
+Test_Group_Name: Name for the group of tests you are doing. Must be different than what you have done before so repeat tester can make another directory.
+Test_Name: Name of the specfic test. 
+Number_Tests_dep: Number of tests you will do with each set of settings specified by each specific test.
+Map_Dim_x_dep: How far the ends of the search rectangle are from x axis
+Map_Dim_y_dep: How far the ends of the search rectangle are from y axis
+DVL_Data: True/False. Setting to turn on or off dvl data
+Lawn_Mode: True/False. Setting to turn on and off lawn mode. If lawn mode is off it wil use the bayes filter to search the modes of the space.
+Red_Vel_dep: The speed of the red_actor.
+Blue_Vel_dep: The speed of the blue_actor.
+Custody_Dist: How close the blue_rovs have to get to the red asset before they just look at it.
+
+How to use repeat tester:
+
+1) Set up tests using the csv to control the settings of the test.
+2) Start up oceans.launch
+```
+roslaunch etddf scenario.sitl.ocean.launch
+```
+3) Press play in Gazebo
+4) Launch repeat test
+```
+roslaunch etddf repeat.launch
+```
+
+All the data will be baged in the folder scripts/data/(Test_Group_Name)/(Test_Name).bag
+The topics that are baged are:
+/bluerov2_3/pose_gt
+/bluerov2_4/pose_gt
+/red_actor_1/pose_gt
+/bluerov2_3/etddf/estimate/network
+/bluerov2_4/etddf/estimate/network
+/bluerov2_3/strapdown/estimate
+/bluerov2_4/strapdown/estimate
+/bluerov2_3/sonar_processing/target_list 
+/bluerov2_4/sonar_processing/target_list
+
+
 ## References
 
 1) I. Loefgren, N. Ahmed, E. W. Frew,  C. Heckman, and S. Humbert. Scalable Event-Triggered data fusion for autonomous cooperative swarm localization. In 2019 22nd International Conference on Information Fusion (FUSION) (FUSION 2019), Ottawa, Canada, July 2019. 
