@@ -69,16 +69,18 @@ Configuration for the repeat tester can be found in config/repeat.csv.
 
 Any Configuration Group ending in _dep will be the same for all tests.
 
-Test_Group_Name: Name for the group of tests you are doing. Must be different than what you have done before so repeat tester can make another directory.
-Test_Name: Name of the specfic test. 
-Number_Tests_dep: Number of tests you will do with each set of settings specified by each specific test.
-Map_Dim_x_dep: How far the ends of the search rectangle are from x axis
-Map_Dim_y_dep: How far the ends of the search rectangle are from y axis
-DVL_Data: True/False. Setting to turn on or off dvl data
-Lawn_Mode: True/False. Setting to turn on and off lawn mode. If lawn mode is off it wil use the bayes filter to search the modes of the space.
-Red_Vel_dep: The speed of the red_actor.
-Blue_Vel_dep: The speed of the blue_actor.
-Custody_Dist: How close the blue_rovs have to get to the red asset before they just look at it.
+List of configuration settings:
+
+- Test_Group_Name: Name for the group of tests you are doing. Must be different than what you have done before so repeat tester can make another directory.
+- Test_Name: Name of the specfic test. 
+- Number_Tests_dep: Number of tests you will do with each set of settings specified by each specific test.
+- Map_Dim_x_dep: How far the ends of the search rectangle are from x axis
+- Map_Dim_y_dep: How far the ends of the search rectangle are from y axis
+- DVL_Data: True/False. Setting to turn on or off dvl data
+- Lawn_Mode: True/False. Setting to turn on and off lawn mode. If lawn mode is off it wil use the bayes filter to search the modes of the space.
+- Red_Vel_dep: The speed of the red_actor.
+- Blue_Vel_dep: The speed of the blue_actor.
+- Custody_Dist: How close the blue_rovs have to get to the red asset before they just look at it.
 
 How to use repeat tester:
 
@@ -95,15 +97,15 @@ roslaunch etddf repeat.launch
 
 All the data will be baged in the folder scripts/data/(Test_Group_Name)/(Test_Name).bag
 The topics that are baged are:
-/bluerov2_3/pose_gt
-/bluerov2_4/pose_gt
-/red_actor_1/pose_gt
-/bluerov2_3/etddf/estimate/network
-/bluerov2_4/etddf/estimate/network
-/bluerov2_3/strapdown/estimate
-/bluerov2_4/strapdown/estimate
-/bluerov2_3/sonar_processing/target_list 
-/bluerov2_4/sonar_processing/target_list
+- /bluerov2_3/pose_gt
+- /bluerov2_4/pose_gt
+- /red_actor_1/pose_gt
+- /bluerov2_3/etddf/estimate/network
+- /bluerov2_4/etddf/estimate/network
+- /bluerov2_3/strapdown/estimate
+- /bluerov2_4/strapdown/estimate
+- /bluerov2_3/sonar_processing/target_list 
+- /bluerov2_4/sonar_processing/target_list
 
 
 ## References
