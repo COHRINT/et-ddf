@@ -35,10 +35,11 @@ initial_uncertainty:
     z: 8
     z_vel: 1.0
 measurement_topics:
-  depth: mavros/global_position/rel_alt
+  depth: baro
   dvl: None
-  imu_ci: None
-  sonar: None
+  imu_ci: strapdown/intersection
+  imu_est: strapdown/estimate
+  sonar: sonar_processing/target_list
 process_noise:
   blueteam:
     x: 0.0
@@ -48,12 +49,12 @@ process_noise:
     z: 0.0
     z_vel: 0.0
   ownship:
-    x: 0.001
-    x_vel: 5.0e-06
-    y: 0.001
-    y_vel: 5.0e-06
-    z: 0.001
-    z_vel: 5.0e-06
+    x: 0.01
+    x_vel: 5.0e-05
+    y: 0.01
+    y_vel: 5.0e-05
+    z: 0.01
+    z_vel: 5.0e-05
   redteam:
     x: 0.1
     x_vel: 0.05
@@ -61,5 +62,5 @@ process_noise:
     y_vel: 0.05
     z: 0.1
     z_vel: 0.05
-update_rate: 10
+update_rate: 1
 use_control_input: false

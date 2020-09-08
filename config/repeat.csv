@@ -1,5 +1,5 @@
-Test_Group_Name,Test_Name,Number_Tests_dep,Mins_Per_Test_dep,Map_Dim_x_dep,Map_Dim_y_dep,Map_Dim_z_dep,IMU_Data,DVL_Data,Sonar_Data,Red_Vel_dep,Blue_Vel_dep
-phase2_0,control,3,2,10,10,5,FALSE,FALSE,FALSE,0.4,0.4
-phase2_0,dvl_test,0,0,0,0,0,FALSE,TRUE,FALSE,0.4,0.4
-phase2_0,sonar_imu_test,0,0,0,0,0,TRUE,FALSE,TRUE,0.4,0.4
-phase2_0,dvl_sonar_imu_test,0,0,0,0,0,TRUE,TRUE,TRUE,0.4,0.4
+Test_Group_Name,Test_Name,Number_Tests_dep,Map_Dim_x_dep,Map_Dim_y_dep,DVL_Data,Lawn_Mode,Red_Vel_dep,Blue_Vel_dep,Custody_Dist
+phase2_1,lawn,1,20,20,False,True,0.2,0.2,3
+phase2_1,lawn_dvl,1,20,20,True,True,0.2,0.2,3
+phase2_1,bayes,1,20,20,False,False,0.2,0.2,3
+phase2_1,bayes_dvl,1,20,20,True,False,0.2,0.2,3

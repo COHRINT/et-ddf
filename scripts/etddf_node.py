@@ -126,8 +126,8 @@ class ETDDF_Node:
     
 
         # DVL Subscription
-        if rospy.get_param("~measurement_topics/dvl") != "None":
-            rospy.Subscriber(rospy.get_param("~measurement_topics/dvl"),Vector3,self.dvl_callback)
+        # if rospy.get_param("~measurement_topics/dvl") != "None":
+        #     rospy.Subscriber(rospy.get_param("~measurement_topics/dvl"),Vector3,self.dvl_callback)
 
         # Initialize Buffer Service
         # rospy.Service('etddf/get_measurement_package', GetMeasurementPackage, self.get_meas_pkg_callback)
@@ -571,17 +571,6 @@ if __name__ == "__main__":
     meas_space_table = get_meas_space_table()
     missed_meas_tolerance_table = get_missed_meas_tolerance_table()
     num_assets = len(asset2id) - 1 # subtract surface
-    print('')
-    print('')
-    print('')
-    print('')
-    print('')
-    print(num_assets * NUM_OWNSHIP_STATES)
-    print('')
-    print('')
-    print('')
-    print('')
-    print('')
     x0, P0 = get_initial_estimate(num_assets * NUM_OWNSHIP_STATES)
     Q = get_process_noise(num_assets * NUM_OWNSHIP_STATES)
     default_meas_variance = get_default_meas_variance()

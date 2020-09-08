@@ -47,6 +47,7 @@ class Waypoint:
         self.yaw = None
         rospy.Subscriber("pose_gt", Odometry, self.pose_callback)
         rospy.Subscriber("uuv_control/control_status", ControlStatus, self.yaw_estimate_callback)
+        self.pub = rospy.Publisher("done",Bool,queue_size=10)
 
     def pose_callback(self, msg):
         """Stores all the odometry information
@@ -120,15 +121,16 @@ while not rospy.is_shutdown():
         diff_y = float(target_waypt[1]) - wp.pose.pose.pose.position.y
         diff_z = -float(target_waypt[2]) + wp.pose.pose.pose.position.z
         dist = np.linalg.norm([diff_x, diff_y,diff_z])
-        if dist < 1:
+        if dist < 0.5:
             #teleport red rov to next waypoint and send them off again
-            waypt_num = (waypt_num + 2) % len(waypts)
-            initial_point = Pose()
-            initial_point.position.x = float(waypts[waypt_num-1][0])
-            initial_point.position.y = float(waypts[waypt_num-1][1])
-            initial_point.position.z = float(waypts[waypt_num-1][2])
-            nameS = rospy.get_namespace()
-            set_model_state(nameS[1:-1],initial_point)
+            # waypt_num = (waypt_num + 2) % len(waypts)
+            # initial_point = Pose()
+            # initial_point.position.x = float(waypts[waypt_num-1][0])
+            # initial_point.position.y = float(waypts[waypt_num-1][1])
+            # initial_point.position.z = float(waypts[waypt_num-1][2])
+            # nameS = rospy.get_namespace()
+            # set_model_state(nameS[1:-1],initial_point)
+            wp.pub.publish(True)
 
         # Get New control
         target_waypt = waypts[waypt_num]

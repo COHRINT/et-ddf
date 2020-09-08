@@ -107,11 +107,11 @@ def simulate(bel,state,plotting=False):
             x = np.array(range(40))
             X,Y = np.meshgrid(x,x)
             cp = plt.contourf(X, Y, bel.transpose())
-            if i ==0:
-                fig.colorbar(cp)
+            # if i ==0:
+            #     fig.colorbar(cp)
 
             ax.set_title('Contour Plot')
-            plt.pause(0.05)
+            plt.pause(0.00001)
 
 
 

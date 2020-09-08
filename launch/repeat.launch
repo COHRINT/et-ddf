@@ -1,9 +1,6 @@
 <launch>
     <arg name="config_file" default="$(find etddf)/config/repeat.csv"/>
     <arg name="data_location" default="$(find etddf)/scripts/data"/>
-    <node name="sonar_scanner" pkg="etddf" type="sonar_scanner.py" output="screen">
-        <param name="sonar_range" value="10"/>
-    </node>
     <node name="repeat_tester" pkg="etddf" type="repeat_tester.py" output="screen">
         <param name="file" value="$(arg config_file)"/>
         <param name="data_loc" value="$(arg data_location)"/>

@@ -23,6 +23,7 @@ add_message_files(
 add_service_files(
   FILES
   GetMeasurementPackage.srv
+  Detection.srv
 )
 
 generate_messages(

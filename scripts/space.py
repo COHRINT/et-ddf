@@ -1,11 +1,23 @@
 import perlin
 import numpy as np
 
+"""
+    Keeps track of the belief of the space and has the bayes filter built in.
+
+
+    """
+
 
 sonar_range = 10
 
 class Space:
     def __init__(self,x,y):
+        """Initializes space
+
+        Args:
+            x (int): how long the space is in x direction
+            y (int): how long the space is in y direction
+        """
         self.x_diff = int(2*x)
         self.y_diff = int(2*y)
         self.x_0 = -x
@@ -14,6 +26,9 @@ class Space:
         self.plot_count = 1
         self.discritize_space()
     def discritize_space(self):
+        """
+        Breaks space into 1 meter squares and starts it off with some continuous random noisey belief
+        """
         x_blocks = self.x_diff + 1
         y_blocks = self.y_diff + 1
 
@@ -34,7 +49,7 @@ class Space:
         self.scan = self.sonarScans(20)
         self.p_obs, self.p_dynm = self.defineModels(self.bel,self.scan)
     def sonarScans(self,num_ang):
-        #this determines which relative angles are within a scan range so I don't have to commute it evertime
+        #this determines which relative angles are within a scan range so I don't have to compute it every time
         delta = 2*np.pi/ num_ang
         scans = [[]for i in range(num_ang)]
         for i in range(num_ang):
@@ -47,6 +62,15 @@ class Space:
                             scans[i].append([x,y,rng])
         return scans
     def defineModels(self,bel,scans):
+        """Defines the model for the bayes filter, both for observation and how the space will evolve with time
+
+        Args:
+            bel (2d numpy array): belief of the space
+            scans (array of scans): precomputed scan angles
+
+        Returns:
+            [pobs,pdym]: the models of the bayes filter
+        """
         #p_obs(x_t,y_t|bx_t,by_t,sonar_ang_t)
         p_obs = np.ones(shape=(2*sonar_range+1,2*sonar_range+1,len(scans)))
 
@@ -73,6 +97,22 @@ class Space:
         
         return p_obs,p_dynm
     def bayes(self,bel,z,p_dyn,p_obs):
+        """This is the bayes filter to update knowledge of the space.
+
+        Args:
+            bel (Numpy array): belief of space
+            z ([x,y,ang]): measurement of space, x and y of rov as well as sonar angle
+            p_dyn (Numpy array): How space updates with time
+            p_obs (Numpy array): How space updates with measurments
+
+        Returns:
+            [type]: [description]
+        """
+        z[0] -= self.x_0
+        z[1] -= self.y_0
+        z[0] = int(z[0])
+        z[1] = int(z[1])
+        
         belBar = np.zeros(shape=bel.shape) 
         newBel = np.zeros(shape=bel.shape)
         #loop through space
