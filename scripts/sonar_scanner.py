@@ -45,14 +45,19 @@ class SonarScanner():
         self.use_360 = False
         return True
     
+    def normalize_ang_degree(self,ang):
+        if ang > 180:
+            return ang-360
+        return ang
+    
     def run(self):
         settings = SonarSettings()
         settings.range = 10
         rate = rospy.Rate(10)
         while not rospy.is_shutdown():
-            settings.min_angle_deg = self.angle * self.angles_per_scan
-            self.pub_angle.publish(Int16(settings.min_angle_deg))
-            settings.max_angle_deg = ((self.angle+1)%self.num_scans) * self.angles_per_scan
+            settings.min_angle_deg = self.normalize_ang_degree(self.angle * self.angles_per_scan)
+            self.pub_angle.publish(Int16(self.angle * self.angles_per_scan))
+            settings.max_angle_deg = self.normalize_ang_degree(((self.angle+1)%self.num_scans) * self.angles_per_scan)
 
             self.set_settings(settings)
             if self.use_360:

@@ -19,7 +19,7 @@ import os
 import space
 
 
-PLOTTING = False
+PLOTTING = True
 
 
 #Open up config file to get the volume we are going to patrol
@@ -110,7 +110,12 @@ class Search:
         """
         if self.yaw==None:
             return
-        self.angle = int(round((msg.data) / 18.0))
+        ang = msg.data + (self.yaw*180.0/np.pi)
+        ang = ang % 360
+        
+
+        self.angle = int(round((ang) / 18.0))
+        
         x = int(round(self.position.x))
         y = int(round(self.position.y))
         self.bel.bel = self.bel.bayes(self.bel.bel,[x,y,self.angle],self.bel.p_dynm,self.bel.p_obs)

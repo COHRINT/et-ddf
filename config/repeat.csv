@@ -1,5 +1,5 @@
 Test_Group_Name,Test_Name,Number_Tests_dep,Map_Dim_x_dep,Map_Dim_y_dep,DVL_Data,Lawn_Mode,Red_Vel_dep,Blue_Vel_dep,Custody_Dist
-phase2_1,lawn,1,20,20,False,True,0.2,0.2,3
-phase2_1,lawn_dvl,1,20,20,True,True,0.2,0.2,3
-phase2_1,bayes,1,20,20,False,False,0.2,0.2,3
-phase2_1,bayes_dvl,1,20,20,True,False,0.2,0.2,3
+Test_1,lawn,2,10,10,False,True,0.2,0.2,3
+Test_1,lawn_dvl,1,20,20,True,True,0.2,0.2,3
+Test_1,bayes,1,20,20,False,False,0.2,0.2,3
+Test_1,bayes_dvl,1,20,20,True,False,0.2,0.2,3
