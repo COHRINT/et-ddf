@@ -11,6 +11,9 @@ from sensor_msgs.msg import Imu
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Pose, Point, Quaternion, PoseWithCovariance, Vector3, Twist, TwistWithCovariance
 import numpy as np
+from numpy.linalg import inv
+from numpy import dot
+np.set_printoptions(suppress=True, precision=2)
 from scipy.linalg import block_diag, sqrtm
 import tf
 import threading
@@ -59,16 +62,32 @@ class StrapdownINS:
         # rospy.Subscriber("mavros/global_position/rel_alt", Float64, self.depth_callback, queue_size=1)
         rospy.Subscriber("baro", Float64, self.depth_callback, queue_size=1)
         rospy.Subscriber("dvl", Vector3, self.dvl_callback, queue_size=1)
-        rospy.Subscriber("pose_gt", Odometry, self.gps_callback, queue_size=1)
+        # rospy.Subscriber("pose_gt", Odometry, self.gps_callback, queue_size=1)
 
         if strapdown:
             rospy.Subscriber("imu", Imu, self.propagate_strap, queue_size=1)
         else:
             rospy.Subscriber("imu", Imu, self.propagate_normal, queue_size=1)
-        # rospy.Subscriber("strapdown/intersection_result", PositionVelocity, self.intersection_result)
+        rospy.Subscriber("strapdown/intersection_result", PositionVelocity, self.intersection_result)
         self.cuprint("loaded")
 
     def publish_intersection(self):
+        trans_strap2ci = np.zeros((8,8))
+        trans_strap2ci[:3,:3] = np.eye(3)
+        trans_strap2ci[3:6, 4:7] = np.eye(3)
+        trans_strap2ci[6,3] = 1
+        trans_strap2ci[7,7] = 1
+
+        x = dot(trans_strap2ci, self.x.reshape(-1,1))
+        P = dot(trans_strap2ci, self.P).dot(trans_strap2ci.T)
+
+        position = Vector3(x[0], x[1], x[2])
+        velocity = Vector3(x[3], x[4], x[5])
+        cov = list(P[:6,:6].flatten())
+        msg = PositionVelocity(position, velocity, cov)
+        self.ci_pub.publish(msg)
+
+    def publish_intersection_strapdown(self):
         position = Vector3(self.x[0], self.x[1], self.x[2])
         velocity = Vector3(self.x[3], self.x[4], self.x[5])
         cov = list(self.P[:6,:6].flatten())
@@ -83,10 +102,9 @@ class StrapdownINS:
         self.dvl_y = msg.y
 
     def gps_callback(self, msg):
-        self.skip_multiplexer += 1
-        if self.skip_multiplexer % 300 == 0:
-            self.data_x = msg.pose.pose.position.x + np.random.normal(0, scale=0.05)
-            self.data_y = msg.pose.pose.position.y + np.random.normal(0, scale=0.05)
+        # if self.skip_multiplexer % 300 == 0:
+        self.data_x = msg.pose.pose.position.x + np.random.normal(0, scale=0.05)
+        self.data_y = msg.pose.pose.position.y + np.random.normal(0, scale=0.05)
 
     def depth_callback(self, msg):
         self.last_depth = msg.data
@@ -167,9 +185,9 @@ class StrapdownINS:
 
         self.update_lock.release()
 
-        # if self.skip_multiplexer > 1000:
+        # if self.skip_multiplexer > 250:
         self.publish_estimate(imu_measurement.header.seq, imu_measurement.header.stamp)
-        
+        self.skip_multiplexer += 1
 
     def propagate_strap(self,imu_measurement):
         """
@@ -226,7 +244,7 @@ class StrapdownINS:
                                     [w_z-b_wz, w_y-b_wy, -(w_x-b_wx), 0]])
 
         # propagate attitude quaternion
-        q_dot = 0.5*np.dot(quaterion_stm,np.array([q0,q1,q2,q3]).T)
+        q_dot = 0.5*dot(quaterion_stm,np.array([q0,q1,q2,q3]).T)
         # TODO get the angular velocity by substracting
         # the final yaw (euler) from the initial divided by dt
         self.x[6:10] = self.x[6:10] + q_dot*dt
@@ -244,7 +262,7 @@ class StrapdownINS:
                                 [2*(q1*q3-q0*q2), 2*(q0*q1+q2*q3), q0**2-q1**2-q2**2+q3**2]])
 
         # propagate velocity, TODO add RK4
-        vel_dot = np.dot(body2inertial,(np.array([a_x,a_y,a_z])-np.array([b_ax,b_ay,b_az])).T) # - np.array([0,0,G_ACCEL])
+        vel_dot = dot(body2inertial,(np.array([a_x,a_y,a_z])-np.array([b_ax,b_ay,b_az])).T) # - np.array([0,0,G_ACCEL])
         self.x[3:6] = self.x[3:6] + vel_dot*dt
 
         # propagate position
@@ -296,7 +314,7 @@ class StrapdownINS:
         # Q[13:16,13:16] = 7*self.sensors['IMU'].gyro_bias*dt
 
         stm = np.eye(16) + F*dt
-        self.P = np.dot(stm,np.dot(self.P,stm.T)) + Q*dt
+        self.P = dot(stm,dot(self.P,stm.T)) + Q*dt
 
         # enforce symmetry
         self.P = 0.5*self.P + 0.5*self.P.T
@@ -313,27 +331,34 @@ class StrapdownINS:
             self.publish_estimate_strapdown(imu_measurement.header.seq, imu_measurement.header.stamp, np.zeros(3), np.eye(3)*0.001)
 
     def update(self, compass_meas, compass_meas_cov):
+        if self.last_intersection != None:
+            pos = [self.last_intersection.position.x, self.last_intersection.position.y, self.last_intersection.position.z]
+            vel = [self.last_intersection.velocity.x, self.last_intersection.velocity.y, self.last_intersection.velocity.z]
+            x_CI = np.array([pos[0], pos[1], pos[2], vel[0], vel[1], vel[2]]).reshape(-1,1)
+            P_CI = np.array(self.last_intersection.covariance).reshape(6,6)
+            self.psci(x_CI, P_CI)
+
         H = np.zeros((1,NUM_STATES))
         H[0,3] = 1
         _, _, yaw_meas = tf.transformations.euler_from_quaternion([compass_meas.x,\
             compass_meas.y, compass_meas.z, compass_meas.w])
         R = 0.1
-        tmp = np.dot( np.dot(H, self.P), H.T) + R
-        K = np.dot(self.P, np.dot( H.T, np.linalg.inv( tmp )) )
+        tmp = dot( dot(H, self.P), H.T) + R
+        K = dot(self.P, dot( H.T, inv( tmp )) )
         innovation = self.normalize_angle(yaw_meas-self.x[3])
-        self.x = self.x + np.dot(K, innovation).reshape(NUM_STATES)
+        self.x = self.x + dot(K, innovation).reshape(NUM_STATES)
         self.normalize_angle_states()
-        self.P = np.dot(np.eye(NUM_STATES)-np.dot(K,H),self.P)
+        self.P = dot(np.eye(NUM_STATES)-dot(K,H),self.P)
 
         # Update depth
         if self.last_depth is not None:
             H = np.zeros((1,NUM_STATES))
             H[0,2] = 1
             R = 0.1
-            tmp = np.dot( np.dot(H, self.P), H.T) + R
-            K = np.dot(self.P, np.dot( H.T, np.linalg.inv( tmp )) )
-            self.x = self.x + np.dot(K,self.last_depth-self.x[2]).reshape(NUM_STATES)
-            self.P = np.dot(np.eye(NUM_STATES)-np.dot(K,H),self.P)
+            tmp = dot( dot(H, self.P), H.T) + R
+            K = dot(self.P, dot( H.T, inv( tmp )) )
+            self.x = self.x + dot(K,self.last_depth-self.x[2]).reshape(NUM_STATES)
+            self.P = dot(np.eye(NUM_STATES)-dot(K,H),self.P)
             self.last_depth = None
 
         if self.data_x is not None and self.data_y is not None:
@@ -343,10 +368,10 @@ class StrapdownINS:
             R = np.eye(2) * 0.1
             meas = np.array([[self.data_x, self.data_y]]).T
             pred = np.array([[self.x[0], self.x[1]]]).T
-            tmp = np.dot( np.dot(H, self.P), H.T) + R
-            K = np.dot(self.P, np.dot( H.T, np.linalg.inv( tmp )) )
-            self.x = self.x + np.dot(K,meas-pred).reshape(NUM_STATES)
-            self.P = np.dot(np.eye(NUM_STATES)-np.dot(K,H),self.P)
+            tmp = dot( dot(H, self.P), H.T) + R
+            K = dot(self.P, dot( H.T, inv( tmp )) )
+            self.x = self.x + dot(K,meas-pred).reshape(NUM_STATES)
+            self.P = dot(np.eye(NUM_STATES)-dot(K,H),self.P)
 
             self.data_x = None
             self.data_y = None
@@ -358,27 +383,14 @@ class StrapdownINS:
             R = np.eye(2) * 0.025
             meas = np.array([[self.dvl_x, self.dvl_y]]).T
             pred = np.array([[self.x[4], self.x[5]]]).T
-            tmp = np.dot( np.dot(H, self.P), H.T) + R
-            K = np.dot(self.P, np.dot( H.T, np.linalg.inv( tmp )) )
-            self.x = self.x + np.dot(K,meas-pred).reshape(NUM_STATES)
-            self.P = np.dot(np.eye(NUM_STATES)-np.dot(K,H),self.P)
+            tmp = dot( dot(H, self.P), H.T) + R
+            K = dot(self.P, dot( H.T, inv( tmp )) )
+            self.x = self.x + dot(K,meas-pred).reshape(NUM_STATES)
+            self.P = dot(np.eye(NUM_STATES)-dot(K,H),self.P)
             self.dvl_x = None
             self.dvl_y = None
 
         if self.last_intersection != None:
-            self.cuprint("Received CI result, correcting")
-            pos = [self.last_intersection.position.x, self.last_intersection.position.y, self.last_intersection.position.z]
-            vel = [self.last_intersection.velocity.x, self.last_intersection.velocity.y, self.last_intersection.velocity.z]
-            c_bar = np.array([pos[0], pos[1], pos[2], vel[0], vel[1], vel[2]]).reshape(-1,1)
-            Pcc = np.array(self.last_intersection.covariance).reshape(6,6)
-            x_prior = np.delete(self.x[:7], 3).reshape(-1,1) # remove yaw, yaw_vel
-            P_prior = self.P[:7, :7]
-            # Remove yaw
-            P_prior = np.delete(P_prior, 3, 0)
-            P_prior = np.delete(P_prior, 3, 1)
-
-            self.psci(x_prior, P_prior, c_bar, Pcc)
-            # self.normalize_angle_states()
             self.last_intersection = None
         else:
             self.publish_intersection()
@@ -396,11 +408,11 @@ class StrapdownINS:
         meas = np.array([[compass_meas.x, compass_meas.y, compass_meas.z, compass_meas.w]]).T
         pred = self.x[6:10].reshape(-1,1)
         R = 0.01
-        tmp = np.dot( np.dot(H, self.P), H.T) + R
-        K = np.dot(self.P, np.dot( H.T, np.linalg.inv( tmp )) )
+        tmp = dot( dot(H, self.P), H.T) + R
+        K = dot(self.P, dot( H.T, inv( tmp )) )
         innovation = meas-pred
-        self.x = self.x + np.dot(K, innovation).reshape(NUM_STATES)
-        self.P = np.dot(np.eye(16)-np.dot(K,H),self.P)
+        self.x = self.x + dot(K, innovation).reshape(NUM_STATES)
+        self.P = dot(np.eye(16)-dot(K,H),self.P)
         # enforce symmetry
         self.P = 0.5*self.P + 0.5*self.P.T
         # renormalize quaternion attitude
@@ -411,10 +423,10 @@ class StrapdownINS:
             H = np.zeros((1,16))
             H[0,2] = 1
             R = 0.1
-            tmp = np.dot( np.dot(H, self.P), H.T) + R
-            K = np.dot(self.P, np.dot( H.T, np.linalg.inv( tmp )) )
-            self.x = self.x + np.dot(K,self.last_depth-self.x[2]).reshape(NUM_STATES)
-            self.P = np.dot(np.eye(16)-np.dot(K,H),self.P)
+            tmp = dot( dot(H, self.P), H.T) + R
+            K = dot(self.P, dot( H.T, inv( tmp )) )
+            self.x = self.x + dot(K,self.last_depth-self.x[2]).reshape(NUM_STATES)
+            self.P = dot(np.eye(16)-dot(K,H),self.P)
             # enforce symmetry
             self.P = 0.5*self.P + 0.5*self.P.T
             # renormalize quaternion attitude
@@ -429,10 +441,10 @@ class StrapdownINS:
             R = np.eye(2) * 0.1
             meas = np.array([[self.data_x, self.data_y]]).T
             pred = np.array([[self.x[0], self.x[1]]]).T
-            tmp = np.dot( np.dot(H, self.P), H.T) + R
-            K = np.dot(self.P, np.dot( H.T, np.linalg.inv( tmp )) )
-            self.x = self.x + np.dot(K,meas-pred).reshape(NUM_STATES)
-            self.P = np.dot(np.eye(16)-np.dot(K,H),self.P)
+            tmp = dot( dot(H, self.P), H.T) + R
+            K = dot(self.P, dot( H.T, inv( tmp )) )
+            self.x = self.x + dot(K,meas-pred).reshape(NUM_STATES)
+            self.P = dot(np.eye(16)-dot(K,H),self.P)
             # enforce symmetry
             self.P = 0.5*self.P + 0.5*self.P.T
             # renormalize quaternion attitude
@@ -448,10 +460,10 @@ class StrapdownINS:
             R = np.eye(2) * 0.025
             meas = np.array([[self.dvl_x, self.dvl_y]]).T
             pred = np.array([[self.x[3], self.x[4]]]).T
-            tmp = np.dot( np.dot(H, self.P), H.T) + R
-            K = np.dot(self.P, np.dot( H.T, np.linalg.inv( tmp )) )
-            self.x = self.x + np.dot(K,meas-pred).reshape(NUM_STATES)
-            self.P = np.dot(np.eye(16)-np.dot(K,H),self.P)
+            tmp = dot( dot(H, self.P), H.T) + R
+            K = dot(self.P, dot( H.T, inv( tmp )) )
+            self.x = self.x + dot(K,meas-pred).reshape(NUM_STATES)
+            self.P = dot(np.eye(16)-dot(K,H),self.P)
             # enforce symmetry
             self.P = 0.5*self.P + 0.5*self.P.T
             # renormalize quaternion attitude
@@ -463,11 +475,11 @@ class StrapdownINS:
             self.cuprint("Received CI result, correcting")
             pos = [self.last_intersection.position.x, self.last_intersection.position.y, self.last_intersection.position.z]
             vel = [self.last_intersection.velocity.x, self.last_intersection.velocity.y, self.last_intersection.velocity.z]
-            c_bar = np.array([pos[0], pos[1], pos[2], vel[0], vel[1], vel[2]]).reshape(-1,1)
-            Pcc = np.array(self.last_intersection.covariance).reshape(6,6)
+            x_CI = np.array([pos[0], pos[1], pos[2], vel[0], vel[1], vel[2]]).reshape(-1,1)
+            P_CI = np.array(self.last_intersection.covariance).reshape(6,6)
             x_prior = self.x[:6].reshape(-1,1)
             P_prior = self.P[:6, :6]
-            self.psci_strapdown(x_prior, P_prior, c_bar, Pcc) # LOOK BACK IN HISTORY
+            self.psci_strapdown(x_prior, P_prior, x_CI, P_CI) # LOOK BACK IN HISTORY
             self.last_intersection = None
         else:
             self.publish_intersection()
@@ -482,10 +494,10 @@ class StrapdownINS:
         #     R = np.eye(2) * 0.01
         #     meas = np.array([[0.0, 0.0]]).T
         #     pred = np.array([[self.x[3], self.x[4]]]).T
-        #     tmp = np.dot( np.dot(H, self.P), H.T) + R
-        #     K = np.dot(self.P, np.dot( H.T, np.linalg.inv( tmp )) )
-        #     self.x = self.x + np.dot(K,meas-pred).reshape(NUM_STATES)
-        #     self.P = np.dot(np.eye(16)-np.dot(K,H),self.P)
+        #     tmp = dot( dot(H, self.P), H.T) + R
+        #     K = dot(self.P, dot( H.T, inv( tmp )) )
+        #     self.x = self.x + dot(K,meas-pred).reshape(NUM_STATES)
+        #     self.P = dot(np.eye(16)-dot(K,H),self.P)
         #     # enforce symmetry
         #     self.P = 0.5*self.P + 0.5*self.P.T
         #     # renormalize quaternion attitude
@@ -493,33 +505,61 @@ class StrapdownINS:
         # else:
         #     rospy.loginfo_once("Fake DVL meas done")
 
-    def psci(self, x_prior, P_prior, c_bar, Pcc):
-        x = self.x.reshape(-1,1)
-        P = self.P
+    def psci(self, x_CI, P_CI):
+        # Transformation matrix from strapdown state ordering to common information state ordering
+        trans_strap2ci = np.zeros((8,8))
+        trans_strap2ci[:3,:3] = np.eye(3)
+        trans_strap2ci[3:6, 4:7] = np.eye(3)
+        trans_strap2ci[6,3] = 1
+        trans_strap2ci[7,7] = 1
 
-        D_inv = np.linalg.inv(P_prior) - np.linalg.inv(Pcc)
-        D_inv_d = np.dot( np.linalg.inv(P_prior), x_prior) - np.dot( np.linalg.inv(Pcc), c_bar)
+        x = dot(trans_strap2ci, self.x.reshape(-1,1))
+        P = dot(trans_strap2ci, self.P).dot(trans_strap2ci.T)
+
+        simple = False
+        if simple:
+            x[:6] = x_CI
+            P[:6,:6] = P_CI
+            self.x = dot(trans_strap2ci.T, x).reshape(-1)
+            self.P = dot(trans_strap2ci.T, P).dot(trans_strap2ci)
+        else:
+            x_cij = x[:6]
+            P_cij = P[:6,:6]
+
+            """
+
+            NOTE IS DIFFERENT FROM THE THESIS, SWITHC!!!!!!!
+
+            """
+
+            # D_inv = inv( P_cij ) - inv(P_CI)
+            # D_inv_d = dot( inv( P_cij ), x_cij) - dot( inv(P_CI), x_CI)
+            D_inv = inv( P_CI ) - inv(P_cij)
+            D_inv_d = dot( inv( P_CI ), x_CI) - dot( inv(P_cij), x_cij)
+
+            info_matrix = np.zeros((8,8))
+            info_matrix[:6,:6] = D_inv
+            info_vector = np.zeros((8,1))
+            info_vector[:6] = D_inv_d
+            
+            posterior_cov = inv( inv( P ) + info_matrix )
+            tmp = dot(inv( P ), x) + info_vector
+            posterior_state = dot( posterior_cov, tmp )
+
+            # posterior_state[:6] = x_CI
+            # posterior_cov[:6,:6] = P_CI
+
+            self.x = dot(trans_strap2ci.T, posterior_state).reshape(-1)
+            self.P = dot(trans_strap2ci.T, posterior_cov).dot(trans_strap2ci)
+
         
-        trans = np.zeros((8,6)) # Transformation Matrix
-        trans[:3,:3] = np.eye(3)
-        trans[4:7,3:6] = np.eye(3)
 
-        info_vector = np.dot(trans, D_inv_d)
-        info_matrix = np.dot(trans, D_inv).dot(trans.T)
-
-        posterior_cov = np.linalg.inv( np.linalg.inv( P ) + info_matrix )
-        tmp = np.dot(np.linalg.inv( P ), x) + info_vector
-        posterior_state = np.dot( posterior_cov, tmp )
-
-        self.x = posterior_state.reshape(-1)
-        self.P = posterior_cov
-
-    def psci_strapdown(self, x_prior, P_prior, c_bar, Pcc):
+    def psci_strapdown(self, x_prior, P_prior, x_CI, P_CI):
         x = self.x.reshape(-1,1)
         P = self.P
 
-        D_inv = np.linalg.inv(P_prior) - np.linalg.inv(Pcc)
-        D_inv_d = np.dot( np.linalg.inv(P_prior), x_prior) - np.dot( np.linalg.inv(Pcc), c_bar)
+        D_inv = inv(P_prior) - inv(P_CI)
+        D_inv_d = dot( inv(P_prior), x_prior) - dot( inv(P_CI), x_CI)
 
         info_vector = np.zeros( x.shape )
         info_vector[:6] = D_inv_d
@@ -527,9 +567,9 @@ class StrapdownINS:
         info_matrix = np.zeros( P.shape )
         info_matrix[:6,:6] = D_inv
 
-        posterior_cov = np.linalg.inv( np.linalg.inv( P ) + info_matrix )
-        tmp = np.dot(np.linalg.inv( P ), x) + info_vector
-        posterior_state = np.dot( posterior_cov, tmp )
+        posterior_cov = inv( inv( P ) + info_matrix )
+        tmp = dot(inv( P ), x) + info_vector
+        posterior_state = dot( posterior_cov, tmp )
 
         self.x = posterior_state.reshape(-1)
         self.P = posterior_cov
@@ -580,9 +620,9 @@ def get_process_noise():
     Q[1,1] = ownship_Q["y"]
     Q[2,2] = ownship_Q["z"]
     Q[3,3] = ownship_Q["yaw"]
-    Q[3,3] = ownship_Q["x_vel"]
-    Q[4,4] = ownship_Q["y_vel"]
-    Q[5,5] = ownship_Q["z_vel"]
+    Q[4,4] = ownship_Q["x_vel"]
+    Q[5,5] = ownship_Q["y_vel"]
+    Q[6,6] = ownship_Q["z_vel"]
     Q[7,7] = ownship_Q["yaw_vel"]
     return Q
 

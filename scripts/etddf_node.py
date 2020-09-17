@@ -115,7 +115,7 @@ class ETDDF_Node:
             rospy.Subscriber(rospy.get_param("~measurement_topics/sonar"), SonarTargetList, self.sonar_callback)
         
         self.data_x, self.data_y = None, None
-        rospy.Subscriber("pose_gt", Odometry, self.gps_callback, queue_size=1)
+        # rospy.Subscriber("pose_gt", Odometry, self.gps_callback, queue_size=1)
     
         # Initialize Buffer Service
         # rospy.Service('etddf/get_measurement_package', GetMeasurementPackage, self.get_meas_pkg_callback)
@@ -197,7 +197,7 @@ class ETDDF_Node:
 
         # correction
         self.filter.correct(t_now)
-        self.publish_estimates(t_now, Odometry())
+        self.publish_estimates(t_now)
         self.last_update_time = t_now
         self.update_seq += 1
         self.update_lock.release()
@@ -248,15 +248,13 @@ class ETDDF_Node:
         cov = np.array(pv_msg.covariance).reshape(6,6)
 
         # Run covariance intersection
-        if np.trace(cov) < 1: # Prevent Nav Filter from having zero uncertainty
-            cov = np.eye(NUM_OWNSHIP_STATES) * 0.1
-        # c_bar, Pcc = self.filter.intersect(mean, cov)
+        c_bar, Pcc = self.filter.intersect(mean, cov)
 
-        # position = Vector3(c_bar[0,0], c_bar[1,0], c_bar[2,0])
-        # velocity = Vector3(c_bar[3,0], c_bar[4,0], c_bar[5,0])
-        # covariance = list(Pcc.flatten())
-        # new_pv_msg = PositionVelocity(position, velocity, covariance)
-        # self.intersection_pub.publish(new_pv_msg)
+        position = Vector3(c_bar[0,0], c_bar[1,0], c_bar[2,0])
+        velocity = Vector3(c_bar[3,0], c_bar[4,0], c_bar[5,0])
+        covariance = list(Pcc.flatten())
+        new_pv_msg = PositionVelocity(position, velocity, covariance)
+        self.intersection_pub.publish(new_pv_msg)
 
         self.publish_estimates(t_now)
         self.last_update_time = t_now
