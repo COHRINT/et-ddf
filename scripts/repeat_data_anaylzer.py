@@ -5,7 +5,6 @@ import os
 import rosbag
 import numpy as np
 import matplotlib.pyplot as plt
-# from minau.msg import SonarTarget, SonarTargetList
 import time
 
 def quadratureDiff(A,B):
@@ -47,6 +46,8 @@ class AnalyzeData:
         self.merge_spottings = [[]for i in range(len(self.bag_files))]
         self.ratio = []
         self.plot_count = 1
+        # print(self.bag_files)
+        # exit()
         for i in range(len(self.bag_files)):
             bag = rosbag.Bag(self.bag_files[i])
             #gets truth poses and ownship estimates
@@ -69,7 +70,6 @@ class AnalyzeData:
             self.estimate4_poses3[i] = self.extract_odometry_network('/bluerov2_4/etddf/estimate/network',bag,'bluerov2_3')
             self.estimate3_red[i] = self.extract_odometry_network('/bluerov2_3/etddf/estimate/network',bag,'red_actor_1')
             self.estimate4_red[i] = self.extract_odometry_network('/bluerov2_4/etddf/estimate/network',bag,'red_actor_1')
-
             bag.close()
 
         #Gets the times the red asset is in the zone for each trial
@@ -95,15 +95,10 @@ class AnalyzeData:
             self.network_error_43[i] = self.get_network_error(self.truth_poses3[i],self.estimate4_poses3[i])
             self.network_error_3r[i] = self.get_network_error(self.truth_red[i],self.estimate3_red[i])
             self.network_error_4r[i] = self.get_network_error(self.truth_red[i],self.estimate4_red[i])
-        
+        print(self.network_error_3r)
 
         self.groups,self.group_names = self.get_groups()
-        self.graph_network_error(self.network_error_33,'Bluerov2_3 Ownship Error',20,'3ownship_')
-        self.graph_network_error(self.network_error_44,'Bluerov2_4 Ownship Error',20,'4ownship_')
-        self.graph_network_error(self.network_error_34,'Bluerov2_3 Network Error of Bluerov2_4',20,'3blue_')
-        self.graph_network_error(self.network_error_43,'Bluerov2_4 Network Error of Bluerov2_3',20,'4blue_')
-        self.graph_network_error(self.network_error_3r,'Bluerov2_3 Network Error of Red Actor',20,'3red_')
-        self.graph_network_error(self.network_error_4r,'Bluerov2_4 Network Error of Red Actor',20,'4red_')
+        self.graph_network_error()
 
         self.graph_time()
 
@@ -111,29 +106,41 @@ class AnalyzeData:
 
 
     def graph_time(self):
+        fig1, ax1 = plt.subplots(ncols=2,nrows=2,sharex='col', sharey='row',
+                        gridspec_kw={'hspace': .2, 'wspace': 0})
         for i in range(len(self.groups)):
             data = []
             for j in range(len(self.groups[i])):
                 data.append((self.tracking_data[self.groups[i][j]][1])/10**9)
-            plt.figure()
-            plt.hist(data, bins = 10)
-            plt.title('Time to Find Red Asset for '+self.group_names[i])
+            ax1[int(i/2),int(i%2)].hist(data,bins = 10)
             plt.xlabel('Time(s)')
             plt.ylabel('Frequency of Tests')
-            plt.savefig(self.data_loc+'/time_to_find_'+self.group_names[i]+'.png')
-            plt.close()
+            ax1[int(i/2),int(i%2)].set_title(self.group_names[i])
+            if int(i/2) == 1:
+                ax1[int(i/2),int(i%2)].set_xlabel('Time(s)')
+            if int(i%2) == 0:
+                ax1[int(i/2),int(i%2)].set_ylabel('Frequency of Tests')
+        fig1.suptitle('Time to Find Red Asset')
+        fig1.savefig(self.data_loc+'/time_to_find.png')
+        plt.close()
 
+        fig1, ax1 = plt.subplots(ncols=2,nrows=2,sharex='col', sharey='row',
+                        gridspec_kw={'hspace': .2, 'wspace': 0})
+        bins = [10*i for i in range(11)]
         for i in range(len(self.groups)):
             data = []
             for j in range(len(self.groups[i])):
                 data.append(self.tracking_data[self.groups[i][j]][0]*100)
-            plt.figure()
-            plt.hist(data, bins = 10)
-            plt.title('Percent of Time Red Asset is Tracked in Zone '+self.group_names[i])
-            plt.xlabel('Percent')
-            plt.ylabel('Frequency of Tests')
-            plt.savefig(self.data_loc+'/percent_tracked_'+self.group_names[i]+'.png')
-            plt.close()
+            ax1[int(i/2),int(i%2)].hist(data, bins = bins)
+            if int(i/2) == 1:
+                ax1[int(i/2),int(i%2)].set_xlabel('Percent')
+            if int(i%2) == 0:
+                ax1[int(i/2),int(i%2)].set_ylabel('Frequency of Tests')
+            ax1[int(i/2),int(i%2)].set_title(self.group_names[i])
+        fig1.suptitle('Percent of Time Red Asset is Tracked in Zone')
+        fig1.savefig(self.data_loc+'/percent_tracked.png')
+        plt.close()
+        fig1, ax1 = plt.subplots(ncols=2,nrows=2)
 
         labels = 'Found','Not Found'
         for i in range(len(self.groups)):
@@ -146,12 +153,11 @@ class AnalyzeData:
             data/=data.sum()
             data*=100
             
-            plt.figure()
-            plt.pie(data, labels=labels,autopct='%1.1f%%', shadow=True, startangle=140)
-            plt.title('Percent of Time Red Asset is Found with '+self.group_names[i])
-
-            plt.savefig(self.data_loc+'/percent_found_'+self.group_names[i]+'.png')
-            plt.close()
+            ax1[int(i/2),int(i%2)].pie(data, labels=labels,autopct='%1.1f%%', shadow=True, startangle=140)
+            ax1[int(i/2),int(i%2)].set_title(self.group_names[i])
+        fig1.suptitle('Percent of Time Red Asset is Found with each Setting')
+        fig1.savefig(self.data_loc+'/percent_found.png')
+        plt.close()
         
 
         
@@ -174,20 +180,48 @@ class AnalyzeData:
                 groups.append([i])
         return groups,group_names
             
+    def get_data(self,error,group):
+        data = []
+        for j in range(len(group)):
+            if error[group[j]] != None:
+                data.append(error[group[j]])
+        return data
 
-    def graph_network_error(self,error,name,num_bins,file_name):
+    def graph_network_error(self):
+        bins_own = np.linspace(0,.3,11)
+        bins_other = np.linspace(0,15,16)
         for i in range(len(self.groups)):
-            data = []
-            for j in range(len(self.groups[i])):
-                if error[self.groups[i][j]] != None:
-                    data.append(error[self.groups[i][j]])
-            plt.figure()
-            plt.hist(data, bins = num_bins)
-            plt.title(name+' for '+self.group_names[i])
-            plt.xlabel('Estimate Error(m)')
-            plt.ylabel('Frequency of Tests')
-            plt.savefig(self.data_loc+'/'+file_name+self.group_names[i]+'.png')
+            fig1, ax1 = plt.subplots(ncols=3,nrows=2,sharex='col', sharey='row',
+                        gridspec_kw={'hspace': .2, 'wspace': 0})
+            data = self.get_data(self.network_error_33,self.groups[i])
+            ax1[0,0].hist(data,bins = bins_own)
+            ax1[0,0].set_title('3 Ownship')
+            ax1[0,0].set_ylabel('Number of Tests')
+            data = self.get_data(self.network_error_34,self.groups[i])
+            ax1[0,1].hist(data,bins = bins_other)
+            ax1[0,1].set_title('3 Est 4')
+            data = self.get_data(self.network_error_3r,self.groups[i])
+
+            ax1[0,2].hist(data,bins = bins_other)
+            ax1[0,2].set_title('3 Est Red')
+
+            data = self.get_data(self.network_error_44,self.groups[i])
+            ax1[1,0].hist(data,bins = bins_own)
+            ax1[1,0].set_title('4 Ownship')
+            ax1[1,0].set_ylabel('Number of Tests')
+            ax1[1,0].set_xlabel('Average Error(m)')
+            data = self.get_data(self.network_error_43,self.groups[i])
+            ax1[1,1].hist(data,bins = bins_other)
+            ax1[1,1].set_title('4 Est 3')
+            ax1[1,1].set_xlabel('Average Error(m)')
+            data = self.get_data(self.network_error_4r,self.groups[i])
+            ax1[1,2].hist(data,bins = bins_other)
+            ax1[1,2].set_title('4 Est Red')
+            ax1[1,2].set_xlabel('Average Error(m)')
+            fig1.suptitle('Network Error for '+self.group_names[i])
+            fig1.savefig(self.data_loc+'/network_error_'+self.group_names[i]+'.png')
             plt.close()
+
 
     def write_data(self):
         f = open(self.data_loc+'/data.csv','w')
@@ -270,8 +304,11 @@ class AnalyzeData:
         data = []
         count = 0
         for topic, msg, t in bag.read_messages(topics=[name]):
+            # if msg.assets != []:
+            #     print(msg.assets)
             for j in range(len(msg.assets)):
                 if msg.assets[j].name == asset:
+                    # print(msg.assets[j].name)
                     count +=1
                     p = msg.assets[j].odom.pose.pose.position
                     data.append([p.x,p.y,p.z,int(msg.assets[j].odom.header.stamp.secs*10**9 + msg.assets[j].odom.header.stamp.nsecs)])

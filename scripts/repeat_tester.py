@@ -6,7 +6,7 @@ import rospy
 import sys
 import csv
 import pprint
-import random
+import random, shutil
 import os, signal
 import subprocess
 import time
@@ -28,10 +28,10 @@ class repeatTester:
             cFile {string} -- The csv file name that describes the configuations for the test.
         """
         self.data_loc = rospy.get_param("~data_loc")
-        cFile = rospy.get_param("~file")
+        self.cFile = rospy.get_param("~file")
         #reads the csv in as a dictionary, removing all whitespace
         reader = csv.DictReader(
-            open(cFile)
+            open(self.cFile)
         )
         # remove leading and trailing whitespace from all values
         reader = (
@@ -167,6 +167,7 @@ class repeatTester:
         #this is where the bagged data will be stored
         dirTo = self.data_loc+'/'+self.test_group_name
         os.mkdir(dirTo)
+        shutil.copy(self.cFile,dirTo)
         for j in range(self.num_configs):
             self.setup_config(j)
             for i in range(self.num_groups):
