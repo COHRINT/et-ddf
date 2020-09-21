@@ -107,6 +107,19 @@ The topics that are baged are:
 - /bluerov2_3/sonar_processing/target_list 
 - /bluerov2_4/sonar_processing/target_list
 
+To analyze the repeat tester data do:
+```
+./repeat_data_analyzer.py data/Test_Group_Name x_dim y_dim
+```
+Where Test_Group_Name is the name corresponding the the Test_Group_Name in the repeat.csv. The x_dim and y_dim are the dimensions of the space as specified in the repeat.csv also.
+This will graph the network error for each test, as well as the time to capture, percent of time tracked and percent found as well as make a csv within the data/Test_Group_Name directory of all the relevant data.
+
+If you want all the graphs for each test setting subplotted on one graph you can do:
+```
+./graph_groups.py data/Test_Group_Name
+```
+This will use all the data in the Test_Group_Name.csv to make these plots.
+
 
 ## References
 

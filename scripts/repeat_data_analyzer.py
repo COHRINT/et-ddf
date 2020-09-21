@@ -106,41 +106,47 @@ class AnalyzeData:
 
 
     def graph_time(self):
-        fig1, ax1 = plt.subplots(ncols=2,nrows=2,sharex='col', sharey='row',
+        num_cols = int(round(float(len(self.groups))/2))
+
+        fig1, ax1 = plt.subplots(ncols=num_cols,nrows=2,sharex='col', sharey='row',
                         gridspec_kw={'hspace': .2, 'wspace': 0})
         for i in range(len(self.groups)):
             data = []
             for j in range(len(self.groups[i])):
                 data.append((self.tracking_data[self.groups[i][j]][1])/10**9)
-            ax1[int(i/2),int(i%2)].hist(data,bins = 10)
+            ax1[int(i%2),int(i/2)].hist(data,bins = 10)
             plt.xlabel('Time(s)')
             plt.ylabel('Frequency of Tests')
-            ax1[int(i/2),int(i%2)].set_title(self.group_names[i])
-            if int(i/2) == 1:
-                ax1[int(i/2),int(i%2)].set_xlabel('Time(s)')
-            if int(i%2) == 0:
-                ax1[int(i/2),int(i%2)].set_ylabel('Frequency of Tests')
+            ax1[int(i%2),int(i/2)].set_title(self.group_names[i])
+            if int(i%2) == 1:
+                ax1[int(i%2),int(i/2)].set_xlabel('Time(s)')
+            if int(i/2) == 0:
+                ax1[int(i%2),int(i/2)].set_ylabel('Frequency of Tests')
         fig1.suptitle('Time to Find Red Asset')
+        if num_cols%2== 1:
+            ax1[int(len(self.groups)%2),int(len(self.groups)/2)].axis('off')
         fig1.savefig(self.data_loc+'/time_to_find.png')
         plt.close()
 
-        fig1, ax1 = plt.subplots(ncols=2,nrows=2,sharex='col', sharey='row',
+        fig1, ax1 = plt.subplots(ncols=num_cols,nrows=2,sharex='col', sharey='row',
                         gridspec_kw={'hspace': .2, 'wspace': 0})
         bins = [10*i for i in range(11)]
         for i in range(len(self.groups)):
             data = []
             for j in range(len(self.groups[i])):
                 data.append(self.tracking_data[self.groups[i][j]][0]*100)
-            ax1[int(i/2),int(i%2)].hist(data, bins = bins)
-            if int(i/2) == 1:
-                ax1[int(i/2),int(i%2)].set_xlabel('Percent')
-            if int(i%2) == 0:
-                ax1[int(i/2),int(i%2)].set_ylabel('Frequency of Tests')
-            ax1[int(i/2),int(i%2)].set_title(self.group_names[i])
+            ax1[int(i%2),int(i/2)].hist(data, bins = bins)
+            if int(i%2) == 1:
+                ax1[int(i%2),int(i/2)].set_xlabel('Percent')
+            if int(i/2) == 0:
+                ax1[int(i%2),int(i/2)].set_ylabel('Frequency of Tests')
+            ax1[int(i%2),int(i/2)].set_title(self.group_names[i])
         fig1.suptitle('Percent of Time Red Asset is Tracked in Zone')
+        if num_cols%2== 1:
+            ax1[int(len(self.groups)%2),int(len(self.groups)/2)].axis('off')
         fig1.savefig(self.data_loc+'/percent_tracked.png')
         plt.close()
-        fig1, ax1 = plt.subplots(ncols=2,nrows=2)
+        fig1, ax1 = plt.subplots(ncols=num_cols,nrows=2)
 
         labels = 'Found','Not Found'
         for i in range(len(self.groups)):
@@ -153,9 +159,11 @@ class AnalyzeData:
             data/=data.sum()
             data*=100
             
-            ax1[int(i/2),int(i%2)].pie(data, labels=labels,autopct='%1.1f%%', shadow=True, startangle=140)
-            ax1[int(i/2),int(i%2)].set_title(self.group_names[i])
+            ax1[int(i%2),int(i/2)].pie(data, labels=labels,autopct='%1.1f%%', shadow=True, startangle=140)
+            ax1[int(i%2),int(i/2)].set_title(self.group_names[i])
         fig1.suptitle('Percent of Time Red Asset is Found with each Setting')
+        if num_cols%2== 1:
+            ax1[int(len(self.groups)%2),int(len(self.groups)/2)].axis('off')
         fig1.savefig(self.data_loc+'/percent_found.png')
         plt.close()
         
