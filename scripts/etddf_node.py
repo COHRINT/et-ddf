@@ -56,7 +56,8 @@ class ETDDF_Node:
         self.use_control_input = use_control_input
         self.default_meas_variance = default_meas_variance
         self.my_name = my_name
-        self.landmark_pose = [rospy.get_param("~landmark_x"), rospy.get_param("~landmark_y"),0,0]
+        self.landmark_dict = rospy.get_param("~landmarks")
+        print(self.landmark_dict)
 
         self.cuprint = CUPrint(rospy.get_name())
         
@@ -102,13 +103,18 @@ class ETDDF_Node:
             self.control_input = None
             rospy.Subscriber("uuv_control/control_status", ControlStatus, self.control_status_callback, queue_size=1)
 
+        
+        rospy.Subscriber(rospy.get_param("~measurement_topics/imu_est"), Odometry, self.orientation_estimate_callback, queue_size=1)
+        rospy.wait_for_message(rospy.get_param("~measurement_topics/imu_est"), Odometry)
+
         # IMU Covariance Intersection
         if rospy.get_param("~measurement_topics/imu_ci") == "None":
+            self.cuprint("Not intersecting with strapdown filter")
             rospy.Timer(rospy.Duration(1 / self.update_rate), self.no_nav_filter_callback)
         else:
+            self.cuprint("Intersecting with strapdown")
             self.intersection_pub = rospy.Publisher("strapdown/intersection_result", PositionVelocity, queue_size=1)
             rospy.Subscriber(rospy.get_param("~measurement_topics/imu_ci"), PositionVelocity, self.nav_filter_callback, queue_size=1)
-            rospy.Subscriber(rospy.get_param("~measurement_topics/imu_est"), Odometry, self.orientation_estimate_callback, queue_size=1)
 
         # Sonar Subscription
         if rospy.get_param("~measurement_topics/sonar") != "None":
@@ -128,6 +134,7 @@ class ETDDF_Node:
     def orientation_estimate_callback(self, odom):
         self.meas_lock.acquire()
         self.last_orientation = odom.pose.pose.orientation
+        self.last_orientation_cov = np.array(odom.pose.covariance).reshape(6,6)
         self.meas_lock.release()
 
     def sonar_callback(self, sonar_list):
@@ -136,6 +143,8 @@ class ETDDF_Node:
             # self.cuprint("Receiving sonar data")
             if self.last_orientation is None: # No orientation, no linearization of the sonar measurement
                 return
+            if target.id == "detection":
+                continue
             # Convert quaternions to Euler angles.
             self.meas_lock.acquire()
             (r, p, y) = tf.transformations.euler_from_quaternion([self.last_orientation.x, \
@@ -150,9 +159,9 @@ class ETDDF_Node:
 
             now = rospy.get_rostime()
             sonar_x, sonar_y = None, None
-            if target.id == "landmark":
-                sonar_x = Measurement("sonar_x", now, self.my_name, "", x, self.default_meas_variance["sonar_x"], self.landmark_pose)
-                sonar_y = Measurement("sonar_y", now, self.my_name, "", y, self.default_meas_variance["sonar_x"], self.landmark_pose)
+            if "landmark_" in target.id:
+                sonar_x = Measurement("sonar_x", now, self.my_name, "", x, self.default_meas_variance["sonar_x"], self.landmark_dict[target.id[len("landmark_"):]])
+                sonar_y = Measurement("sonar_y", now, self.my_name, "", y, self.default_meas_variance["sonar_x"], self.landmark_dict[target.id[len("landmark_"):]])
             else:
                 sonar_x = Measurement("sonar_x", now, self.my_name, target.id, x, self.default_meas_variance["sonar_x"], [])
                 sonar_y = Measurement("sonar_y", now, self.my_name, target.id, y, self.default_meas_variance["sonar_y"], [])
@@ -278,6 +287,7 @@ class ETDDF_Node:
 
     def publish_estimates(self, timestamp):
         ne = NetworkEstimate()
+        print(self.asset2id.keys())
         for asset in self.asset2id.keys():
             if "surface" in asset:
                 continue
@@ -289,11 +299,16 @@ class ETDDF_Node:
             # Construct Odometry Msg for Asset
 
             mean, cov = self.filter.get_asset_estimate(asset)
-            pose = Pose(Point(mean[0],mean[1],mean[2]), \
-                        Quaternion(0,0,0,1))
             pose_cov = np.zeros((6,6))
             pose_cov[:3,:3] = cov[:3,:3]
-            pose_cov[3:,3:] = np.eye(3) * -1
+            if asset == self.my_name:
+                pose = Pose(Point(mean[0],mean[1],mean[2]), \
+                            self.last_orientation)
+                pose_cov[3:,3:] = self.last_orientation_cov[3:,3:]
+            else:
+                pose = Pose(Point(mean[0],mean[1],mean[2]), \
+                            Quaternion(0,0,0,1))
+                pose_cov[3:,3:] = np.eye(3) * 3
             pwc = PoseWithCovariance(pose, list(pose_cov.flatten()))
 
             tw = Twist(Vector3(mean[3],mean[4],mean[5]), Vector3(0,0,0))

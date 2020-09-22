@@ -6,9 +6,9 @@ delta_tiers: [1]
 
 ## Measurement topics
 measurement_topics:
-  depth: baro
-  imu_ci: strapdown/intersection
-  imu_est: strapdown/estimate
+  depth: "baro" # "mavros/global_position/rel_alt"
+  imu_ci: "None"
+  imu_est: "mavros/global_position/local"
   sonar: "sonar_processing/target_list/associated"
 
 ### Buffer space configurations ###
