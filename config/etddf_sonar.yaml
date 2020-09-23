@@ -6,10 +6,12 @@ delta_tiers: [1]
 
 ## Measurement topics
 measurement_topics:
-  depth: "baro" # "mavros/global_position/rel_alt"
+  depth: "mavros/global_position/rel_alt"
   imu_ci: "None"
-  imu_est: "pose_gt" # "mavros/global_position/local"
+  imu_est: "odometry/filtered" #"pose_gt" # "mavros/global_position/local"
   sonar: "sonar_processing/target_list/associated"
+
+  # TODO verify mavros_global_position/rel_alt
 
 ### Buffer space configurations ###
 buffer_space:

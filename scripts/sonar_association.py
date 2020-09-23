@@ -12,14 +12,14 @@ class SonarAssociator:
     def __init__(self):
         
         self.cuprint = CUPrint("SonarAssociator")
-        self.association_threshold_distance = 1
+        self.association_threshold_distance = 2
 
         self.landmark_dict = rospy.get_param("~landmarks")
 
-        # pose_topic = "etddf/estimate" + rospy.get_namespace()[:-1]
-        pose_topic = rospy.get_namespace()[:-1] + "/pose_gt"
+        pose_topic = "/bluerov2_4/etddf/estimate/bluerov2_4"# + rospy.get_namespace()[:-1]
+        # pose_topic = rospy.get_namespace()[:-1] + "/pose_gt"
         rospy.Subscriber(pose_topic, Odometry, self.pose_callback)
-        rospy.wait_for_message(pose_topic, Odometry)
+        # rospy.wait_for_message(pose_topic, Odometry)
 
         self.pub = rospy.Publisher("sonar_processing/target_list/associated", SonarTargetList, queue_size=10)
 
@@ -34,15 +34,21 @@ class SonarAssociator:
     def sonar_callback(self, msg):
         for i in range(len(msg.targets)):
 
-            ori = self.pose.pose.pose.orientation
-            _, _, current_yaw = tf.transformations.euler_from_quaternion([ori.x, ori.y, ori.z, ori.w])
-            current_x = self.pose.pose.pose.position.x
-            current_y = self.pose.pose.pose.position.y
+            # ori = self.pose.pose.pose.orientation
+            # _, _, current_yaw = tf.transformations.euler_from_quaternion([ori.x, ori.y, ori.z, ori.w])
+            # current_x = self.pose.pose.pose.position.x
+            # current_y = self.pose.pose.pose.position.y
+
+            current_yaw = 0
+            current_x, current_y = 2.1, 0.7
+
+
             bearing2target_inertial = current_yaw + msg.targets[i].bearing_rad
             projected_target_x = msg.targets[i].range_m * np.cos( bearing2target_inertial ) + current_x
             projected_target_y = msg.targets[i].range_m * np.sin( bearing2target_inertial ) + current_y
 
             # Attempt to associate with a landmark
+            dists = []
             for l in self.landmark_dict.keys():
                 landmark_x, landmark_y, landmark_z = self.landmark_dict[l]
                 dist = np.linalg.norm([projected_target_x - landmark_x, projected_target_y - landmark_y])
@@ -50,6 +56,9 @@ class SonarAssociator:
                     msg.targets[i].id = "landmark_" + l
                     self.cuprint("associating detection with: " + l)
                     break
+                else:
+                    dists.append(dist)
+            print("Norms: " + str(dists) + " for " + str(self.landmark_dict.keys()))
         
         self.pub.publish(msg)
 
