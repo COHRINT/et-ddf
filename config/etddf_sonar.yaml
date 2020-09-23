@@ -1,4 +1,4 @@
-update_rate: 2
+update_rate: 10
 
 ## Multipliers for Delta tiers
 ## increases a measurements threshold to be added to the buffer by the given amount
@@ -8,7 +8,7 @@ delta_tiers: [1]
 measurement_topics:
   depth: "baro" # "mavros/global_position/rel_alt"
   imu_ci: "None"
-  imu_est: "mavros/global_position/local"
+  imu_est: "pose_gt" # "mavros/global_position/local"
   sonar: "sonar_processing/target_list/associated"
 
 ### Buffer space configurations ###
@@ -32,11 +32,11 @@ default_starting_position:
 ### Process Noise Configurations ###
 process_noise:
   ownship:
-    x: 0.001
-    y: 0.001
+    x: 0.0001
+    y: 0.0001
     z: 0.01
-    x_vel: 0.001
-    y_vel: 0.001
+    x_vel: 0.0001
+    y_vel: 0.0001
     z_vel: 0.1
   blueteam:
     x: 0.0

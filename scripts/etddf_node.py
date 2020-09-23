@@ -135,6 +135,8 @@ class ETDDF_Node:
         self.meas_lock.acquire()
         self.last_orientation = odom.pose.pose.orientation
         self.last_orientation_cov = np.array(odom.pose.covariance).reshape(6,6)
+        self.last_orientation_dot = odom.twist.twist.angular
+        self.last_orientation_dot_cov = np.array(odom.twist.covariance).reshape(6,6)
         self.meas_lock.release()
 
     def sonar_callback(self, sonar_list):
@@ -167,7 +169,7 @@ class ETDDF_Node:
                 sonar_y = Measurement("sonar_y", now, self.my_name, target.id, y, self.default_meas_variance["sonar_y"], [])
                 if target.id in self.red_asset_names:
                     self.red_asset_found = True
-            # sonar_z = Measurement("sonar_z", now, self.my_name, target.id, z, self.default_meas_variance["sonar_z"], [])
+            # sonar_z = Measurement("sonar_z", now, self.my_name, target.id, z, self.default_meas_variance["sonar_z"], []
 
             self.filter.add_meas(sonar_x)
             self.filter.add_meas(sonar_y)
@@ -287,7 +289,6 @@ class ETDDF_Node:
 
     def publish_estimates(self, timestamp):
         ne = NetworkEstimate()
-        print(self.asset2id.keys())
         for asset in self.asset2id.keys():
             if "surface" in asset:
                 continue
@@ -311,10 +312,14 @@ class ETDDF_Node:
                 pose_cov[3:,3:] = np.eye(3) * 3
             pwc = PoseWithCovariance(pose, list(pose_cov.flatten()))
 
-            tw = Twist(Vector3(mean[3],mean[4],mean[5]), Vector3(0,0,0))
             twist_cov = np.zeros((6,6))
             twist_cov[:3,:3] = cov[3:6,3:6]
-            twist_cov[3:, 3:] = np.eye(3) * -1
+            if asset == self.my_name:
+                tw = Twist(Vector3(mean[3],mean[4],mean[5]), self.last_orientation_dot)
+                twist_cov[3:, 3:] = self.last_orientation_dot_cov[3:,3:]
+            else:
+                tw = Twist(Vector3(mean[3],mean[4],mean[5]), Vector3(0,0,0))
+                twist_cov[3:, 3:] = np.eye(3) * -1
             twc = TwistWithCovariance(tw, list(twist_cov.flatten()))
             h = Header(self.update_seq, timestamp, "map")
             o = Odometry(h, "map", pwc, twc)

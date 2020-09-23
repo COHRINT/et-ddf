@@ -19,19 +19,19 @@ measurements:
 
   sonar_x:
     base_et_delta: 1.0
-    default_sd: 0.1
+    default_sd: 0.3
     buffer_size: 2
     missed_tolerance: 10
 
   sonar_y:
     base_et_delta: 1.0
-    default_sd: 0.1
+    default_sd: 0.3
     buffer_size: 2
     missed_tolerance: 10
 
   sonar_z:
     base_et_delta: 1.0
-    default_sd: 0.1
+    default_sd: 0.3
     buffer_size: 2
     missed_tolerance: 10
 
