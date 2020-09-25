@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import rospy
+import math
 from nav_msgs.msg import Odometry
 from minau.msg import SonarTargetList, SonarTarget
 import tf
@@ -12,7 +13,7 @@ class SonarAssociator:
     def __init__(self):
         
         self.cuprint = CUPrint("SonarAssociator")
-        self.association_threshold_distance = 2
+        self.association_threshold_distance = 1
 
         self.landmark_dict = rospy.get_param("~landmarks")
 
@@ -34,16 +35,19 @@ class SonarAssociator:
     def sonar_callback(self, msg):
         for i in range(len(msg.targets)):
 
-            # ori = self.pose.pose.pose.orientation
-            # _, _, current_yaw = tf.transformations.euler_from_quaternion([ori.x, ori.y, ori.z, ori.w])
-            # current_x = self.pose.pose.pose.position.x
-            # current_y = self.pose.pose.pose.position.y
+            msg.targets[i].bearing_rad += np.pi
 
-            current_yaw = 0
-            current_x, current_y = 2.1, 0.7
+            ori = self.pose.pose.pose.orientation
+            _, _, current_yaw = tf.transformations.euler_from_quaternion([ori.x, ori.y, ori.z, ori.w])
+            current_x = self.pose.pose.pose.position.x
+            current_y = self.pose.pose.pose.position.y
+
+            # current_yaw = math.radians(8.0)
+            # current_x, current_y = 1.22, 0.0
 
 
             bearing2target_inertial = current_yaw + msg.targets[i].bearing_rad
+
             projected_target_x = msg.targets[i].range_m * np.cos( bearing2target_inertial ) + current_x
             projected_target_y = msg.targets[i].range_m * np.sin( bearing2target_inertial ) + current_y
 
@@ -55,10 +59,12 @@ class SonarAssociator:
                 if dist < self.association_threshold_distance:
                     msg.targets[i].id = "landmark_" + l
                     self.cuprint("associating detection with: " + l)
+                    info = [x*(180 / np.pi) for x in [current_yaw, msg.targets[i].bearing_rad, bearing2target_inertial]]
+                    print("Vehicle Orientation, Measured Bearing, Estimated World Bearing: " + str(info))
                     break
                 else:
                     dists.append(dist)
-            print("Norms: " + str(dists) + " for " + str(self.landmark_dict.keys()))
+            # print("Norms: " + str(dists) + " for " + str(self.landmark_dict.keys()))
         
         self.pub.publish(msg)
 

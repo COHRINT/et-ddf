@@ -34,8 +34,8 @@ default_starting_position:
 ### Process Noise Configurations ###
 process_noise:
   ownship:
-    x: 0.0001
-    y: 0.0001
+    x: 0.00001
+    y: 0.00001
     z: 0.01
     x_vel: 0.0001
     y_vel: 0.0001

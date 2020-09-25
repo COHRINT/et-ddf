@@ -119,6 +119,7 @@ class ETDDF_Node:
         # Sonar Subscription
         if rospy.get_param("~measurement_topics/sonar") != "None":
             rospy.Subscriber(rospy.get_param("~measurement_topics/sonar"), SonarTargetList, self.sonar_callback)
+        # rospy.Subscriber('/sonar_processing/target_list/associated', SonarTargetList, self.sonar_callback)
         
         self.data_x, self.data_y = None, None
         # rospy.Subscriber("pose_gt", Odometry, self.gps_callback, queue_size=1)
@@ -142,17 +143,18 @@ class ETDDF_Node:
     def sonar_callback(self, sonar_list):
 
         for target in sonar_list.targets:
-            self.cuprint("Receiving sonar data")
-            # if self.last_orientation is None: # No orientation, no linearization of the sonar measurement
-            #     return
+            if self.last_orientation is None: # No orientation, no linearization of the sonar measurement
+                return
             if target.id == "detection":
                 continue
+
+            self.cuprint("Receiving sonar data")
             # Convert quaternions to Euler angles.
             self.meas_lock.acquire()
-            # (r, p, y) = tf.transformations.euler_from_quaternion([self.last_orientation.x, \
-            #     self.last_orientation.y, self.last_orientation.z, self.last_orientation.w])
+            (r, p, y) = tf.transformations.euler_from_quaternion([self.last_orientation.x, \
+                self.last_orientation.y, self.last_orientation.z, self.last_orientation.w])
             self.meas_lock.release()
-            y = (np.pi/180.0) * 8
+            # y = (np.pi/180.0) * 8
             bearing_world = y + target.bearing_rad
 
             z = target.range_m * np.sin(target.elevation_rad)
@@ -303,12 +305,12 @@ class ETDDF_Node:
             mean, cov = self.filter.get_asset_estimate(asset)
             pose_cov = np.zeros((6,6))
             pose_cov[:3,:3] = cov[:3,:3]
-            # if asset == self.my_name:
-            if 0:
+            if asset == self.my_name:
+            # if 0:
                 pose = Pose(Point(mean[0],mean[1],mean[2]), \
                             self.last_orientation)
                 pose.position.z -= 0.7
-                # pose_cov[3:,3:] = self.last_orientation_cov[3:,3:]
+                pose_cov[3:,3:] = self.last_orientation_cov[3:,3:]
             else:
                 pose = Pose(Point(mean[0],mean[1],mean[2]), \
                             Quaternion(0,0,0,1))
@@ -317,10 +319,10 @@ class ETDDF_Node:
 
             twist_cov = np.zeros((6,6))
             twist_cov[:3,:3] = cov[3:6,3:6]
-            # if asset == self.my_name:
-            if 0:
+            if asset == self.my_name:
+            # if 0:
                 tw = Twist(Vector3(mean[3],mean[4],mean[5]), self.last_orientation_dot)
-                # twist_cov[3:, 3:] = self.last_orientation_dot_cov[3:,3:]
+                twist_cov[3:, 3:] = self.last_orientation_dot_cov[3:,3:]
             else:
                 tw = Twist(Vector3(mean[3],mean[4],mean[5]), Vector3(0,0,0))
                 twist_cov[3:, 3:] = np.eye(3) * -1

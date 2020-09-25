@@ -9,7 +9,7 @@
 
     <arg name="red_team_names" default="[]" />
     <arg name="config_file" default="$(find etddf)/config/etddf_sonar.yaml" />
-    <arg name="starting_position_enu" default="[1.5,1,0]" /> <!-- [x,y,z] -->
+    <arg name="starting_position_enu" default="[1.22,0,0]" /> <!-- [x,y,z] -->
     <arg name="starting_yaw_enu" default="0.0" />
     
     <node name="etddf" pkg="etddf" type="etddf_node.py" output="screen">
@@ -24,8 +24,8 @@
         <rosparam command="load" file="$(arg landmark_file)" />
     </node>
 
-    <!-- <node name="sonar_association" pkg="etddf" type="sonar_association.py" output="screen">
+    <node name="sonar_association" pkg="etddf" type="sonar_association.py" output="screen">
         <rosparam command="load" file="$(arg landmark_file)" />
-    </node> -->
+    </node>
 
 </launch>
