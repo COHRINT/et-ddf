@@ -142,7 +142,7 @@ class ETDDF_Node:
     def sonar_callback(self, sonar_list):
 
         for target in sonar_list.targets:
-            # self.cuprint("Receiving sonar data")
+            self.cuprint("Receiving sonar data")
             if self.last_orientation is None: # No orientation, no linearization of the sonar measurement
                 return
             if target.id == "detection":
@@ -305,6 +305,7 @@ class ETDDF_Node:
             if asset == self.my_name:
                 pose = Pose(Point(mean[0],mean[1],mean[2]), \
                             self.last_orientation)
+                pose.position.z -= 0.7
                 pose_cov[3:,3:] = self.last_orientation_cov[3:,3:]
             else:
                 pose = Pose(Point(mean[0],mean[1],mean[2]), \
