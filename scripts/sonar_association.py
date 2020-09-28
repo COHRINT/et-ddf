@@ -17,10 +17,10 @@ class SonarAssociator:
 
         self.landmark_dict = rospy.get_param("~landmarks")
 
-        pose_topic = "/bluerov2_4/etddf/estimate/bluerov2_4"# + rospy.get_namespace()[:-1]
+        pose_topic = "etddf/estimate" + rospy.get_namespace()[:-1]
         # pose_topic = rospy.get_namespace()[:-1] + "/pose_gt"
         rospy.Subscriber(pose_topic, Odometry, self.pose_callback)
-        # rospy.wait_for_message(pose_topic, Odometry)
+        rospy.wait_for_message(pose_topic, Odometry)
 
         self.pub = rospy.Publisher("sonar_processing/target_list/associated", SonarTargetList, queue_size=10)
 
@@ -41,10 +41,6 @@ class SonarAssociator:
             _, _, current_yaw = tf.transformations.euler_from_quaternion([ori.x, ori.y, ori.z, ori.w])
             current_x = self.pose.pose.pose.position.x
             current_y = self.pose.pose.pose.position.y
-
-            # current_yaw = math.radians(8.0)
-            # current_x, current_y = 1.22, 0.0
-
 
             bearing2target_inertial = current_yaw + msg.targets[i].bearing_rad
 
