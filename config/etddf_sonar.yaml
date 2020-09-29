@@ -1,15 +1,20 @@
 update_rate: 10
 
+
+# FOR HARDWARE
+# Change depth topic, add_depth_bias
+
 ## Multipliers for Delta tiers
 ## increases a measurements threshold to be added to the buffer by the given amount
 delta_tiers: [1]
 
 ## Measurement topics
 measurement_topics:
-  depth: "mavros/global_position/rel_alt"
+  depth: "baro" #"mavros/global_position/rel_alt"
   imu_ci: "None"
   imu_est: "odometry/filtered" #"pose_gt" # "mavros/global_position/local"
   sonar: "sonar_processing/target_list/associated"
+  add_depth_bias: False # Add depth bias in hardware to keep the agent from bottominng out
 
   # TODO verify mavros_global_position/rel_alt
 

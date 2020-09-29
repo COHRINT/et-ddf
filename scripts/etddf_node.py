@@ -95,6 +95,7 @@ class ETDDF_Node:
         # Depth Sensor
         if rospy.get_param("~measurement_topics/depth") != "None":
             rospy.Subscriber(rospy.get_param("~measurement_topics/depth"), Float64, self.depth_callback, queue_size=1)
+            self.add_depth_bias = rospy.get_param("~measurement_topics/add_depth_bias")
 
         # Modem & Measurement Packages
         rospy.Subscriber("etddf/packages_in", MeasurementPackage, self.meas_pkg_callback, queue_size=1)
@@ -308,7 +309,8 @@ class ETDDF_Node:
             # if 0:
                 pose = Pose(Point(mean[0],mean[1],mean[2]), \
                             self.last_orientation)
-                pose.position.z -= 0.7
+                if self.add_depth_bias:
+                    pose.position.z -= 0.7
                 pose_cov[3:,3:] = self.last_orientation_cov[3:,3:]
             else:
                 pose = Pose(Point(mean[0],mean[1],mean[2]), \
