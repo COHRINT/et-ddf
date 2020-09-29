@@ -56,7 +56,7 @@ class ETDDF_Node:
         self.use_control_input = use_control_input
         self.default_meas_variance = default_meas_variance
         self.my_name = my_name
-        self.landmark_dict = rospy.get_param("~landmarks")
+        self.landmark_dict = rospy.get_param("~landmarks", {})
         print(self.landmark_dict)
 
         self.cuprint = CUPrint(rospy.get_name())
@@ -119,7 +119,6 @@ class ETDDF_Node:
         # Sonar Subscription
         if rospy.get_param("~measurement_topics/sonar") != "None":
             rospy.Subscriber(rospy.get_param("~measurement_topics/sonar"), SonarTargetList, self.sonar_callback)
-        # rospy.Subscriber('/sonar_processing/target_list/associated', SonarTargetList, self.sonar_callback)
         
         self.data_x, self.data_y = None, None
         # rospy.Subscriber("pose_gt", Odometry, self.gps_callback, queue_size=1)

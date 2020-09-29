@@ -24,6 +24,7 @@
 
     <node name="sonar_association" pkg="etddf" type="sonar_association.py" output="screen">
         <rosparam command="load" file="$(arg landmark_file)" />
+        <rosparam param="blue_team_names" subst_value="True">$(arg blue_team_names)</rosparam> 
     </node>
 
 </launch>

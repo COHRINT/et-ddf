@@ -15,12 +15,17 @@ class SonarAssociator:
         self.cuprint = CUPrint("SonarAssociator")
         self.association_threshold_distance = 1
 
-        self.landmark_dict = rospy.get_param("~landmarks")
+        self.landmark_dict = rospy.get_param("~landmarks", {})
 
         pose_topic = "etddf/estimate" + rospy.get_namespace()[:-1]
         # pose_topic = rospy.get_namespace()[:-1] + "/pose_gt"
         rospy.Subscriber(pose_topic, Odometry, self.pose_callback)
         rospy.wait_for_message(pose_topic, Odometry)
+
+        blue_team = rospy.get_param("~blue_team_names")
+        self.blue_team = {}
+        for b in blue_team:
+            rospy.Subscriber("etddf/estimate/" + b, Odometry, self.blue_team_callback, callback_args=b)
 
         self.pub = rospy.Publisher("sonar_processing/target_list/associated", SonarTargetList, queue_size=10)
 
@@ -32,10 +37,11 @@ class SonarAssociator:
     def pose_callback(self, msg):
         self.pose = msg
 
+    def blue_team_callback(self, msg, agent_name):
+        self.blue_team[agent_name] = msg
+
     def sonar_callback(self, msg):
         for i in range(len(msg.targets)):
-
-            msg.targets[i].bearing_rad += np.pi
 
             ori = self.pose.pose.pose.orientation
             _, _, current_yaw = tf.transformations.euler_from_quaternion([ori.x, ori.y, ori.z, ori.w])
@@ -55,6 +61,18 @@ class SonarAssociator:
                 if dist < self.association_threshold_distance:
                     msg.targets[i].id = "landmark_" + l
                     self.cuprint("associating detection with: " + l)
+                    info = [x*(180 / np.pi) for x in [current_yaw, msg.targets[i].bearing_rad, bearing2target_inertial]]
+                    print("Vehicle Orientation, Measured Bearing, Estimated World Bearing: " + str(info))
+                    break
+                else:
+                    dists.append(dist)
+            for b in self.blue_team.keys():
+                blue_position = self.blue_team[b].pose.pose.position
+                blue_x, blue_y, blue_z = blue_position.x, blue_position.y, blue_position.z
+                dist = np.linalg.norm([projected_target_x - blue_x, projected_target_y - blue_y])
+                if dist < self.association_threshold_distance:
+                    msg.targets[i].id = b
+                    self.cuprint("associating detection with: " + b)
                     info = [x*(180 / np.pi) for x in [current_yaw, msg.targets[i].bearing_rad, bearing2target_inertial]]
                     print("Vehicle Orientation, Measured Bearing, Estimated World Bearing: " + str(info))
                     break
