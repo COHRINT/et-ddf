@@ -10,7 +10,7 @@ delta_tiers: [1]
 
 ## Measurement topics
 measurement_topics:
-  depth: "baro" #"mavros/global_position/rel_alt"
+  depth: "mavros/global_position/rel_alt" # baro
   imu_ci: "None"
   imu_est: "odometry/filtered" #"pose_gt" # "mavros/global_position/local"
   sonar: "sonar_processing/target_list/associated"
@@ -41,10 +41,10 @@ process_noise:
   ownship:
     x: 0.00001
     y: 0.00001
-    z: 0.01
-    x_vel: 0.0001
-    y_vel: 0.0001
-    z_vel: 0.1
+    z: 0.001
+    x_vel: 0.00001
+    y_vel: 0.00001
+    z_vel: 0.0001
   blueteam:
     x: 0.0
     y: 0.0
@@ -66,9 +66,9 @@ initial_uncertainty:
     x: 1.0
     y: 1.0
     z: 1.0
-    x_vel: 0.2
-    y_vel: 0.2
-    z_vel: 0.2
+    x_vel: 0.01
+    y_vel: 0.01
+    z_vel: 0.01
   # for asset positions provided to us through roslaunch params
   known_starting_position: 
     x: 0.0

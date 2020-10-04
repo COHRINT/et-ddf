@@ -13,7 +13,7 @@ class SonarAssociator:
     def __init__(self):
         
         self.cuprint = CUPrint("SonarAssociator")
-        self.association_threshold_distance = 1
+        self.association_threshold_distance = rospy.get_param("~threshold",1)
 
         self.landmark_dict = rospy.get_param("~landmarks", {})
 
@@ -60,9 +60,9 @@ class SonarAssociator:
                 dist = np.linalg.norm([projected_target_x - landmark_x, projected_target_y - landmark_y])
                 if dist < self.association_threshold_distance:
                     msg.targets[i].id = "landmark_" + l
-                    self.cuprint("associating detection with: " + l)
+                    self.cuprint(l)
                     info = [x*(180 / np.pi) for x in [current_yaw, msg.targets[i].bearing_rad, bearing2target_inertial]]
-                    print("Vehicle Orientation, Measured Bearing, Estimated World Bearing: " + str(info))
+                    # print("Vehicle Orientation, Measured Bearing, Estimated World Bearing: " + str(info))
                     break
                 else:
                     dists.append(dist)
@@ -72,9 +72,9 @@ class SonarAssociator:
                 dist = np.linalg.norm([projected_target_x - blue_x, projected_target_y - blue_y])
                 if dist < self.association_threshold_distance:
                     msg.targets[i].id = b
-                    self.cuprint("associating detection with: " + b)
+                    self.cuprint(b)
                     info = [x*(180 / np.pi) for x in [current_yaw, msg.targets[i].bearing_rad, bearing2target_inertial]]
-                    print("Vehicle Orientation, Measured Bearing, Estimated World Bearing: " + str(info))
+                    # print("Vehicle Orientation, Measured Bearing, Estimated World Bearing: " + str(info))
                     break
                 else:
                     dists.append(dist)

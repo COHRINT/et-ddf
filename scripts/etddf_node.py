@@ -148,7 +148,7 @@ class ETDDF_Node:
             if target.id == "detection":
                 continue
 
-            self.cuprint("Receiving sonar data")
+            # self.cuprint("Receiving sonar data")
             # Convert quaternions to Euler angles.
             self.meas_lock.acquire()
             (r, p, y) = tf.transformations.euler_from_quaternion([self.last_orientation.x, \
@@ -306,7 +306,6 @@ class ETDDF_Node:
             pose_cov = np.zeros((6,6))
             pose_cov[:3,:3] = cov[:3,:3]
             if asset == self.my_name:
-            # if 0:
                 pose = Pose(Point(mean[0],mean[1],mean[2]), \
                             self.last_orientation)
                 if self.add_depth_bias:
@@ -321,7 +320,6 @@ class ETDDF_Node:
             twist_cov = np.zeros((6,6))
             twist_cov[:3,:3] = cov[3:6,3:6]
             if asset == self.my_name:
-            # if 0:
                 tw = Twist(Vector3(mean[3],mean[4],mean[5]), self.last_orientation_dot)
                 twist_cov[3:, 3:] = self.last_orientation_dot_cov[3:,3:]
             else:
@@ -340,26 +338,27 @@ class ETDDF_Node:
     def meas_pkg_callback(self, msg):
         # Modem Meas taken by surface
         if msg.src_asset == "surface":
-            self.cuprint("Receiving Surface Modem Measurements")
+            # self.cuprint("Receiving Surface Modem Measurements")
             for meas in msg.measurements:
                 # Approximate the fuse on the next update, so we can get other asset's position immediately
                 if meas.meas_type == "modem_elevation":
                     rospy.logerr("Ignoring Modem Elevation Measurement since we have depth measurements")
                     continue
                 elif meas.meas_type == "modem_azimuth":
-                    meas.global_pose = list(meas.global_pose)
-                    self.cuprint("azimuth: " + str(meas.data))
+                    meas.global_pose = [0,-8.82,-0.2,0.4] #list(meas.global_pose)
+                    # self.cuprint("azimuth: " + str(meas.data))
                     meas.data = (meas.data * np.pi) / 180
                     meas.variance = self.default_meas_variance["modem_azimuth"]
                 elif meas.meas_type == "modem_range":
-                    meas.global_pose = list(meas.global_pose)
-                    self.cuprint("range: " + str(meas.data))
+                    meas.global_pose = [0,-8.82,-0.2,0.4] #list(meas.global_pose)
+                    # self.cuprint("range: " + str(meas.data))
                     meas.variance = self.default_meas_variance["modem_range"]
+                meas.measured_asset = "bluerov2_4"
                 self.filter.add_meas(meas, force_fuse=True)
 
         # Modem Meas taken by me
         elif msg.src_asset == self.my_name:
-            self.cuprint("Receiving Modem Measurements Taken by Me")
+            # self.cuprint("Receiving Modem Measurements Taken by Me")
             for meas in msg.measurements:
                 # Approximate the fuse on the next update, so we can get other asset's position immediately
                 if meas.meas_type == "modem_elevation":

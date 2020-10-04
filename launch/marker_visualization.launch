@@ -1,0 +1,8 @@
+<launch>
+<arg name="landmark_file" default="$(find etddf)/config/landmarks_flight.yaml" />
+<node name="marker_visualization" type="marker_visualization.py" pkg="etddf" output="screen">
+    <rosparam command="load" file="$(arg landmark_file)" />
+</node>
+<node name="visualize_beam" type="visualize_scan_beam_rviz.py" pkg="etddf" output="screen" />
+
+</launch>
