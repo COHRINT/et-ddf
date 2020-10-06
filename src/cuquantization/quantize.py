@@ -175,13 +175,11 @@ if __name__ == "__main__":
     mp = MeasurementPackage()
     mp.src_asset = "surface"
     mp.delta_multiplier = 1.0
-
     t = rospy.get_rostime()
     m = Measurement("modem_range", t, mp.src_asset, "bluerov2_3", 3.65, 0.5, global_pose)
     m2 = Measurement("modem_azimuth", t, mp.src_asset, "bluerov2_3", -65.72, 0.5, global_pose)
     m3 = Measurement("modem_range", t, mp.src_asset, "bluerov2_4", 7.8, 0.5, global_pose)
     m4 = Measurement("modem_azimuth", t, mp.src_asset, "bluerov2_4", 23.0, 0.5, global_pose)
-
     mp.measurements.append(m)
     mp.measurements.append(m2)
     mp.measurements.append(m3)

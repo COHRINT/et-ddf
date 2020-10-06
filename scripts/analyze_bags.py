@@ -9,7 +9,12 @@ import matplotlib.patches as mpatches
 from matplotlib.collections import PatchCollection
 import tf
 
-ASSET_NAME = "bluerov2_4"
+ASSET_NAME = "bluerov2_3"
+# ASSET_NAME = "bluerov2_4"
+# MEASURED_NAME = ASSET_NAME
+MEASURED_NAME = "bluerov2_4"
+# MEASURED_NAME = "bluerov2_3"
+
 
 def get_plot_labels(num_states, num_ownship_states, asset_id):
     num_assets = int( num_states / num_ownship_states )
@@ -155,11 +160,11 @@ last_pose_gt = None
 last_pose_gt_time = None
 
 if args.etddf == True:
-    etddf_topic = '/'+ASSET_NAME + '/etddf/estimate/' + ASSET_NAME
+    etddf_topic = '/'+ASSET_NAME + '/etddf/estimate/' + MEASURED_NAME
 else:
     etddf_topic = '/'+ASSET_NAME + '/strapdown/estimate'
 # etddf_topic = '/bluerov2_4/odometry/filtered'
-for topic, msg, t in bag.read_messages(topics=[etddf_topic, '/' + ASSET_NAME+ '/pose_gt']):
+for topic, msg, t in bag.read_messages(topics=[etddf_topic, '/' + MEASURED_NAME+ '/pose_gt']):
     if topic == etddf_topic and last_pose_gt is not None:
         synced_3of3.append([msg, last_pose_gt])
         synced_times.append([t, last_pose_gt_time])

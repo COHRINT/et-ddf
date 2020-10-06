@@ -125,7 +125,7 @@ class ETDDF_Node:
         # rospy.Subscriber("pose_gt", Odometry, self.gps_callback, queue_size=1)
     
         # Initialize Buffer Service
-        # rospy.Service('etddf/get_measurement_package', GetMeasurementPackage, self.get_meas_pkg_callback)
+        rospy.Service('etddf/get_measurement_package', GetMeasurementPackage, self.get_meas_pkg_callback)
         self.cuprint("loaded")
 
     def gps_callback(self, msg):
@@ -338,22 +338,21 @@ class ETDDF_Node:
     def meas_pkg_callback(self, msg):
         # Modem Meas taken by surface
         if msg.src_asset == "surface":
-            # self.cuprint("Receiving Surface Modem Measurements")
+            self.cuprint("Receiving Surface Modem Measurements")
             for meas in msg.measurements:
                 # Approximate the fuse on the next update, so we can get other asset's position immediately
                 if meas.meas_type == "modem_elevation":
                     rospy.logerr("Ignoring Modem Elevation Measurement since we have depth measurements")
                     continue
                 elif meas.meas_type == "modem_azimuth":
-                    meas.global_pose = [0,-8.82,-0.2,0.4] #list(meas.global_pose)
+                    meas.global_pose = list(meas.global_pose)
                     # self.cuprint("azimuth: " + str(meas.data))
                     meas.data = (meas.data * np.pi) / 180
                     meas.variance = self.default_meas_variance["modem_azimuth"]
                 elif meas.meas_type == "modem_range":
-                    meas.global_pose = [0,-8.82,-0.2,0.4] #list(meas.global_pose)
+                    meas.global_pose = list(meas.global_pose)
                     # self.cuprint("range: " + str(meas.data))
                     meas.variance = self.default_meas_variance["modem_range"]
-                meas.measured_asset = "bluerov2_4"
                 self.filter.add_meas(meas, force_fuse=True)
 
         # Modem Meas taken by me
@@ -377,7 +376,9 @@ class ETDDF_Node:
         else:
             self.cuprint("receiving buffer")
             self.update_lock.acquire()
+            self.cuprint("catching up...")
             implicit_cnt, explicit_cnt = self.filter.catch_up(msg.delta_multiplier, msg.measurements)
+            self.cuprint("...caught up")
             self.update_lock.release()
             self.statistics.implicit_count += implicit_cnt
             self.statistics.explicit_count += explicit_cnt
@@ -388,7 +389,6 @@ class ETDDF_Node:
         ind = self.statistics.delta_tiers.index(delta)
         self.statistics.buffer_counts[ind] += 1
         mp = MeasurementPackage(buffer, self.my_name, delta)
-        print(mp)
         return mp
 
 

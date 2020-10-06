@@ -10,17 +10,15 @@ delta_tiers: [1]
 
 ## Measurement topics
 measurement_topics:
-  depth: "mavros/global_position/rel_alt" # baro
+  depth: "baro" # "mavros/global_position/rel_alt" # baro
   imu_ci: "None"
   imu_est: "odometry/filtered" #"pose_gt" # "mavros/global_position/local"
-  sonar: "sonar_processing/target_list/associated"
+  sonar: "None" # "sonar_processing/target_list/associated"
   add_depth_bias: False # Add depth bias in hardware to keep the agent from bottominng out
-
-  # TODO verify mavros_global_position/rel_alt
 
 ### Buffer space configurations ###
 buffer_space:
-  capacity: 32 # Total capacity
+  capacity: 28 # Total capacity, should be 28
   bookstart: 1 # Space for indicating START of measurement stream
   bookend: 1 # Space for indicating STOP of meas stream
   final_time: 0 # Space to send last time in buffer
@@ -46,19 +44,19 @@ process_noise:
     y_vel: 0.00001
     z_vel: 0.0001
   blueteam:
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    x_vel: 0.0
-    y_vel: 0.0
-    z_vel: 0.0
+    x: 0.00001
+    y: 0.00001
+    z: 0.001
+    x_vel: 0.00001
+    y_vel: 0.00001
+    z_vel: 0.001
   redteam:
-    x: 0.1
-    y: 0.1
-    z: 0.1
-    x_vel: 0.05
-    y_vel: 0.05
-    z_vel: 0.05
+    x: 0.00001
+    y: 0.00001
+    z: 0.00001
+    x_vel: 0.00001
+    y_vel: 0.00001
+    z_vel: 0.00001
 
 ### Initial Uncertainty Configurations ###
 initial_uncertainty:
@@ -71,12 +69,12 @@ initial_uncertainty:
     z_vel: 0.01
   # for asset positions provided to us through roslaunch params
   known_starting_position: 
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    x_vel: 0.0
-    y_vel: 0.0
-    z_vel: 0.0
+    x: 1.0
+    y: 1.0
+    z: 1.0
+    x_vel: 0.01
+    y_vel: 0.01
+    z_vel: 0.01
   # asset positions not provided in roslaunch, including redteam
   unknown_starting_position: 
     x: 1000

@@ -1,6 +1,17 @@
 #!/usr/bin/env python
 
 
+"""
+To play a hardware scenario back in RVIZ
+(Run the topic extractor)
+Launch RVIZ
+roslaunch etddf marker_visualization.launch __ns:=bluerov2_4
+roslaunch ping360_sonar detection.launch __ns:=bluerov2_4
+rosrun etddf truth_position_publisher.py __ns:=bluerov2_4 # make sure it has the right truth position(s)
+roslaunch etddf etddf_sonar_associate.launch __ns:=bluerov2_4
+play the rosbag
+"""
+
 
 import rospy
 from visualization_msgs.msg import MarkerArray, Marker

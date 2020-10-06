@@ -70,7 +70,7 @@ class DeltaTier:
             missed_meas_tolerance_table, \
             delta_codebook_table, 69, \
             True, asset2id[my_name]
-        )
+        ) # Make delta multiplier high so we don't share meas using this filter
 
         # Remember for instantiating new LedgerFilters
         self.num_ownship_states = num_ownship_states

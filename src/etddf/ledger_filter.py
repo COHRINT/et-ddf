@@ -208,6 +208,7 @@ class LedgerFilter:
         Returns:
             list -- the flushed buffer of measurements
         """
+        self.expected_measurements = {}
         return self.buffer.flush(final_time)
 
     def reset(self, buffer, ledger_update_times, ledger_meas, ledger_control=None, ledger_ci=None):
@@ -241,6 +242,8 @@ class LedgerFilter:
         else:
             # Initialize with empty lists
             self.ledger_control = [[] for _ in range(len(self.ledger_update_times))]
+            if not self.ledger_control:
+                self.ledger_control = [[]]
 
         # Covariance intersection ledger
         if ledger_ci is not None:
