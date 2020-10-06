@@ -10,6 +10,7 @@ measurement_topics:
   imu_ci: strapdown/intersection
   imu_est: strapdown/estimate
   sonar: "sonar_processing/target_list/associated"
+  add_depth_bias: False
 
 ### Buffer space configurations ###
 buffer_space:

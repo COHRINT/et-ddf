@@ -1,7 +1,9 @@
 <launch>
-    <arg name="pos3" default="[0,0,0]"/>
-    <arg name="pos4" default="[0,0,0]"/>
-    <arg name="schedule_file" default="$(find minau)/config/schedules/schedule_1_assets.json"/>
+    <arg name="pos3" default="[10,10,0]"/>
+    <arg name="pos4" default="[-10,10,0]"/>
+    <arg name="pos5" default="[-10,-10,0]"/>
+    <arg name="pos6" default="[10,-10,0]"/>
+    <arg name="schedule_file" default="$(find minau)/config/schedules/schedule_repeat_test.json"/>
     <group ns="bluerov2_3">    
         <node name="uuv_control" pkg="minau" type="uuv_control_node.py" output="screen">
             <param name="config" value="$(find minau)/config/vehicle.sitl.json"/>
@@ -9,9 +11,10 @@
             <param name="use_truth" value="False" />
         </node>
         <include file="$(find etddf)/launch/etddf.launch">
+            <arg name="landmark_file" value="$(find etddf)/config/landmarks_dummy.yaml" />
             <arg name="my_name" value="bluerov2_3"/>
-            <arg name="blue_team_names" value="[bluerov2_4]"/>
-            <arg name="blue_team_positions_enu" value="[$(arg pos4)]"/>
+            <arg name="blue_team_names" value="[bluerov2_4,bluerov2_5,bluerov2_6]"/>
+            <arg name="blue_team_positions_enu" value="[$(arg pos4),$(arg pos5),$(arg pos6)]"/>
             <arg name="red_team_names" value="[red_actor_1]" />
             <arg name="starting_position_enu" value="$(arg pos3)" />
             <arg name="config_file" default="$(find etddf)/config/etddf_temp.yaml" />
@@ -31,11 +34,58 @@
             <param name="use_truth" value="False" />
         </node>
         <include file="$(find etddf)/launch/etddf.launch">
+            <arg name="landmark_file" value="$(find etddf)/config/landmarks_dummy.yaml" />
             <arg name="my_name" value="bluerov2_4"/>
-            <arg name="blue_team_names" value="[bluerov2_3]"/>
-            <arg name="blue_team_positions_enu" value="[$(arg pos3)]"/>
+            <arg name="blue_team_names" value="[bluerov2_3,bluerov2_5,bluerov2_6]"/>
+            <arg name="blue_team_positions_enu" value="[$(arg pos3),$(arg pos5),$(arg pos6)]"/>
             <arg name="red_team_names" value="[red_actor_1]" />
             <arg name="starting_position_enu" value="$(arg pos4)" />
+            <arg name="config_file" default="$(find etddf)/config/etddf_temp.yaml" />
+        </include>
+        <node name="fleet_communication" pkg="minau" type="fleet_communication_node.py" output="screen">
+            <param name="rate" value="20.0"/>
+            <param name="schedule_file" value="$(arg schedule_file)"/>
+        </node>
+        <node name="sonar_scanner" pkg="etddf" type="sonar_scanner.py" output="screen">
+            <param name="sonar_range" value="10"/>
+        </node>
+    </group>
+    <group ns="bluerov2_5">    
+        <node name="uuv_control" pkg="minau" type="uuv_control_node.py" output="screen">
+            <param name="config" value="$(find minau)/config/vehicle.sitl.json"/>
+            <param name="rate" value="20.0"/>
+            <param name="use_truth" value="False" />
+        </node>
+        <include file="$(find etddf)/launch/etddf.launch">
+            <arg name="landmark_file" value="$(find etddf)/config/landmarks_dummy.yaml" />
+            <arg name="my_name" value="bluerov2_5"/>
+            <arg name="blue_team_names" value="[bluerov2_3,bluerov2_4,bluerov2_6]"/>
+            <arg name="blue_team_positions_enu" value="[$(arg pos3),$(arg pos4),$(arg pos6)]"/>
+            <arg name="red_team_names" value="[red_actor_1]" />
+            <arg name="starting_position_enu" value="$(arg pos5)" />
+            <arg name="config_file" default="$(find etddf)/config/etddf_temp.yaml" />
+        </include>
+        <node name="fleet_communication" pkg="minau" type="fleet_communication_node.py" output="screen">
+            <param name="rate" value="20.0"/>
+            <param name="schedule_file" value="$(arg schedule_file)"/>
+        </node>
+        <node name="sonar_scanner" pkg="etddf" type="sonar_scanner.py" output="screen">
+            <param name="sonar_range" value="10"/>
+        </node>
+    </group>
+    <group ns="bluerov2_6">    
+        <node name="uuv_control" pkg="minau" type="uuv_control_node.py" output="screen">
+            <param name="config" value="$(find minau)/config/vehicle.sitl.json"/>
+            <param name="rate" value="20.0"/>
+            <param name="use_truth" value="False" />
+        </node>
+        <include file="$(find etddf)/launch/etddf.launch">
+            <arg name="landmark_file" value="$(find etddf)/config/landmarks_dummy.yaml" />
+            <arg name="my_name" value="bluerov2_6"/>
+            <arg name="blue_team_names" value="[bluerov2_3,bluerov2_4,bluerov2_5]"/>
+            <arg name="blue_team_positions_enu" value="[$(arg pos3),$(arg pos4),$(arg pos5)]"/>
+            <arg name="red_team_names" value="[red_actor_1]" />
+            <arg name="starting_position_enu" value="$(arg pos6)" />
             <arg name="config_file" default="$(find etddf)/config/etddf_temp.yaml" />
         </include>
         <node name="fleet_communication" pkg="minau" type="fleet_communication_node.py" output="screen">

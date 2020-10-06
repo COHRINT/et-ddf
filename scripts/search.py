@@ -19,7 +19,7 @@ import os
 import space
 
 
-PLOTTING = True
+PLOTTING = False
 
 
 #Open up config file to get the volume we are going to patrol
@@ -49,10 +49,7 @@ def normalize_velocity(v,speed):
   
 
 class Search:
-    def __init__(self,space,name,half):
-        #0 for top half, 1 for bottom half
-        self.half = half
-        self.z = self.half-1
+    def __init__(self,space,name):
         #name in format '/bluerov2_X'
         self.bel = space
         self.need_plot = False
@@ -64,6 +61,7 @@ class Search:
         self.angle_scan_begin = 0
         self.step = 1
         self.red_found = 0
+        self.z = -1 
         self.x = None
         self.waypoint = None
         self.lawn = rospy.get_param("~lawn",False)
@@ -71,6 +69,7 @@ class Search:
         self.visited_x = []
         self.visited_y = []
         self.vel = rospy.get_param("~vel",0.4)
+        self.prev = None
 
 
         #Make sure both rovs are armed
@@ -87,11 +86,15 @@ class Search:
         
         #Subscribes to the necisary topics for the search node for each rov
         rospy.Subscriber(self.name+"/strapdown/estimate",Odometry,self.ownship_callback)
+        rospy.Subscriber(self.name+"pose_gt",Odometry,self.truth_callback)
         rospy.Subscriber(self.name+"/sonar_processing/target_list",SonarTargetList,self.detections)
         rospy.Subscriber(self.name+"/sonar_angle",Int16,self.angle_callback)
         self.first = True
         self.angle = 0
-        
+    
+    def truth_callback(self,msg):
+        self.truth_vel = [msg.twist.twist.linear.x,msg.twist.twist.linear.y]
+
     def ownship_callback(self,msg):
         """Takes in ownship estimate to be used as it searches the space
 
@@ -114,7 +117,7 @@ class Search:
         ang = ang % 360
         
 
-        self.angle = int(round((ang) / 18.0))
+        self.angle = int(round((ang) / 18.0))%20
         
         x = int(round(self.position.x))
         y = int(round(self.position.y))
@@ -176,15 +179,11 @@ class Search:
         Generates a new waypoint based on beleif. If in lawn mode then it just goes back and forth along the space.
         """
         if not self.lawn:
-            if self.half == 0:
-                dir = 1
-            else:
-                dir = -1
             max_x = 0
-            max_y = dir
+            max_y = 0
             total_max = 0
             for i in range(len(self.bel.x_cords)):
-                for j in range(int(len(self.bel.y_cords)/2)):
+                for j in range(len(self.bel.y_cords)):
                     total = 0
                     # for k in range(21):
                     #     if k+i-10 >=0 and k+i-10 < len(self.bel.x_cords):
@@ -193,9 +192,8 @@ class Search:
                     #     if dir*(j+1) + k -10 >=0 and dir*(j+1) + k -10 <len(self.bel.y_cords):
                     #         total+= self.bel.bel[i,dir*(j+1) + k -10]
                     # if total > total_max:
-                    if self.bel.bel[i,dir*(j+1)] > self.bel.bel[max_x,max_y]:
-                        if self.waypoint == None or (self.bel.x_cords[i] != self.waypoint[0] or self.bel.y_cords[(dir*j+1)] != self.waypoint[1]):
-                            max_x,max_y = i,dir*(j+1)
+                    if self.bel.bel[i,j] > self.bel.bel[max_x,max_y]:
+                        max_x,max_y = i,j
                         # total_max = total
             self.waypoint = [self.bel.x_cords[max_x],self.bel.y_cords[max_y],self.z]
         else:
@@ -290,6 +288,8 @@ class Search:
             self.angle_start=None
         #else the rovs velocity is set so it moves toward the waypoint
         else:
+            if np.linalg.norm([self.truth_vel[0],self.truth_vel[1]]) < 0.00001:
+                resp1 = self.arm_control()
             self.shv(ang*(180/np.pi),v)
 
 
@@ -297,9 +297,18 @@ if __name__ == "__main__":
     rospy.init_node("search_node")
     x_dim = rospy.get_param("~x")
     y_dim = rospy.get_param("~y")
-    space = space.Space(x_dim,y_dim)
-    s3 = Search(space,'/bluerov2_3',0)
-    s4 = Search(space,'/bluerov2_4',1)
+    space3 = space.Space(0,0,x_dim,y_dim)
+    space4 = space.Space(-x_dim,0,x_dim,y_dim)
+    space5 = space.Space(-x_dim,-y_dim,x_dim,y_dim)
+    space6 = space.Space(0,-y_dim,x_dim,y_dim)
+    print('All done getting spaces set up!')
+    print('All done getting spaces set up!')
+    print('All done getting spaces set up!')
+    s3 = Search(space3,'/bluerov2_3')
+    s4 = Search(space4,'/bluerov2_4')
+    s5 = Search(space5,'/bluerov2_5')
+    s6 = Search(space6,'/bluerov2_6')
+
     initial_time = rospy.get_rostime()
     print(initial_time)
     rate = rospy.Rate(20)
@@ -308,6 +317,8 @@ if __name__ == "__main__":
     while (not rospy.is_shutdown()):
         s3.run()
         s4.run()
+        s5.run()
+        s6.run()
         if PLOTTING:
             s3.plot_continuous()
         rate.sleep()

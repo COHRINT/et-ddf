@@ -189,6 +189,8 @@ class DeltaTier:
         info_matrix = np.zeros( P.shape )
         info_matrix[begin_ind:end_ind, begin_ind:end_ind] = D_inv
 
+        if np.linalg.det(P) < 0.01:
+            P = np.eye(len(P))*0.1
         posterior_cov = np.linalg.inv( np.linalg.inv( P ) + info_matrix )
         tmp = np.dot(np.linalg.inv( P ), x) + info_vector
         posterior_state = np.dot( posterior_cov, tmp )

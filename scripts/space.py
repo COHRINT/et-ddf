@@ -11,17 +11,17 @@ import numpy as np
 sonar_range = 10
 
 class Space:
-    def __init__(self,x,y):
+    def __init__(self,x,y,w,h):
         """Initializes space
 
         Args:
             x (int): how long the space is in x direction
             y (int): how long the space is in y direction
         """
-        self.x_diff = int(2*x)
-        self.y_diff = int(2*y)
-        self.x_0 = -x
-        self.y_0 = -y
+        self.x_diff = int(w)
+        self.y_diff = int(h)
+        self.x_0 = x
+        self.y_0 = y
         self.z = -1
         self.plot_count = 1
         self.discritize_space()

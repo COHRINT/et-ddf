@@ -5,7 +5,7 @@
   <arg name="latitude" default="56.71897669633431"/>
   <arg name="longitude" default="3.515625"/>
 
-  <arg name="schedule_file" default="$(find minau)/config/schedules/schedule_1_assets.json"/>
+  <arg name="schedule_file" default="$(find minau)/config/schedules/schedule_repeat_test.json"/>
   <arg name="plan_filename" default="$(find minau)/config/mission_description_reservoir.xml"/>
   <!-- <arg name="schedule_file" default="$(find minau)/config/schedules/schedule_3_assets.json"/> -->
 
@@ -19,14 +19,24 @@
 
   <!-- Asset 3 Starting Position NED -->
   <arg name="x_3" value="8.0"/>
-  <arg name="y_3" value="0.0"/>
+  <arg name="y_3" value="8.0"/>
   <arg name="z_3" value="0.0"/>
   <arg name="starting_position_3_enu" value="[$(arg y_3), $(arg x_3), -$(arg z_3)]"/>
   <!-- Asset 4 Starting Position NED -->
   <arg name="x_4" value="8.0"/>
-  <arg name="y_4" value="-3.0"/>
+  <arg name="y_4" value="-8.0"/>
   <arg name="z_4" value="0.0"/>
   <arg name="starting_position_4_enu" value="[$(arg y_4), $(arg x_4), -$(arg z_4)]"/>
+  <!-- Asset 5 Starting Position NED -->
+  <arg name="x_5" value="-8.0"/>
+  <arg name="y_5" value="-8.0"/>
+  <arg name="z_5" value="0.0"/>
+  <arg name="starting_position_5_enu" value="[$(arg y_5), $(arg x_5), -$(arg z_5)]"/>
+  <!-- Asset 6 Starting Position NED -->
+  <arg name="x_6" value="-8.0"/>
+  <arg name="y_6" value="8.0"/>
+  <arg name="z_6" value="0.0"/>
+  <arg name="starting_position_6_enu" value="[$(arg y_6), $(arg x_6), -$(arg z_6)]"/>
 
   <!-- Red Asset Starting Position -->
   <arg name="red_x" default="10.0"/>
@@ -100,8 +110,8 @@
     <arg name="schedule_file" value="$(arg schedule_file)"/>
     <!-- DDF params -->
     <!-- <arg name="blue_team_names" value="[bluerov2_3]" /> -->
-    <arg name="blue_team_names" value="[bluerov2_4]" />
-    <arg name="blue_team_positions" value="[$(arg starting_position_3_enu)]"/>
+    <arg name="blue_team_names" value="[bluerov2_4,bluerov2_5,bluerov2_6]" />
+    <arg name="blue_team_positions" value="[$(arg starting_position_3_enu),$(arg starting_position_5_enu),$(arg starting_position_6_enu)]"/>
     <!-- <arg name="red_team_names" default="[red_actor_$(arg red_asset_id)]" /> -->
     <!-- <arg name="sonar_360_scan_range_m" value="$(arg sonar_360_scan_range_m)" />-->
     <arg name="plan_filename" value="$(arg plan_filename)"/>
@@ -129,8 +139,66 @@
     <arg name="schedule_file" value="$(arg schedule_file)"/>
     <!-- DDF params -->
     <!-- <arg name="blue_team_names" value="[bluerov2_3]" /> -->
-    <arg name="blue_team_names" value="[bluerov2_4]" />
-    <arg name="blue_team_positions" value="[$(arg starting_position_4_enu)]"/>
+    <arg name="blue_team_names" value="[bluerov2_4,bluerov2_5,bluerov2_6]" />
+    <arg name="blue_team_positions" value="[$(arg starting_position_4_enu),$(arg starting_position_5_enu),$(arg starting_position_6_enu)]"/>
+    <!-- <arg name="red_team_names" default="[red_actor_$(arg red_asset_id)]" />
+    <arg name="sonar_360_scan_range_m" value="$(arg sonar_360_scan_range_m)" />-->
+    <arg name="plan_filename" value="$(arg plan_filename)"/> 
+  </include>
+
+  <include file="$(find etddf)/launch/vehicle.bluerov2.sitl.launch">
+    <arg name="asset_id" value="5"/>
+    <arg name="ardusub_instance" value="2"/>
+    <arg name="ardusub_params" value="$(arg ardusub_params)"/>
+    <arg name="latitude" value="$(arg latitude)"/>
+    <arg name="longitude" value="$(arg longitude)"/>
+    <!-- The following arguments must be set w.r.t. NED world frame -->
+    <arg name="x" value="$(arg x_5)"/>
+    <arg name="y" value="$(arg y_5)"/>
+    <arg name="z" value="$(arg z_5)"/>
+    <arg name="roll" value="0.0"/>
+    <arg name="pitch" value="0.0"/>
+    <arg name="yaw" value="-1.57"/>
+
+    <arg name="is_landmark" value="$(arg is_landmark)"/>
+    <arg name="landmark_x" value="$(arg pole_x)"/>
+    <arg name="landmark_y" value="$(arg pole_y)"/>
+    <arg name="use_360" value="$(arg use_360)"/>
+
+    <arg name="schedule_file" value="$(arg schedule_file)"/>
+    <!-- DDF params -->
+    <!-- <arg name="blue_team_names" value="[bluerov2_3]" /> -->
+    <arg name="blue_team_names" value="[bluerov2_4,bluerov2_3,bluerov2_6]" />
+    <arg name="blue_team_positions" value="[$(arg starting_position_3_enu),$(arg starting_position_4_enu),$(arg starting_position_6_enu)]"/>
+    <!-- <arg name="red_team_names" default="[red_actor_$(arg red_asset_id)]" />
+    <arg name="sonar_360_scan_range_m" value="$(arg sonar_360_scan_range_m)" />-->
+    <arg name="plan_filename" value="$(arg plan_filename)"/> 
+  </include>
+
+  <include file="$(find etddf)/launch/vehicle.bluerov2.sitl.launch">
+    <arg name="asset_id" value="6"/>
+    <arg name="ardusub_instance" value="4"/>
+    <arg name="ardusub_params" value="$(arg ardusub_params)"/>
+    <arg name="latitude" value="$(arg latitude)"/>
+    <arg name="longitude" value="$(arg longitude)"/>
+    <!-- The following arguments must be set w.r.t. NED world frame -->
+    <arg name="x" value="$(arg x_6)"/>
+    <arg name="y" value="$(arg y_6)"/>
+    <arg name="z" value="$(arg z_6)"/>
+    <arg name="roll" value="0.0"/>
+    <arg name="pitch" value="0.0"/>
+    <arg name="yaw" value="-1.57"/>
+
+    <arg name="is_landmark" value="$(arg is_landmark)"/>
+    <arg name="landmark_x" value="$(arg pole_x)"/>
+    <arg name="landmark_y" value="$(arg pole_y)"/>
+    <arg name="use_360" value="$(arg use_360)"/>
+
+    <arg name="schedule_file" value="$(arg schedule_file)"/>
+    <!-- DDF params -->
+    <!-- <arg name="blue_team_names" value="[bluerov2_3]" /> -->
+    <arg name="blue_team_names" value="[bluerov2_3,bluerov2_4,bluerov2_5]" />
+    <arg name="blue_team_positions" value="[$(arg starting_position_3_enu),$(arg starting_position_4_enu),$(arg starting_position_5_enu)]"/>
     <!-- <arg name="red_team_names" default="[red_actor_$(arg red_asset_id)]" />
     <arg name="sonar_360_scan_range_m" value="$(arg sonar_360_scan_range_m)" />-->
     <arg name="plan_filename" value="$(arg plan_filename)"/> 

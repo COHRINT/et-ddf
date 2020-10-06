@@ -40,8 +40,10 @@ class repeatTester:
         for row in reader:
             self.config.append(row)
 
-        self.first_3 = [0,-6,-1]
-        self.first_4 = [0,6,-1]
+        self.first_3 = [10,10,-1]
+        self.first_4 = [-10,10,-1]
+        self.first_5 = [-10,-10,-1]
+        self.first_6 = [10,-10,-1]
 
         #extracts data and asigns it to variables
         self.config_names=[]
@@ -158,6 +160,8 @@ class repeatTester:
         """
         set_model_state('bluerov2_3',self.first_3)
         set_model_state('bluerov2_4',self.first_4)
+        set_model_state('bluerov2_5',self.first_5)
+        set_model_state('bluerov2_6',self.first_6)
         set_model_state('red_actor_1',self.first_red[idx])
 
     def run(self):
@@ -178,7 +182,9 @@ class repeatTester:
 
                 pos3 = 'pos3:='+str(self.first_3)
                 pos4 = 'pos4:='+str(self.first_4)
-                args2 = ['roslaunch','etddf','uuv_etddf.launch',pos3,pos4]
+                pos5 = 'pos5:='+str(self.first_5)
+                pos6 = 'pos6:='+str(self.first_6)
+                args2 = ['roslaunch','etddf','uuv_etddf.launch',pos3,pos4,pos5,pos6]
 
                 fileFor3 = self.data_loc+'/waypoints/'+'waypoints_'+str(i)+'.csv'
                 args3 = ['rosrun','etddf','waypoint_move.py','__ns:=red_actor_1',fileFor3,'_vel:='+str(self.red_vel)]
@@ -188,19 +194,31 @@ class repeatTester:
                 bagfile_name = self.config_names[j]+'_'+str(i+1)
                 args5 = 'rosbag record -O '+bagfile_name+' /bluerov2_3/pose_gt \
                                                            /bluerov2_4/pose_gt \
+                                                           /bluerov2_5/pose_gt \
+                                                           /bluerov2_6/pose_gt \
                                                            /red_actor_1/pose_gt \
                                                            /bluerov2_3/etddf/estimate/network \
                                                            /bluerov2_4/etddf/estimate/network \
+                                                           /bluerov2_5/etddf/estimate/network \
+                                                           /bluerov2_6/etddf/estimate/network \
                                                            /bluerov2_3/strapdown/estimate \
                                                            /bluerov2_4/strapdown/estimate \
+                                                           /bluerov2_5/strapdown/estimate \
+                                                           /bluerov2_6/strapdown/estimate \
                                                            /bluerov2_3/sonar_processing/target_list \
-                                                           /bluerov2_4/sonar_processing/target_list'
+                                                           /bluerov2_4/sonar_processing/target_list \
+                                                           /bluerov2_5/sonar_processing/target_list \
+                                                           /bluerov2_6/sonar_processing/target_list'
 
-                proc2 = subprocess.Popen(args2,stdout=FNULL,stderr=subprocess.STDOUT)
+                proc2 = subprocess.Popen(args2)
+                # proc2 = subprocess.Popen(args2,stdout=FNULL,stderr=subprocess.STDOUT)
                 time.sleep(10)
+                # proc5 = subprocess.Popen(args5,stdin=subprocess.PIPE, shell=True, cwd=dirTo)
+                # proc3 = subprocess.Popen(args3,stdout=FNULL,stderr=subprocess.STDOUT)
+                # proc4 = subprocess.Popen(args4,stdout=FNULL,stderr=subprocess.STDOUT)
                 proc5 = subprocess.Popen(args5,stdin=subprocess.PIPE, shell=True, cwd=dirTo)
-                proc3 = subprocess.Popen(args3,stdout=FNULL,stderr=subprocess.STDOUT)
-                proc4 = subprocess.Popen(args4,stdout=FNULL,stderr=subprocess.STDOUT)
+                proc3 = subprocess.Popen(args3)
+                proc4 = subprocess.Popen(args4)
                 
                 rate = rospy.Rate(10)
                 # rospy.sleep(self.mins_per*60)

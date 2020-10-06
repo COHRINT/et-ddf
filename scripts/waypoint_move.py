@@ -109,6 +109,7 @@ wp = Waypoint()
 
 #start with second waypoint
 waypt_num = 1
+prev = None
 rate = rospy.Rate(1)
 while not rospy.is_shutdown():
     if wp.yaw != None:
@@ -131,6 +132,9 @@ while not rospy.is_shutdown():
             # nameS = rospy.get_namespace()
             # set_model_state(nameS[1:-1],initial_point)
             wp.pub.publish(True)
+
+        if np.linalg.norm([wp.twist.twist.linear.x,wp.twist.twist.linear.y]) < 0.000001:
+            resp1 = arm_control()
 
         # Get New control
         target_waypt = waypts[waypt_num]

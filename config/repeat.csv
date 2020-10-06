@@ -1,5 +1,2 @@
 Test_Group_Name,Test_Name,Number_Tests_dep,Map_Dim_x_dep,Map_Dim_y_dep,DVL_Data,Lawn_Mode,Red_Vel_dep,Blue_Vel_dep,Custody_Dist
-Test_2,lawn,2,20,20,False,True,0.4,0.3,3
-Test_2,lawn_dvl,1,20,20,True,True,0.2,0.2,3
-Test_2,bayes,1,20,20,False,False,0.2,0.2,3
-Test_2,bayes_dvl,1,20,20,True,False,0.2,0.2,3
+Test_4,Bayes_Search,10,50,50,True,False,0.4,0.3,3

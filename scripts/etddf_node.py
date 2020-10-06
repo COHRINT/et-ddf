@@ -126,8 +126,8 @@ class ETDDF_Node:
     
 
         # DVL Subscription
-        # if rospy.get_param("~measurement_topics/dvl") != "None":
-        #     rospy.Subscriber(rospy.get_param("~measurement_topics/dvl"),Vector3,self.dvl_callback)
+        if rospy.get_param("~measurement_topics/dvl") != "None":
+            rospy.Subscriber(rospy.get_param("~measurement_topics/dvl"),Vector3,self.dvl_callback)
 
         # Initialize Buffer Service
         # rospy.Service('etddf/get_measurement_package', GetMeasurementPackage, self.get_meas_pkg_callback)
@@ -274,6 +274,8 @@ class ETDDF_Node:
                         pv_msg.velocity.x, pv_msg.velocity.y, pv_msg.velocity.z]]).T
         cov = np.array(pv_msg.covariance).reshape(6,6)
 
+        if np.trace(cov) < 1: # Prevent Nav Filter from having zero uncertainty
+            cov = np.eye(NUM_OWNSHIP_STATES) * 0.1
         # Run covariance intersection
         c_bar, Pcc = self.filter.intersect(mean, cov)
 
