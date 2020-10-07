@@ -22,7 +22,8 @@ def measPkg2Bytes(meas_pkg, asset_landmark_dict, packet_size):
 
     Args:
         meas_pkg (etddf/MeasurementPackage.msg): The measurement package to compress
-        asset_landmark_dict (dict): Agreed upon dictionary to go from asset to an integer 0-16
+        asset_landmark_dict (dict): Agreed upon dictionary to go from asset_name --> integer 0-15.
+            Must be the same on every agent.
             e.g. {'bluerov2_4' : 0, 'bluerov2_3' : 1, 'landmark_pole1' : 2, 'red_agent' : 3}
         packet_size (int): Number of bytes to use. Unused bytes are packed to fill packet_size
 
@@ -120,7 +121,7 @@ def bytes2MeasPkg(byte_arr, transmission_time, asset_landmark_dict, global_pose)
         transmission_time (int): Estimated time delta between when measPkg2Bytes() was called
             and this method has been called
             If unknown set to 0; Not critical to be accurate
-        asset_landmark_dict (dict): Agreed upon dictionary to go from asset to an integer 0-16.
+        asset_landmark_dict (dict): Agreed upon dictionary to go from asset_name --> integer 0-15.
             Must be the same on every agent.
             e.g. {'bluerov2_4' : 0, 'bluerov2_3' : 1, 'landmark_pole1' : 2, 'red_agent' : 3}
         global_pose (list): Pose of the surface beacon
