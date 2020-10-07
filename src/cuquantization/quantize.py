@@ -45,6 +45,8 @@ def measPkg2Bytes(meas_pkg, asset_landmark_dict, packet_size):
     # Measurements
     present_time = rospy.get_rostime()
     for meas in meas_pkg.measurements:
+        if meas.meas_type not in HEADERS:
+            raise ValueError(meas.meas_type + " not in supported types: " + str(HEADERS.keys()))
         header = HEADERS[meas.meas_type]
         header2 = 0
         for mwa in MEASUREMENTS_WITH_AGENTS:
