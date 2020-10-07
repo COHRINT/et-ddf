@@ -4,6 +4,7 @@ from etddf.msg import MeasurementPackage, Measurement
 import numpy as np
 import sys
 import rospy
+import struct
 
 """
 Structure of Pkg (28 bytes)
@@ -18,7 +19,18 @@ Structure of Pkg (28 bytes)
 # Asset landmark dict is asset/landmark --> int 0-16
 
 ################ API FUNCTIONS ################
-def measPkg2Bytes(meas_pkg, asset_landmark_dict):
+def measPkg2Bytes(meas_pkg, asset_landmark_dict, packet_size):
+    """Converts an etddf/MeasurementPackage.msg to byte stream
+
+    Args:
+        meas_pkg (etddf/MeasurementPackage.msg): The measurement package to compress
+        asset_landmark_dict (dict): Agreed upon dictionary to go from asset to an integer 0-16
+            e.g. {'bluerov2_4' : 0, 'bluerov2_3' : 1, 'landmark_pole1' : 2, 'red_agent' : 3}
+        packet_size (int): Number of bytes to use. Unused bytes are packed to fill packet_size
+
+    Returns:
+        str: Byte stream
+    """
     byte_string = []
 
     # Delta Multiplier
@@ -45,6 +57,8 @@ def measPkg2Bytes(meas_pkg, asset_landmark_dict):
 
         # Compression
         if meas.meas_type == "depth":
+            if meas.data < -3 or meas.data > 0:
+                raise ValueError("Depth meas outside of compression bounds: " + str(meas.data) + ' for ' + str([-3,0]))
             # Range [-3,0]
             # 256 bins
             bin_per_meter = 256 / -3.0
@@ -52,12 +66,16 @@ def measPkg2Bytes(meas_pkg, asset_landmark_dict):
         elif meas.meas_type in ["sonar_x", "sonar_y"]:
             # Range [-10,10] -> [0, 20] Shift range for convenience
             # 256 bins
+            if meas.data < -10 or meas.data > 10:
+                raise ValueError("Sonar meas outside of compression bounds: " + str(meas.data) + ' for ' + str([-10,10]))
             bin_per_meter = 256 / 20.0
             data = meas.data + 10.0 # Shift the sonar range to be between 0 and 20
             data_bin = int(data * bin_per_meter)
         elif meas.meas_type == "modem_range":
             # Range [0, 20]
             # 256 bins
+            if meas.data < 0 or meas.data > 20:
+                raise ValueError("Modem range meas outside of compression bounds: " + str(meas.data) + ' for ' + str([0,20]))
             bin_per_meter = 256 / 20.0
             data_bin = int(meas.data * bin_per_meter)
         elif meas.meas_type == "modem_azimuth":
@@ -79,9 +97,48 @@ def measPkg2Bytes(meas_pkg, asset_landmark_dict):
         if "book" not in meas.meas_type:
             byte_string.append(data_bin)
 
+    if len(byte_string) > packet_size:
+        raise ValueError("Compression failed. Byte string is greater than packet size")
+
+    # Pack empty values to the end of the buffer for unused space
+    byte_string.extend([HEADERS['empty'] for x in range(packet_size - len(byte_string))])
+
+    # Map all values -128 to 127
+    for i in range(len(byte_string)):
+        byte_string[i] -= 128
+    
+    # Make byte string
+    format_str = ""
+    for i in range(packet_size):
+        format_str += 'b'
+    byte_string = struct.pack(format_str, *byte_string)
     return byte_string
 
 def bytes2MeasPkg(byte_arr, transmission_time, asset_landmark_dict, global_pose):
+    """Converts a byte stream compressed using measPkg2Bytes() to a Measurement Package
+
+    Args:
+        byte_arr (str): byte stream to decompress
+        transmission_time (int): Estimated time delta between when measPkg2Bytes() was called
+            and this method has been called
+            If unknown set to 0; Not critical to be accurate
+        asset_landmark_dict (dict): Agreed upon dictionary to go from asset to an integer 0-16
+            e.g. {'bluerov2_4' : 0, 'bluerov2_3' : 1, 'landmark_pole1' : 2, 'red_agent' : 3}
+        global_pose (list): Pose of the surface beacon
+            e.g. [x,y,z,theta]
+
+    Returns:
+        etddf/MeasurementPackage.msg: Measurement Package
+    """
+
+    format_str = ""
+    for i in range(len(byte_arr)):
+        format_str += 'b'
+    byte_arr = list(struct.unpack(format_str, byte_arr))
+
+    # Map all values 0 to 255
+    for i in range(len(byte_arr)):
+        byte_arr[i] += 128
 
     mp = MeasurementPackage()
 
@@ -97,6 +154,8 @@ def bytes2MeasPkg(byte_arr, transmission_time, asset_landmark_dict, global_pose)
     while index < len(byte_arr):
         header = byte_arr[index]
         meas_type = HEADERS.keys()[HEADERS.values().index( (header & (15 << 4)) >> 4 )]
+        if meas_type == "empty":
+            break
         header2 = header & 15
         index += 1
 
@@ -186,11 +245,11 @@ if __name__ == "__main__":
     mp.measurements.append(m4)
 
     
-    # print(mp)
-    bytes_ = measPkg2Bytes(mp, asset_landmark_dict)
-    print(bytes_)
-    mp_return = bytes2MeasPkg(bytes_, 2, asset_landmark_dict, global_pose)
-    # print(mp_return)
+    num_bytes_buffer = 29
+    print(mp)
+    bytes_ = measPkg2Bytes(mp, asset_landmark_dict, num_bytes_buffer)
+    mp_return = bytes2MeasPkg(bytes_, 0, asset_landmark_dict, global_pose)
+    print(mp_return)
 
     print('############ TEST 2 #################')
     mp = MeasurementPackage()
@@ -212,8 +271,7 @@ if __name__ == "__main__":
     mp.measurements.append(m5)
     mp.measurements.append(m6)
     print(mp)
-    bytes_ = measPkg2Bytes(mp, asset_landmark_dict)
-    print(bytes_)
+    bytes_ = measPkg2Bytes(mp, asset_landmark_dict, num_bytes_buffer)
     mp_return = bytes2MeasPkg(bytes_, 2, asset_landmark_dict, global_pose)
     print(mp_return)
 
