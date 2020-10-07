@@ -59,14 +59,14 @@ def measPkg2Bytes(meas_pkg, asset_landmark_dict, packet_size):
                 raise ValueError("Depth meas outside of compression bounds: " + str(meas.data) + ' for ' + str([-3,0]))
             # Range [-3,0]
             # 256 bins
-            bin_per_meter = 256 / -3.0
+            bin_per_meter = 255 / -3.0
             data_bin = int(meas.data * bin_per_meter)
         elif meas.meas_type in ["sonar_x", "sonar_y"]:
             # Range [-10,10] -> [0, 20] Shift range for convenience
             # 256 bins
             if meas.data < -10 or meas.data > 10:
                 raise ValueError("Sonar meas outside of compression bounds: " + str(meas.data) + ' for ' + str([-10,10]))
-            bin_per_meter = 256 / 20.0
+            bin_per_meter = 255 / 20.0
             data = meas.data + 10.0 # Shift the sonar range to be between 0 and 20
             data_bin = int(data * bin_per_meter)
         elif meas.meas_type == "modem_range":
@@ -74,12 +74,12 @@ def measPkg2Bytes(meas_pkg, asset_landmark_dict, packet_size):
             # 256 bins
             if meas.data < 0 or meas.data > 20:
                 raise ValueError("Modem range meas outside of compression bounds: " + str(meas.data) + ' for ' + str([0,20]))
-            bin_per_meter = 256 / 20.0
+            bin_per_meter = 255 / 20.0
             data_bin = int(meas.data * bin_per_meter)
         elif meas.meas_type == "modem_azimuth":
             # Range [0, 360]
             # 256 bins
-            bin_per_meter = 256 / 360.0
+            bin_per_meter = 255 / 360.0
 
             while meas.data > 360:
                 meas.data -= 360.0
@@ -167,16 +167,16 @@ def bytes2MeasPkg(byte_arr, transmission_time, asset_landmark_dict, global_pose)
             data = 0
             # Compression
             if meas_type == "depth":
-                bin_per_meter = 256 / -3.0
+                bin_per_meter = 255 / -3.0
                 data = data_bin / bin_per_meter
             elif meas_type in ["sonar_x", "sonar_y"]:
-                bin_per_meter = 256 / 20.0
+                bin_per_meter = 255 / 20.0
                 data = data_bin / bin_per_meter - 10.0
             elif meas_type == "modem_range":
-                bin_per_meter = 256 / 20.0
+                bin_per_meter = 255 / 20.0
                 data = data_bin / bin_per_meter
             elif meas_type == "modem_azimuth":
-                bin_per_meter = 256 / 360.0
+                bin_per_meter = 255 / 360.0
                 data = data_bin / bin_per_meter
                 data = np.mod( data + 180, 360) - 180 # -180 to 180
             measured_agent = ""
@@ -258,7 +258,7 @@ if __name__ == "__main__":
     t = rospy.get_rostime()
     m = Measurement("sonar_x", t, mp.src_asset, "bluerov2_4", 2.1, 0.5, [])
     m2 = Measurement("sonar_y", t, mp.src_asset, "bluerov2_4", -6.5, 0.5, [])
-    m3 = Measurement("depth", t, mp.src_asset, "", -1.3, 0.5, [])
+    m3 = Measurement("depth", t, mp.src_asset, "", -3, 0.5, [])
     m4 = Measurement("sonar_x_bookend", rospy.get_rostime(), mp.src_asset, "bluerov2_4", 0.0, 0.5, [])
     m5 = Measurement("depth_bookend", rospy.get_rostime(), mp.src_asset, "", 0.0, 0.5, [])
     m6 = Measurement("sonar_y_bookstart", rospy.get_rostime(), mp.src_asset, "landmark_pole1", 0.0, 0.5, [])
