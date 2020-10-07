@@ -10,7 +10,7 @@ delta_tiers: [1]
 
 ## Measurement topics
 measurement_topics:
-  depth: "baro" # "mavros/global_position/rel_alt" # baro
+  depth: "mavros/global_position/rel_alt" # "baro"
   imu_ci: "None"
   imu_est: "odometry/filtered" #"pose_gt" # "mavros/global_position/local"
   sonar: "sonar_processing/target_list/associated"
@@ -37,8 +37,8 @@ default_starting_position:
 ### Process Noise Configurations ###
 process_noise:
   ownship:
-    x: 0.00001
-    y: 0.00001
+    x: 0.00002
+    y: 0.00002
     z: 0.001
     x_vel: 0.00001
     y_vel: 0.00001

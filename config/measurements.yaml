@@ -13,7 +13,7 @@ measurements:
 
   modem_azimuth: # radians
     base_et_delta: 0.0
-    default_sd: 0.2
+    default_sd: 0.1
     buffer_size: 2 # NOT SHARED
     missed_tolerance: 1 # NOT SHARED
 
