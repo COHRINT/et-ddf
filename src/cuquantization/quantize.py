@@ -16,8 +16,6 @@ Structure of Pkg (28 bytes)
 
 """
 
-# Asset landmark dict is asset/landmark --> int 0-16
-
 ################ API FUNCTIONS ################
 def measPkg2Bytes(meas_pkg, asset_landmark_dict, packet_size):
     """Converts an etddf/MeasurementPackage.msg to byte stream
@@ -122,7 +120,8 @@ def bytes2MeasPkg(byte_arr, transmission_time, asset_landmark_dict, global_pose)
         transmission_time (int): Estimated time delta between when measPkg2Bytes() was called
             and this method has been called
             If unknown set to 0; Not critical to be accurate
-        asset_landmark_dict (dict): Agreed upon dictionary to go from asset to an integer 0-16
+        asset_landmark_dict (dict): Agreed upon dictionary to go from asset to an integer 0-16.
+            Must be the same on every agent.
             e.g. {'bluerov2_4' : 0, 'bluerov2_3' : 1, 'landmark_pole1' : 2, 'red_agent' : 3}
         global_pose (list): Pose of the surface beacon
             e.g. [x,y,z,theta]
