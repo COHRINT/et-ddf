@@ -19,7 +19,6 @@ def imu_callback(imu_msg):
 
 rospy.init_node("quat2euler")
 
-# rospy.Subscriber("bluerov2_3/odometry/filtered", Odometry, callback)
-rospy.Subscriber("bluerov2_3/mavros/imu/data/corrected", Imu, imu_callback)
+rospy.Subscriber("mavros/imu/data/corrected", Imu, imu_callback)
 
 rospy.spin()
