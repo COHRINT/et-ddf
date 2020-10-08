@@ -103,14 +103,7 @@ def measPkg2Bytes(meas_pkg, asset_landmark_dict, packet_size):
     byte_string.extend([HEADERS['empty'] for x in range(packet_size - len(byte_string))])
 
     # Map all values -128 to 127
-    for i in range(len(byte_string)):
-        byte_string[i] -= 128
-    
-    # Make byte string
-    format_str = ""
-    for i in range(packet_size):
-        format_str += 'b'
-    byte_string = struct.pack(format_str, *byte_string)
+    byte_string = [x - 128 for x in byte_string]
     return byte_string
 
 def bytes2MeasPkg(byte_arr, transmission_time, asset_landmark_dict, global_pose):
@@ -131,14 +124,8 @@ def bytes2MeasPkg(byte_arr, transmission_time, asset_landmark_dict, global_pose)
         etddf/MeasurementPackage.msg: Measurement Package
     """
 
-    format_str = ""
-    for i in range(len(byte_arr)):
-        format_str += 'b'
-    byte_arr = list(struct.unpack(format_str, byte_arr))
-
     # Map all values 0 to 255
-    for i in range(len(byte_arr)):
-        byte_arr[i] += 128
+    byte_arr = [x + 128 for x in byte_arr]
 
     mp = MeasurementPackage()
 
