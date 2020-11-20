@@ -1,4 +1,4 @@
-update_rate: 2
+update_rate: 0.5
 
 ## Multipliers for Delta tiers
 ## increases a measurements threshold to be added to the buffer by the given amount
@@ -6,10 +6,11 @@ delta_tiers: [1]
 
 ## Measurement topics
 measurement_topics:
-  depth: baro
+  depth: None
   imu_ci: strapdown/intersection
   imu_est: strapdown/estimate
-  sonar: "sonar_processing/target_list/associated"
+  sonar: "sonar_processing/target_list"
+  add_depth_bias: False # Add depth bias in hardware to keep the agent from bottominng out
 
 ### Buffer space configurations ###
 buffer_space:
@@ -32,19 +33,19 @@ default_starting_position:
 ### Process Noise Configurations ###
 process_noise:
   ownship:
-    x: 0.001
-    y: 0.001
-    z: 0.01
-    x_vel: 0.001
-    y_vel: 0.001
-    z_vel: 0.1
+    x: 0.004
+    y: 0.004
+    z: 0.04
+    x_vel: 0.004
+    y_vel: 0.004
+    z_vel: 0.4
   blueteam:
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    x_vel: 0.0
-    y_vel: 0.0
-    z_vel: 0.0
+    x: 0.004
+    y: 0.004
+    z: 0.0004
+    x_vel: 0.004
+    y_vel: 0.004
+    z_vel: 0.0004
   redteam:
     x: 0.1
     y: 0.1
@@ -64,12 +65,12 @@ initial_uncertainty:
     z_vel: 0.2
   # for asset positions provided to us through roslaunch params
   known_starting_position: 
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    x_vel: 0.0
-    y_vel: 0.0
-    z_vel: 0.0
+    x: 1.0
+    y: 1.0
+    z: 1.0
+    x_vel: 0.2
+    y_vel: 0.2
+    z_vel: 0.2
   # asset positions not provided in roslaunch, including redteam
   unknown_starting_position: 
     x: 1000

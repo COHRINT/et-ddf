@@ -10,3 +10,6 @@
 etddf/Measurement[] measurements
 string src_asset
 float32 delta_multiplier
+
+float64[] mean
+float64[] covariance

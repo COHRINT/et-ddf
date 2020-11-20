@@ -516,7 +516,7 @@ class StrapdownINS:
         x = dot(trans_strap2ci, self.x.reshape(-1,1))
         P = dot(trans_strap2ci, self.P).dot(trans_strap2ci.T)
 
-        simple = False
+        simple = False # Assume the state vector is already in simple form
         if simple:
             x[:6] = x_CI
             P[:6,:6] = P_CI
@@ -528,7 +528,7 @@ class StrapdownINS:
 
             """
 
-            NOTE IS DIFFERENT FROM THE THESIS, SWITHC!!!!!!!
+            NOTE IS DIFFERENT FROM THE THESIS, SWITCH!!!!!!!
 
             """
 

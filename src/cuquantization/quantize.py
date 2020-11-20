@@ -95,7 +95,7 @@ def measPkg2Bytes(meas_pkg, asset_landmark_dict, packet_size):
         full_header = header << 4 | header2
         byte_string.append(full_header)
         byte_string.append(timestamp)
-        if "book" not in meas.meas_type:
+        if "book" not in meas.meas_type and meas.meas_type != "final_time":
             byte_string.append(data_bin)
 
     if len(byte_string) > packet_size:
@@ -152,7 +152,7 @@ def bytes2MeasPkg(byte_arr, transmission_time, asset_landmark_dict, global_pose)
 
         index += 1
 
-        if "book" not in meas_type:
+        if "book" not in meas_type and meas_type != "final_time":
             data_bin = byte_arr[index]
             data = 0
             # Compression
@@ -203,7 +203,8 @@ HEADERS = {
     'sonar_y_bookstart' : 8,
     'sonar_y_bookend' : 9,
     'modem_range' : 10,
-    'modem_azimuth' : 11
+    'modem_azimuth' : 11,
+    'final_time' : 12
 }
 
 delta_multiplier_options = list(np.arange(0,11,1))

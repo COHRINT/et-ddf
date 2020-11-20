@@ -5,8 +5,8 @@ process_noise:
     z: 0.001
     quat: 0.001 # Scaled by 100 in the code
     yaw: 0.01
-    x_vel: 0.00001
-    y_vel: 0.00001
+    x_vel: 0.001
+    y_vel: 0.001
     z_vel: 0.001
     yaw_vel: 0.001
     accel_bias: 0.0001 # m/s^3/sqrt(Hz), scaled by 3 in code

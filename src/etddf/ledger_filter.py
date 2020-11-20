@@ -19,6 +19,8 @@ import numpy as np
 from pdb import set_trace as st
 from etddf.msg import Measurement
 import rospy
+import scipy
+import scipy.optimize
 
 ## Lists all measurement substrings to not send implicitly
 MEASUREMENT_TYPES_NOT_SHARED =     ["modem"]
@@ -55,6 +57,8 @@ class LedgerFilter:
         self.buffer = MeasurementBuffer(meas_space_table, buffer_capacity)
         self.missed_meas_tolerance_table = missed_meas_tolerance_table
         self.is_main_filter = is_main_filter
+        self.my_id = my_id
+        self.num_ownship_states = num_ownship_states
         self.filter = ETFilter(my_id, num_ownship_states, 3, x0, P0, True)
 
         # Initialize Ledgers
@@ -69,11 +73,11 @@ class LedgerFilter:
         self.ledger_control.append([])
         self.ledger_ci.append([])
 
-    def add_meas(self, ros_meas, src_id, measured_id, delta_multiplier=THIS_FILTERS_DELTA, force_fuse=True):
+    def add_meas(self, ros_meas, src_id, measured_id, delta_multiplier=THIS_FILTERS_DELTA):
         """Adds and records a measurement to the filter
 
         Measurements after last correction step time will be fused at next correction step
-            measurements before will be recorded and fused in catch_up()
+            measurements before will be fused via oosm
 
         Arguments:
             ros_meas {etddf.Measurement.msg} -- The measurement in ROS form
@@ -82,8 +86,6 @@ class LedgerFilter:
 
         Keyword Arguments:
             delta_multiplier {float} -- Delta multiplier to use for this measurement (default: {THIS_FILTERS_DELTA})
-            force_fuse {bool} -- If measurement is in the past, fuse it on the next update step anyway (default: {True})
-                Note: the ledger will still reflect the correct measurement time
         """
         # Get the delta trigger for this measurement
         et_delta = self._get_meas_et_delta(ros_meas)
@@ -99,7 +101,7 @@ class LedgerFilter:
         meas = self._get_internal_meas_from_ros_meas(ros_meas, src_id, measured_id, et_delta)
         orig_meas = meas
 
-        # Common filter with delta tiering
+        # Check Implicit Fusion
         if not self.is_main_filter and time_index==FUSE_MEAS_NEXT_UPDATE:
 
             # Check if this measurement is allowed to be sent implicitly
@@ -129,10 +131,58 @@ class LedgerFilter:
         self.ledger_meas[time_index].append(meas)
 
         # Fuse on next timestamp
-        if time_index == FUSE_MEAS_NEXT_UPDATE or force_fuse:
+        if time_index == FUSE_MEAS_NEXT_UPDATE:
             self.filter.add_meas(meas)
-        else:
-            pass # Measurement will be fused on delta_tier's catch_up()
+        else: # Fuse via OOSM
+            self.oosm(meas, time_index)
+
+    def oosm(self, meas, time_index):
+        x0, P0 = self.original_estimate
+        filter = ETFilter(self.my_id, self.num_ownship_states, 3, x0, P0, True)
+        for t in range(len(self.ledger_update_times)):
+            [u, Q, delta_time, _] = self.ledger_control[t]
+            filter.predict(u, Q, delta_time, use_control_input=False)
+            for meas in self.ledger_meas[t]:
+                filter.add_meas(meas)
+            filter.correct()
+
+            if self.ledger_ci[t]: # Should only be on main filter
+                [x, P] = self.ledger_ci[t]
+                begin_ind = self.my_id*self.num_ownship_states
+                end_ind = (self.my_id+1)*self.num_ownship_states
+                x_prior = filter.x_hat[begin_ind:end_ind].reshape(-1,1)
+                P_prior = filter.P[begin_ind:end_ind,begin_ind:end_ind]
+                P_prior = P_prior.reshape(self.num_ownship_states, self.num_ownship_states)
+                c_bar, Pcc = self.run_covariance_intersection(x, P, x_prior, P_prior)
+                filter.x_hat[begin_ind:end_ind] = c_bar
+                filter.P[begin_ind:end_ind,begin_ind:end_ind] = Pcc
+        # Update filter states
+        self.filter.x_hat = filter.x_hat
+        self.filter.P = filter.P
+
+    @staticmethod
+    def run_covariance_intersection(xa, Pa, xb, Pb):
+        """Runs covariance intersection on the two estimates A and B
+
+        Arguments:
+            xa {np.ndarray} -- mean of A
+            Pa {np.ndarray} -- covariance of A
+            xb {np.ndarray} -- mean of B
+            Pb {np.ndarray} -- covariance of B
+        
+        Returns:
+            c_bar {np.ndarray} -- intersected estimate
+            Pcc {np.ndarray} -- intersected covariance
+        """
+        Pa_inv = np.linalg.inv(Pa)
+        Pb_inv = np.linalg.inv(Pb)
+
+        fxn = lambda omega: np.trace(np.linalg.inv(omega*Pa_inv + (1-omega)*Pb_inv))
+        omega_optimal = scipy.optimize.minimize_scalar(fxn, bounds=(0,1), method="bounded").x
+
+        Pcc = np.linalg.inv(omega_optimal*Pa_inv + (1-omega_optimal)*Pb_inv)
+        c_bar = Pcc.dot( omega_optimal*Pa_inv.dot(xa) + (1-omega_optimal)*Pb_inv.dot(xb))
+        return c_bar.reshape(-1,1), Pcc
 
     def predict(self, u, Q, time_delta=1.0, use_control_input=False):
         """Executes filter's prediction step

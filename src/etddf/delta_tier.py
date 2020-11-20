@@ -17,8 +17,6 @@ from etddf.msg import Measurement
 import time
 from pdb import set_trace as st
 import numpy as np
-import scipy
-import scipy.optimize
 import rospy # just for warn print
 
 ## Constant used to indicate each delta tier should scale the measurement's triggering
@@ -80,7 +78,7 @@ class DeltaTier:
         self.delta_codebook_table = delta_codebook_table
         self.delta_multipliers = delta_multipliers
 
-    def add_meas(self, ros_meas, delta_multiplier=USE_DELTA_TIERS, force_fuse=True):
+    def add_meas(self, ros_meas, delta_multiplier=USE_DELTA_TIERS):
         """Adds a measurement to all ledger filters.
         
         If Measurement is after last correction step, it will be fused on next correction step
@@ -90,8 +88,6 @@ class DeltaTier:
 
         Keyword Arguments:
             delta_multiplier {int} -- Delta multiplier to use for this measurement (default: {USE_DELTA_TIERS})
-            force_fuse {bool} -- If measurement is in the past, fuse it on the next update step anyway (default: {True})
-                Note: the ledger will still reflect the correct measurement time
         """
         src_id = self.asset2id[ros_meas.src_asset]
         if ros_meas.measured_asset in self.asset2id.keys():
@@ -101,35 +97,11 @@ class DeltaTier:
         else:
             rospy.logerr("ETDDF doesn't recognize: " + ros_meas.measured_asset + " ... ignoring")
             return
-        self.main_filter.add_meas(ros_meas, src_id, measured_id, delta_multiplier, force_fuse)
+        self.main_filter.add_meas(ros_meas, src_id, measured_id, delta_multiplier)
         for key in self.delta_tiers.keys():
-            self.delta_tiers[key].add_meas(ros_meas, src_id, measured_id, delta_multiplier, force_fuse)
+            self.delta_tiers[key].add_meas(ros_meas, src_id, measured_id, delta_multiplier)
 
-    @staticmethod
-    def run_covariance_intersection(xa, Pa, xb, Pb):
-        """Runs covariance intersection on the two estimates A and B
-
-        Arguments:
-            xa {np.ndarray} -- mean of A
-            Pa {np.ndarray} -- covariance of A
-            xb {np.ndarray} -- mean of B
-            Pb {np.ndarray} -- covariance of B
-        
-        Returns:
-            c_bar {np.ndarray} -- intersected estimate
-            Pcc {np.ndarray} -- intersected covariance
-        """
-        Pa_inv = np.linalg.inv(Pa)
-        Pb_inv = np.linalg.inv(Pb)
-
-        fxn = lambda omega: np.trace(np.linalg.inv(omega*Pa_inv + (1-omega)*Pb_inv))
-        omega_optimal = scipy.optimize.minimize_scalar(fxn, bounds=(0,1), method="bounded").x
-
-        Pcc = np.linalg.inv(omega_optimal*Pa_inv + (1-omega_optimal)*Pb_inv)
-        c_bar = Pcc.dot( omega_optimal*Pa_inv.dot(xa) + (1-omega_optimal)*Pb_inv.dot(xb))
-        return c_bar.reshape(-1,1), Pcc
-
-    def intersect(self, x, P):
+    def intersect(self, x, P, name):
         """Runs covariance intersection with main filter's estimate
 
         Arguments:
@@ -140,24 +112,24 @@ class DeltaTier:
             c_bar {np.ndarray} -- intersected estimate
             Pcc {np.ndarray} -- intersected covariance
         """
-        my_id = self.asset2id[self.my_name]
+        id = self.asset2id[name]
+
+        if name == self.my_name:
+            self.main_filter.ledger_ci[-1] = [x, P]
 
         # Slice out overlapping states in main filter
-        begin_ind = my_id*self.num_ownship_states
-        end_ind = (my_id+1)*self.num_ownship_states
+        begin_ind = id*self.num_ownship_states
+        end_ind = (id+1)*self.num_ownship_states
         x_prior = self.main_filter.filter.x_hat[begin_ind:end_ind].reshape(-1,1)
         P_prior = self.main_filter.filter.P[begin_ind:end_ind,begin_ind:end_ind]
         P_prior = P_prior.reshape(self.num_ownship_states, self.num_ownship_states)
         
-        c_bar, Pcc = DeltaTier.run_covariance_intersection(x, P, x_prior, P_prior)
+        c_bar, Pcc = LedgerFilter.run_covariance_intersection(x, P, x_prior, P_prior)
 
         # Update main filter states
-        if Pcc.shape != self.main_filter.filter.P.shape:
-            self.psci(x_prior, P_prior, c_bar, Pcc)
-        else:
-            self.main_filter.filter.x_hat = c_bar
-            self.main_filter.filter.P = Pcc
-
+        self.main_filter.filter.x_hat[begin_ind:end_ind] = c_bar
+        self.main_filter.filter.P[begin_ind:end_ind,begin_ind:end_ind] = Pcc
+        # psci
         return c_bar, Pcc
 
     def psci(self, x_prior, P_prior, c_bar, Pcc):
@@ -176,8 +148,8 @@ class DeltaTier:
         x = self.main_filter.filter.x_hat
         P = self.main_filter.filter.P
 
-        D_inv = np.linalg.inv(P_prior) - np.linalg.inv(Pcc)
-        D_inv_d = np.dot( np.linalg.inv(P_prior), x_prior) - np.dot( np.linalg.inv(Pcc), c_bar)
+        D_inv = np.linalg.inv(Pcc) - np.linalg.inv(P_prior)
+        D_inv_d = np.dot( np.linalg.inv(Pcc), c_bar) - np.dot( np.linalg.inv(P_prior), x_prior)
         
         my_id = self.asset2id[self.my_name]
         begin_ind = my_id*self.num_ownship_states
@@ -214,103 +186,7 @@ class DeltaTier:
 
         # Add all measurements in buffer to ledgers of all ledger_filters
         for meas in new_buffer:
-            self.add_meas(meas, delta_multiplier, force_fuse=False)
-            if "implicit" in meas.meas_type:
-                implicit_meas_cnt += 1
-            else:
-                explicit_meas_cnt += 1
-
-        common_filters = {}
-        for mult in self.delta_tiers.keys():
-            my_id = self.delta_tiers[mult].filter.my_id
-            [x0, P0] = self.delta_tiers[mult].original_estimate
-            common_filters[mult] = ETFilter(my_id, self.num_ownship_states, 3, x0, P0, True)
-        
-        # Initialize asset's main filter
-        # Pair the main filter with the etfilter the other asset chose and use to update the main filter
-        my_id = self.main_filter.filter.my_id
-        [x0, P0] = self.main_filter.original_estimate
-        other_assets_common = {my_id: common_filters[delta_multiplier]}
-        main_filter = ETFilter_Main(my_id,self.num_ownship_states, 3, x0, P0, True, other_assets_common)
-
-        # Extract full ledgers
-        common_meas_ledger = {}
-        for mult in self.delta_tiers.keys():
-            common_meas_ledger[mult] = self.delta_tiers[mult].ledger_meas
-        main_control_ledger = self.main_filter.ledger_control
-        main_ledger_meas = self.main_filter.ledger_meas
-        # TODO add covariance intersection support (happens before correction)
-        main_ci_ledger = self.main_filter.ledger_meas
-
-        # Grab lock, no updates for right now
-        # Initialize a new main and common filters (all are etfilters) using original estimate
-        for i_ledge in range(len(self.main_filter.ledger_update_times)):
-
-            [u, Q, delta_time, _] = main_control_ledger[i_ledge]
-            
-            for mult in common_filters.keys():
-                common_filters[mult].predict(u, Q, delta_time, use_control_input=False)
-                ledger_meas = common_meas_ledger[mult][i_ledge]
-                for meas in ledger_meas:
-                    common_filters[mult].add_meas(meas)
-                common_filters[mult].correct()
-
-            main_filter.predict(u, Q, delta_time, use_control_input=True)
-            for meas in main_ledger_meas[i_ledge]:
-                main_filter.add_meas(meas)
-            main_filter.correct()
-                
-        # Trim ledgers
-        if next_ledger_time_index != len(self.main_filter.ledger_update_times):
-            ledger_update_times = self.main_filter.ledger_update_times[next_ledger_time_index:]
-            for mult in common_meas_ledger.keys():
-                common_meas_ledger[mult] = common_meas_ledger[mult][next_ledger_time_index:]
-            main_ledger_meas = main_ledger_meas[next_ledger_time_index:]
-            main_control_ledger = main_control_ledger[next_ledger_time_index:]
-        else:
-            ledger_update_times = []
-            for mult in common_meas_ledger.keys():
-                common_meas_ledger[mult] = [[]]
-            main_ledger_meas = [[]]
-            main_control_ledger = [[]]
-
-
-        ### Reset the ledger filters ###
-
-        # Reset the delta tier filters
-        for multiplier in self.delta_tiers.keys():
-
-            # Caught up estimate becomes new initial estimate
-            x0 = common_filters[multiplier].x_hat
-            P0 = common_filters[multiplier].P
-            
-            buf = deepcopy(self.delta_tiers[multiplier].buffer)
-            # Instantiate new delta tier
-            self.delta_tiers[multiplier] = LedgerFilter(
-                self.num_ownship_states, x0, P0, \
-                self.buffer_capacity, self.meas_space_table, \
-                self.missed_meas_tolerance_table, \
-                self.delta_codebook_table, multiplier, \
-                False, self.asset2id[self.my_name]
-            )
-            self.delta_tiers[multiplier].reset(buf, ledger_update_times, common_meas_ledger[multiplier])
-
-        ### Reset the main filter ###
-
-        # Caught up estimate becomes new initial estimate
-        x0 = main_filter.x_hat
-        P0 = main_filter.P
-        mainbuf = deepcopy(self.main_filter.buffer)
-        # Instantiate new Main Filter
-        self.main_filter = LedgerFilter(
-            self.num_ownship_states, x0, P0, \
-            self.buffer_capacity, self.meas_space_table, \
-            self.missed_meas_tolerance_table, \
-            self.delta_codebook_table, 1.0, \
-            True, self.asset2id[self.my_name]
-        )
-        self.main_filter.reset(mainbuf, ledger_update_times, main_ledger_meas, main_control_ledger)
-
+            self.add_meas(meas, delta_multiplier)
         return implicit_meas_cnt, explicit_meas_cnt
 
     def peek_buffer(self):

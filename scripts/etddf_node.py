@@ -30,7 +30,7 @@ __email__ = "luke.barbier@colorado.edu"
 __status__ = "Development"
 __license__ = "MIT"
 __maintainer__ = "Luke Barbier"
-__version__ = "2.0"
+__version__ = "3.0"
 
 NUM_OWNSHIP_STATES = 6
 
@@ -95,7 +95,7 @@ class ETDDF_Node:
         # Depth Sensor
         if rospy.get_param("~measurement_topics/depth") != "None":
             rospy.Subscriber(rospy.get_param("~measurement_topics/depth"), Float64, self.depth_callback, queue_size=1)
-            self.add_depth_bias = rospy.get_param("~measurement_topics/add_depth_bias")
+        self.add_depth_bias = rospy.get_param("~measurement_topics/add_depth_bias")
 
         # Modem & Measurement Packages
         rospy.Subscriber("etddf/packages_in", MeasurementPackage, self.meas_pkg_callback, queue_size=1)
@@ -262,7 +262,7 @@ class ETDDF_Node:
         cov = np.array(pv_msg.covariance).reshape(6,6)
 
         # Run covariance intersection
-        c_bar, Pcc = self.filter.intersect(mean, cov)
+        c_bar, Pcc = self.filter.intersect(mean, cov, self.my_name)
 
         position = Vector3(c_bar[0,0], c_bar[1,0], c_bar[2,0])
         velocity = Vector3(c_bar[3,0], c_bar[4,0], c_bar[5,0])
@@ -336,59 +336,70 @@ class ETDDF_Node:
         self.network_pub.publish(ne)
 
     def meas_pkg_callback(self, msg):
-        # Modem Meas taken by surface
-        if msg.src_asset == "surface":
-            self.cuprint("Receiving Surface Modem Measurements")
-            for meas in msg.measurements:
-                # Approximate the fuse on the next update, so we can get other asset's position immediately
-                if meas.meas_type == "modem_elevation":
-                    rospy.logerr("Ignoring Modem Elevation Measurement since we have depth measurements")
-                    continue
-                elif meas.meas_type == "modem_azimuth":
-                    meas.global_pose = list(meas.global_pose)
-                    # self.cuprint("azimuth: " + str(meas.data))
-                    meas.data = (meas.data * np.pi) / 180
-                    meas.variance = self.default_meas_variance["modem_azimuth"]
-                elif meas.meas_type == "modem_range":
-                    meas.global_pose = list(meas.global_pose)
-                    # self.cuprint("range: " + str(meas.data))
-                    meas.variance = self.default_meas_variance["modem_range"]
-                self.filter.add_meas(meas, force_fuse=True)
+        self.update_lock.acquire()
 
-        # Modem Meas taken by me
-        elif msg.src_asset == self.my_name:
-            # self.cuprint("Receiving Modem Measurements Taken by Me")
-            for meas in msg.measurements:
-                # Approximate the fuse on the next update, so we can get other asset's position immediately
-                if meas.meas_type == "modem_elevation":
-                    rospy.logerr("Ignoring Modem Elevation Measurement since we have depth measurements")
-                    continue
-                elif meas.meas_type == "modem_azimuth":
-                    meas.global_pose = list(meas.global_pose)
-                    meas.data = (meas.data * np.pi) / 180
-                    meas.variance = self.default_meas_variance["modem_azimuth"]
-                elif meas.meas_type == "modem_range":
-                    meas.global_pose = list(meas.global_pose)
-                    meas.variance = self.default_meas_variance["modem_range"]
-                self.filter.add_meas(meas, force_fuse=True)
-
-        # Buffer
+        if msg.mean: # DDF
+            self.cuprint("Intersecting")
+            mean = np.array(msg.mean).reshape(-1,1)
+            cov = np.array(msg.covariance).reshape(len(mean), len(mean))
+            self.filter.intersect(mean, cov, msg.src_asset)
         else:
-            self.cuprint("receiving buffer")
-            self.update_lock.acquire()
-            self.cuprint("catching up...")
-            implicit_cnt, explicit_cnt = self.filter.catch_up(msg.delta_multiplier, msg.measurements)
-            self.cuprint("...caught up")
-            self.update_lock.release()
-            self.statistics.implicit_count += implicit_cnt
-            self.statistics.explicit_count += explicit_cnt
+            # Modem Meas taken by surface
+            if msg.src_asset == "surface":
+                self.cuprint("Receiving Surface Modem Measurements")
+                for meas in msg.measurements:
+                    # Approximate the fuse on the next update, so we can get other asset's position immediately
+                    if meas.meas_type == "modem_elevation":
+                        rospy.logerr("Ignoring Modem Elevation Measurement since we have depth measurements")
+                        continue
+                    elif meas.meas_type == "modem_azimuth":
+                        meas.global_pose = list(meas.global_pose)
+                        # self.cuprint("azimuth: " + str(meas.data))
+                        meas.data = (meas.data * np.pi) / 180.0
+                        meas.variance = self.default_meas_variance["modem_azimuth"]
+                    elif meas.meas_type == "modem_range":
+                        meas.global_pose = list(meas.global_pose)
+                        # self.cuprint("range: " + str(meas.data))
+                        meas.variance = self.default_meas_variance["modem_range"]
+                    self.filter.add_meas(meas)
+
+            # Modem Meas taken by me
+            elif msg.src_asset == self.my_name:
+                # self.cuprint("Receiving Modem Measurements Taken by Me")
+                for meas in msg.measurements:
+                    # Approximate the fuse on the next update, so we can get other asset's position immediately
+                    if meas.meas_type == "modem_elevation":
+                        rospy.logerr("Ignoring Modem Elevation Measurement since we have depth measurements")
+                        continue
+                    elif meas.meas_type == "modem_azimuth":
+                        meas.global_pose = list(meas.global_pose)
+                        meas.data = (meas.data * np.pi) / 180
+                        meas.variance = self.default_meas_variance["modem_azimuth"]
+                    elif meas.meas_type == "modem_range":
+                        meas.global_pose = list(meas.global_pose)
+                        meas.variance = self.default_meas_variance["modem_range"]
+                    self.filter.add_meas(meas)
+
+            # Buffer
+            else:
+                self.cuprint("receiving buffer")
+                self.cuprint("catching up...")
+                self.filter.catch_up(msg.delta_multiplier, msg.measurements)
+                self.cuprint("...caught up")
+        self.update_lock.release()
 
     def get_meas_pkg_callback(self, req):
-        self.cuprint("pulling buffer")
-        delta, buffer = self.filter.pull_buffer()
-        ind = self.statistics.delta_tiers.index(delta)
-        self.statistics.buffer_counts[ind] += 1
-        mp = MeasurementPackage(buffer, self.my_name, delta)
+        # self.cuprint("pulling buffer")
+        # delta, buffer = self.filter.pull_buffer()
+        # ind = self.statistics.delta_tiers.index(delta)
+        # self.statistics.buffer_counts[ind] += 1
+        # mp = MeasurementPackage(buffer, self.my_name, delta) #, [],[])
+
+        # DDF
+        mean, cov = self.filter.get_asset_estimate(self.my_name)
+        print(list(mean.flatten()))
+        print(list(cov.flatten()))
+        mp = MeasurementPackage([], self.my_name, 0.0, list(mean.flatten()), list(cov.flatten()))
         return mp
 
 

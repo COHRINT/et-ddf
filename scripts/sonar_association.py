@@ -8,6 +8,8 @@ import tf
 import numpy as np
 from cuprint.cuprint import CUPrint
 
+# TODO switching off truth pose in 2 subscribers!
+
 class SonarAssociator:
 
     def __init__(self):
@@ -17,15 +19,16 @@ class SonarAssociator:
 
         self.landmark_dict = rospy.get_param("~landmarks", {})
 
-        pose_topic = "etddf/estimate" + rospy.get_namespace()[:-1]
-        # pose_topic = rospy.get_namespace()[:-1] + "/pose_gt"
+        # pose_topic = "etddf/estimate" + rospy.get_namespace()[:-1]
+        pose_topic = rospy.get_namespace()[:-1] + "/pose_gt"
         rospy.Subscriber(pose_topic, Odometry, self.pose_callback)
         rospy.wait_for_message(pose_topic, Odometry)
 
         blue_team = rospy.get_param("~blue_team_names")
         self.blue_team = {}
         for b in blue_team:
-            rospy.Subscriber("etddf/estimate/" + b, Odometry, self.blue_team_callback, callback_args=b)
+            rospy.Subscriber( "/" + b + "/pose_gt", Odometry, self.blue_team_callback, callback_args=b)
+            # rospy.Subscriber("etddf/estimate/" + b, Odometry, self.blue_team_callback, callback_args=b)
 
         self.pub = rospy.Publisher("sonar_processing/target_list/associated", SonarTargetList, queue_size=10)
 
