@@ -122,7 +122,10 @@ class DeltaTier:
         Pa_inv = np.linalg.inv(Pa)
         Pb_inv = np.linalg.inv(Pb)
 
-        fxn = lambda omega: np.trace(np.linalg.inv(omega*Pa_inv + (1-omega)*Pb_inv))
+        # fxn = lambda omega: np.trace(np.linalg.inv(omega*Pa_inv + (1-omega)*Pb_inv))
+        def fxn(omega):
+            sign, logdet = np.linalg.slogdet( np.linalg.inv(omega*Pa_inv + (1-omega)*Pb_inv) )
+            return logdet
         omega_optimal = scipy.optimize.minimize_scalar(fxn, bounds=(0,1), method="bounded").x
 
         Pcc = np.linalg.inv(omega_optimal*Pa_inv + (1-omega_optimal)*Pb_inv)

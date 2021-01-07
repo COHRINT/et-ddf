@@ -18,7 +18,7 @@ buffer_space:
   bookend: 1 # Space for indicating STOP of meas stream
   final_time: 0 # Space to send last time in buffer
 
-use_control_input: False
+use_control_input: True
 
 ### Initial Mean Estimate Configurations ###
 default_starting_position:
@@ -42,9 +42,9 @@ process_noise:
     x: 0.0
     y: 0.0
     z: 0.0
-    x_vel: 0.0
-    y_vel: 0.0
-    z_vel: 0.0
+    x_vel: 0.2
+    y_vel: 0.2
+    z_vel: 0.2
   redteam:
     x: 0.1
     y: 0.1
@@ -64,12 +64,12 @@ initial_uncertainty:
     z_vel: 0.2
   # for asset positions provided to us through roslaunch params
   known_starting_position: 
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    x_vel: 0.0
-    y_vel: 0.0
-    z_vel: 0.0
+    x: 0.1
+    y: 0.1
+    z: 0.1
+    x_vel: 0.1
+    y_vel: 0.1
+    z_vel: 0.1
   # asset positions not provided in roslaunch, including redteam
   unknown_starting_position: 
     x: 1000

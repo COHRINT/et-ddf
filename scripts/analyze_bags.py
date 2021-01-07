@@ -12,8 +12,8 @@ import tf
 ASSET_NAME = "bluerov2_3"
 # ASSET_NAME = "bluerov2_4"
 # MEASURED_NAME = ASSET_NAME
-MEASURED_NAME = "bluerov2_4"
-# MEASURED_NAME = "bluerov2_3"
+# MEASURED_NAME = "bluerov2_4"
+MEASURED_NAME = "bluerov2_3"
 
 
 def get_plot_labels(num_states, num_ownship_states, asset_id):

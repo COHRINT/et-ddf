@@ -6,7 +6,7 @@ from etddf.msg import Measurement, MeasurementPackage
 from etddf.srv import GetMeasurementPackage
 import rospy
 import numpy as np
-
+from cuprint.cuprint import CUPrint
 from cuquantization.quantize import measPkg2Bytes, bytes2MeasPkg
 
 """
@@ -38,14 +38,17 @@ class SeatracSnub:
 
 if __name__ == "__main__":
     rospy.init_node("seatrac_snub")
+    cuprint = CUPrint(rospy.get_name())
 
     # [comms_type, time_taken]
-    # comm_scheme = [["broadcast_bluerov2_3",4]]
-    comm_scheme = [["ping_surface_to_bluerov2_3", 3], ["ping_surface_to_bluerov2_4", 3], ["broadcast_surface",3], ["broadcast_bluerov2_3",4], ["broadcast_bluerov2_4",4]]
+    # comm_scheme = [["ping_surface_to_bluerov2_3", 3],["broadcast_surface",4]]
+    # comm_scheme = [["ping_surface_to_bluerov2_3", 1],["broadcast_surface",1]]
+    comm_scheme = [["ping_surface_to_bluerov2_3", 3], ["ping_surface_to_bluerov2_4", 3], ["ping_surface_to_bluerov2_5", 3],
+    ["broadcast_surface",3]]#, ["broadcast_bluerov2_3",4], ["broadcast_bluerov2_4",4]]
 
-    asset_landmark_dict = {"surface" : 0, "bluerov2_3":1, "bluerov2_4" : 2}
+    asset_landmark_dict = {"surface" : 0, "bluerov2_3":1, "bluerov2_4" : 2, "bluerov2_5" : 3}
 
-    assets = ["bluerov2_3", "bluerov2_4"]
+    assets = ["bluerov2_3", "bluerov2_4", "bluerov2_5"]
     meas_pkg_pub_dict = {}
     for a in assets:
         meas_pkg_pub_dict[a] = rospy.Publisher(a + "/etddf/packages_in", MeasurementPackage, queue_size=10)
@@ -55,6 +58,8 @@ if __name__ == "__main__":
 
     surface_meas_pkg = MeasurementPackage()
     latest_meas_pkg = MeasurementPackage()
+
+    cuprint("Loaded")
 
     while not rospy.is_shutdown():
         curr_comms = comm_scheme[curr_index]
@@ -66,7 +71,7 @@ if __name__ == "__main__":
             action_executed_by = new_str[ :new_str.index("_to_")]
             measured_asset = new_str[new_str.index("_to_") + len("_to_"):]
 
-            print(action_executed_by + " pinging " + measured_asset)
+            cuprint(action_executed_by + " pinging " + measured_asset)
             
             action_executed_by_pose = seasnub.poses[action_executed_by]
             measured_asset_pose = seasnub.poses[measured_asset]
@@ -97,8 +102,8 @@ if __name__ == "__main__":
                 surface_meas_pkg.src_asset = "surface"
                 rospy.loginfo("surface broadcasting")
 
-                bytes_ = measPkg2Bytes(surface_meas_pkg, asset_landmark_dict)
-                surface_meas_pkg = bytes2MeasPkg(bytes_, 0.0, asset_landmark_dict, GLOBAL_POSE)
+                # bytes_ = measPkg2Bytes(surface_meas_pkg, asset_landmark_dict)
+                # surface_meas_pkg = bytes2MeasPkg(bytes_, 0.0, asset_landmark_dict, GLOBAL_POSE)
 
                 for asset_key in meas_pkg_pub_dict.keys():
                     meas_pkg_pub_dict[asset_key].publish(surface_meas_pkg)

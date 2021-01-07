@@ -45,12 +45,17 @@ def linear_propagation(x_hat, u, num_ownship_states, my_id, time_delta=1.0, use_
 
     x_new = None
     if use_control_input:
-        B = np.zeros((num_states,1))
-        B[my_id*num_ownship_states,0] = u[0,0] * time_delta
-        B[my_id*num_ownship_states+1,0] = u[1,0] * time_delta
-        B[my_id*num_ownship_states+2,0] = u[2,0] * time_delta
-        x_new = A.dot(x_hat) + B
-        x_new[my_id*num_ownship_states+num_base_states:(my_id+1)*num_ownship_states] = u[:]
+        # B = np.zeros((num_states,1))
+        # B = np.zeros((num_states,3))
+        # B[my_id*num_ownship_states,0] = 1
+        # B[my_id*num_ownship_states+1,1] = 1
+        # B[my_id*num_ownship_states+2,2] = 1
+        # B[my_id*num_ownship_states,0] = u[0,0] * time_delta
+        # B[my_id*num_ownship_states+1,0] = u[1,0] * time_delta
+        # B[my_id*num_ownship_states+2,0] = u[2,0] * time_delta
+        # x_new = A.dot(x_hat) + B.dot(u * time_delta)
+        x_hat[my_id*num_ownship_states+num_base_states:(my_id+1)*num_ownship_states] = u[:] # We control velocity directly
+        x_new = A.dot(x_hat)
         A[my_id*num_ownship_states,my_id*num_ownship_states + num_base_states] = 1
         A[my_id*num_ownship_states+1,my_id*num_ownship_states+1 + num_base_states] = 1
         A[my_id*num_ownship_states+2,my_id*num_ownship_states+2 + num_base_states] = 1
