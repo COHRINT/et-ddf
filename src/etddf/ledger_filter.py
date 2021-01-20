@@ -21,7 +21,7 @@ from etddf.msg import Measurement
 import rospy
 
 ## Lists all measurement substrings to not send implicitly
-MEASUREMENT_TYPES_NOT_SHARED =     ["modem"]
+MEASUREMENT_TYPES_NOT_SHARED =     ["modem", "depth"]
 ## Indicates meas should be fused on upcoming update step
 FUSE_MEAS_NEXT_UPDATE =             -1
 ## Indicates to use this filters delta multiplier (Won't be used when fusing a buffer from another asset)
@@ -56,6 +56,7 @@ class LedgerFilter:
         self.missed_meas_tolerance_table = missed_meas_tolerance_table
         self.is_main_filter = is_main_filter
         self.filter = ETFilter(my_id, num_ownship_states, 3, x0, P0, True)
+        self.my_id = my_id
 
         # Initialize Ledgers
         self.ledger_meas = [] # In internal measurement form
@@ -100,7 +101,7 @@ class LedgerFilter:
         orig_meas = meas
 
         # Common filter with delta tiering
-        if not self.is_main_filter and time_index==FUSE_MEAS_NEXT_UPDATE:
+        if (not self.is_main_filter and time_index==FUSE_MEAS_NEXT_UPDATE) and src_id == self.my_id:
 
             # Check if this measurement is allowed to be sent implicitly
             l = [x for x in MEASUREMENT_TYPES_NOT_SHARED if x in ros_meas.meas_type]

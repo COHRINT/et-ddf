@@ -95,7 +95,6 @@ class ETDDF_Node:
         # Depth Sensor
         if rospy.get_param("~measurement_topics/depth") != "None":
             rospy.Subscriber(rospy.get_param("~measurement_topics/depth"), Float64, self.depth_callback, queue_size=1)
-            self.add_depth_bias = rospy.get_param("~measurement_topics/add_depth_bias")
 
         # Modem & Measurement Packages
         rospy.Subscriber("etddf/packages_in", MeasurementPackage, self.meas_pkg_callback, queue_size=1)
@@ -104,7 +103,6 @@ class ETDDF_Node:
             self.control_input = None
             rospy.Subscriber("uuv_control/control_status", ControlStatus, self.control_status_callback, queue_size=1)
 
-        
         rospy.Subscriber(rospy.get_param("~measurement_topics/imu_est"), Odometry, self.orientation_estimate_callback, queue_size=1)
         rospy.wait_for_message(rospy.get_param("~measurement_topics/imu_est"), Odometry)
 
@@ -143,6 +141,7 @@ class ETDDF_Node:
     def sonar_callback(self, sonar_list):
 
         for target in sonar_list.targets:
+            # self.cuprint("Receiving sonar measurements")
             if self.last_orientation is None: # No orientation, no linearization of the sonar measurement
                 return
             if target.id == "detection":
@@ -170,7 +169,8 @@ class ETDDF_Node:
             else:
                 sonar_x = Measurement("sonar_x", now, self.my_name, target.id, x, self.default_meas_variance["sonar_x"], [])
                 sonar_y = Measurement("sonar_y", now, self.my_name, target.id, y, self.default_meas_variance["sonar_y"], [])
-                if target.id in self.red_asset_names:
+                if target.id in self.red_asset_names and not self.red_asset_found:
+                    self.cuprint("Red Asset detected!")
                     self.red_asset_found = True
             # sonar_z = Measurement("sonar_z", now, self.my_name, target.id, z, self.default_meas_variance["sonar_z"], []
 
@@ -308,8 +308,6 @@ class ETDDF_Node:
             if asset == self.my_name:
                 pose = Pose(Point(mean[0],mean[1],mean[2]), \
                             self.last_orientation)
-                if self.add_depth_bias:
-                    pose.position.z -= 0.7
                 pose_cov[3:,3:] = self.last_orientation_cov[3:,3:]
             else:
                 pose = Pose(Point(mean[0],mean[1],mean[2]), \
@@ -376,7 +374,6 @@ class ETDDF_Node:
         else:
             self.cuprint("receiving buffer")
             self.update_lock.acquire()
-            self.cuprint("catching up...")
             implicit_cnt, explicit_cnt = self.filter.catch_up(msg.delta_multiplier, msg.measurements)
             self.cuprint("...caught up")
             self.update_lock.release()
@@ -389,6 +386,7 @@ class ETDDF_Node:
         ind = self.statistics.delta_tiers.index(delta)
         self.statistics.buffer_counts[ind] += 1
         mp = MeasurementPackage(buffer, self.my_name, delta)
+        print(mp)
         return mp
 
 

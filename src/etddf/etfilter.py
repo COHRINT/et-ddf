@@ -184,7 +184,7 @@ class ETFilter(object):
             expected_meas = C.dot(self.x_hat)
         else:
             expected_meas = get_nonlinear_expected_meas(meas, self.x_hat, self.world_dim, self.num_ownship_states)
-        # if True:
+        # if not meas.is_linear_meas:
         #     print("expected meas " + meas.__class__.__name__ + " : " + str(expected_meas))
         #     print("---> actual meas: " + str(meas.data))
         if meas.is_angle_meas:

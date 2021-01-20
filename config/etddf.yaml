@@ -8,8 +8,8 @@ delta_tiers: [1]
 measurement_topics:
   depth: baro
   imu_ci: None # strapdown/intersection
-  imu_est: None #strapdown/estimate
-  sonar: "sonar_processing/target_list/associated"
+  imu_est: strapdown/estimate
+  sonar: "sonar_processing/target_list" # "sonar_processing/target_list/associated"
 
 ### Buffer space configurations ###
 buffer_space:
@@ -32,23 +32,23 @@ default_starting_position:
 ### Process Noise Configurations ###
 process_noise:
   ownship:
-    x: 0.001
-    y: 0.001
+    x: 0.005
+    y: 0.005
     z: 0.01
     x_vel: 0.001
     y_vel: 0.001
     z_vel: 0.1
   blueteam:
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    x_vel: 0.0
-    y_vel: 0.0
-    z_vel: 0.0
+    x: 0.005
+    y: 0.005
+    z: 0.005
+    x_vel: 0.001
+    y_vel: 0.001
+    z_vel: 0.001
   redteam:
-    x: 0.1
-    y: 0.1
-    z: 0.1
+    x: 0.01
+    y: 0.01
+    z: 0.01
     x_vel: 0.05
     y_vel: 0.05
     z_vel: 0.05
@@ -64,12 +64,12 @@ initial_uncertainty:
     z_vel: 0.2
   # for asset positions provided to us through roslaunch params
   known_starting_position: 
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    x_vel: 0.0
-    y_vel: 0.0
-    z_vel: 0.0
+    x: 0.1
+    y: 0.1
+    z: 0.1
+    x_vel: 0.01
+    y_vel: 0.01
+    z_vel: 0.01
   # asset positions not provided in roslaunch, including redteam
   unknown_starting_position: 
     x: 1000
