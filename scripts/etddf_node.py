@@ -374,6 +374,12 @@ class ETDDF_Node:
         else:
             self.cuprint("receiving buffer")
             self.update_lock.acquire()
+
+            # Loop through buffer and see if we've found the red agent
+            for m in msg.measurements:
+                if m.measured_asset in self.red_asset_names and not self.red_asset_found:
+                    self.red_asset_found = True
+                    self.cuprint("Red asset measurement received!")
             implicit_cnt, explicit_cnt = self.filter.catch_up(msg.delta_multiplier, msg.measurements)
             self.cuprint("...caught up")
             self.update_lock.release()
