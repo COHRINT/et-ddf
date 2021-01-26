@@ -485,34 +485,40 @@ def get_initial_estimate(num_states):
     uncertainty += np.eye(num_states) * uncertainty_vector
 
     state_vector = my_starting_position
+    my_name = rospy.get_param("~my_name")
     blue_team_names = rospy.get_param("~blue_team_names")
     blue_team_positions = rospy.get_param("~blue_team_positions")
     red_team_names = rospy.get_param("~red_team_names")
 
-    next_index = 1
+    next_index_unc = 1
+    next_index_pos = 1
     for asset in blue_team_names:
-        if len(blue_team_positions) >= next_index: # we were given the positione of this asset in roslaunch
-            next_position = _add_velocity_states( _list2arr( blue_team_positions[next_index-1]))
+        if asset == my_name:
+            next_index_pos += 1
+            continue
+        if len(blue_team_positions) >= next_index_pos: # we were given the positione of this asset in roslaunch
+            next_position = _add_velocity_states( _list2arr( blue_team_positions[next_index_pos-1]))
             uncertainty_vector = np.zeros((num_states,1))
-            uncertainty_vector[next_index*NUM_OWNSHIP_STATES:(next_index+1)*NUM_OWNSHIP_STATES] = uncertainty_known_starting_position
+            uncertainty_vector[next_index_unc*NUM_OWNSHIP_STATES:(next_index_unc+1)*NUM_OWNSHIP_STATES] = uncertainty_known_starting_position
             uncertainty += np.eye(num_states) * uncertainty_vector
         else:
             next_position = deepcopy(default_starting_position)
             uncertainty_vector = np.zeros((num_states,1))
-            uncertainty_vector[next_index*NUM_OWNSHIP_STATES:(next_index+1)*NUM_OWNSHIP_STATES] = uncertainty_unknown_starting_position
+            uncertainty_vector[next_index_unc*NUM_OWNSHIP_STATES:(next_index_unc+1)*NUM_OWNSHIP_STATES] = uncertainty_unknown_starting_position
             uncertainty += np.eye(num_states) * uncertainty_vector
 
         state_vector = np.concatenate((state_vector, next_position),axis=0)
-        next_index += 1
+        next_index_unc += 1
+        next_index_pos += 1
     for asset in red_team_names:
         next_position = deepcopy(default_starting_position)
         state_vector = np.concatenate((state_vector, next_position),axis=0)
 
         uncertainty_vector = np.zeros((num_states,1))
-        uncertainty_vector[next_index*NUM_OWNSHIP_STATES:(next_index+1)*NUM_OWNSHIP_STATES] = uncertainty_unknown_starting_position
+        uncertainty_vector[next_index_unc*NUM_OWNSHIP_STATES:(next_index_unc+1)*NUM_OWNSHIP_STATES] = uncertainty_unknown_starting_position
         uncertainty += np.eye(num_states) * uncertainty_vector
 
-        next_index += 1
+        next_index_unc += 1
     
     return state_vector, uncertainty
 
@@ -526,11 +532,14 @@ def get_process_noise(num_states):
     Q_vec[:NUM_OWNSHIP_STATES] = ownship_Q
     Q += np.eye(num_states) * Q_vec
 
+    my_name = rospy.get_param("~my_name")
     blue_team_names = rospy.get_param("~blue_team_names")
     red_team_names = rospy.get_param("~red_team_names")
 
     next_index = 1
     for asset in blue_team_names:
+        if asset == my_name:
+            continue
         Q_vec = np.zeros((num_states,1))
         Q_vec[next_index*NUM_OWNSHIP_STATES:(next_index+1)*NUM_OWNSHIP_STATES] = blueteam_Q
         Q += np.eye(num_states) * Q_vec
