@@ -5,6 +5,7 @@ import numpy as np
 import sys
 import rospy
 import struct
+import time
 
 """
 Structure of Pkg (28 bytes)
@@ -17,7 +18,7 @@ Structure of Pkg (28 bytes)
 """
 
 ################ API FUNCTIONS ################
-def measPkg2Bytes(meas_pkg, asset_landmark_dict, packet_size):
+def measPkg2Bytes(meas_pkg, asset_landmark_dict, packet_size=32):
     """Converts an etddf/MeasurementPackage.msg to byte stream
 
     Args:
@@ -67,10 +68,10 @@ def measPkg2Bytes(meas_pkg, asset_landmark_dict, packet_size):
         elif meas.meas_type in ["sonar_x", "sonar_y"]:
             # Range [-10,10] -> [0, 20] Shift range for convenience
             # 256 bins
-            if meas.data < -10 or meas.data > 10:
+            if meas.data < -20 or meas.data > 20:
                 raise ValueError("Sonar meas outside of compression bounds: " + str(meas.data) + ' for ' + str([-10,10]))
-            bin_per_meter = 255 / 20.0
-            data = meas.data + 10.0 # Shift the sonar range to be between 0 and 20
+            bin_per_meter = 255 / 40.0
+            data = meas.data + 20.0 # Shift the sonar range to be between 0 and 20
             data_bin = int(data * bin_per_meter)
         elif meas.meas_type == "modem_range":
             # Range [0, 20]
@@ -203,7 +204,8 @@ HEADERS = {
     'sonar_y_bookstart' : 8,
     'sonar_y_bookend' : 9,
     'modem_range' : 10,
-    'modem_azimuth' : 11
+    'modem_azimuth' : 11,
+    'final_time' : 12
 }
 
 delta_multiplier_options = list(np.arange(0,11,1))
@@ -228,10 +230,12 @@ if __name__ == "__main__":
     m2 = Measurement("modem_azimuth", t, mp.src_asset, "bluerov2_3", -65.72, 0.5, global_pose)
     m3 = Measurement("modem_range", t, mp.src_asset, "bluerov2_4", 7.8, 0.5, global_pose)
     m4 = Measurement("modem_azimuth", t, mp.src_asset, "bluerov2_4", 23.0, 0.5, global_pose)
+    m5 = Measurement("final_time", rospy.get_rostime(), "", "", 0, 0, [])
     mp.measurements.append(m)
     mp.measurements.append(m2)
     mp.measurements.append(m3)
     mp.measurements.append(m4)
+    mp.measurements.append(m5)
 
     
     num_bytes_buffer = 29
@@ -252,6 +256,8 @@ if __name__ == "__main__":
     m4 = Measurement("sonar_x_bookend", rospy.get_rostime(), mp.src_asset, "bluerov2_4", 0.0, 0.5, [])
     m5 = Measurement("depth_bookend", rospy.get_rostime(), mp.src_asset, "", 0.0, 0.5, [])
     m6 = Measurement("sonar_y_bookstart", rospy.get_rostime(), mp.src_asset, "landmark_pole1", 0.0, 0.5, [])
+    time.sleep(1)
+    m7 = Measurement("final_time", rospy.get_rostime(), "", "", 0, 0, [])
 
     mp.measurements.append(m)
     mp.measurements.append(m2)
@@ -259,6 +265,7 @@ if __name__ == "__main__":
     mp.measurements.append(m4)
     mp.measurements.append(m5)
     mp.measurements.append(m6)
+    mp.measurements.append(m7)
     print(mp)
     bytes_ = measPkg2Bytes(mp, asset_landmark_dict, num_bytes_buffer)
     mp_return = bytes2MeasPkg(bytes_, 2, asset_landmark_dict, global_pose)
