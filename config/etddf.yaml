@@ -2,14 +2,14 @@ update_rate: 2
 
 ## Multipliers for Delta tiers
 ## increases a measurements threshold to be added to the buffer by the given amount
-delta_tiers: [1]
+delta_tiers: [1,5]
 
 ## Measurement topics
 measurement_topics:
   depth: baro
-  imu_ci: None # strapdown/intersection
-  imu_est: None # strapdown/estimate
-  sonar: "sonar_processing/target_list" # "sonar_processing/target_list/associated"
+  imu_ci: None #strapdown/intersection
+  imu_est: None #strapdown/estimate
+  sonar: "sonar_processing/target_list/associated" # "sonar_processing/target_list/"
 
 ### Buffer space configurations ###
 buffer_space:

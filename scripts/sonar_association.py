@@ -22,6 +22,7 @@ class SonarAssociator:
         rospy.Subscriber(pose_topic, Odometry, self.pose_callback)
         rospy.wait_for_message(pose_topic, Odometry)
 
+        self.red_team_names = rospy.get_param("~red_team_names")
         blue_team = rospy.get_param("~blue_team_names")
         self.blue_team = {}
         for b in blue_team:
@@ -54,6 +55,7 @@ class SonarAssociator:
             projected_target_y = msg.targets[i].range_m * np.sin( bearing2target_inertial ) + current_y
 
             # Attempt to associate with a landmark
+            associated = False
             dists = []
             for l in self.landmark_dict.keys():
                 landmark_x, landmark_y, landmark_z = self.landmark_dict[l]
@@ -63,9 +65,11 @@ class SonarAssociator:
                     self.cuprint(l)
                     info = [x*(180 / np.pi) for x in [current_yaw, msg.targets[i].bearing_rad, bearing2target_inertial]]
                     # print("Vehicle Orientation, Measured Bearing, Estimated World Bearing: " + str(info))
+                    associated = True
                     break
                 else:
                     dists.append(dist)
+            # Attempt to associate with a blue team member
             for b in self.blue_team.keys():
                 blue_position = self.blue_team[b].pose.pose.position
                 blue_x, blue_y, blue_z = blue_position.x, blue_position.y, blue_position.z
@@ -75,9 +79,20 @@ class SonarAssociator:
                     self.cuprint(b)
                     info = [x*(180 / np.pi) for x in [current_yaw, msg.targets[i].bearing_rad, bearing2target_inertial]]
                     # print("Vehicle Orientation, Measured Bearing, Estimated World Bearing: " + str(info))
+                    associated = True
                     break
                 else:
                     dists.append(dist)
+            
+            # If not association --> assume it's the red asset
+            # TODO future logic 
+            if not associated and self.red_team_names:
+                self.cuprint("Associating detection with red agent")
+                msg.targets[i].id = self.red_team_names[0]
+
+            if msg.targets[i].id != msg.targets[i].actual_id:
+                self.cuprint("MISSACCOCIATION!", warn=True)
+                print(msg.targets[i])
             # print("Norms: " + str(dists) + " for " + str(self.landmark_dict.keys()))
         
         self.pub.publish(msg)

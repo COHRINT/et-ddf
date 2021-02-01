@@ -8,8 +8,9 @@
     <arg name="blue_team_positions_enu" default="[]" /> 
 
     <arg name="red_team_names" default="[]" />
-    <arg name="config_file" default="$(find etddf)/config/etddf_sonar.yaml" />
+    <arg name="config_file" default="$(find etddf)/config/etddf.yaml" />
     <arg name="starting_position_enu" default="[1.22,-1.22,0]" /> <!-- [x,y,z] -->
+    <arg name="starting_yaw_enu" default="0.0" />
     
     <node name="etddf" pkg="etddf" type="etddf_node.py" output="screen">
         <param name="my_name" value="$(arg my_name)" />
@@ -17,14 +18,23 @@
         <rosparam param="blue_team_names" subst_value="True">$(arg blue_team_names)</rosparam> 
         <rosparam param="red_team_names" subst_value="True">$(arg red_team_names)</rosparam> 
         <rosparam param="starting_position" subst_value="True">$(arg starting_position_enu)</rosparam> 
+        <param name="starting_yaw" value="$(arg starting_yaw_enu)" />
         <rosparam command="load" file="$(arg config_file)" />        
         <rosparam command="load" file="$(find etddf)/config/measurements.yaml" />
         <rosparam command="load" file="$(arg landmark_file)" />
     </node>
 
+    <!-- Launch the strapdown filter -->
+    <include file="$(find etddf)/launch/nav_filter.launch" >
+        <arg name="starting_position_enu" value="$(arg starting_position_enu)" />
+        <arg name="starting_yaw_enu" value="$(arg starting_yaw_enu)" />
+        <arg name="wait_on_startup" value="10" />
+    </include>
+
     <node name="sonar_association" pkg="etddf" type="sonar_association.py" output="screen">
         <rosparam command="load" file="$(arg landmark_file)" />
         <rosparam param="blue_team_names" subst_value="True">$(arg blue_team_names)</rosparam> 
+        <rosparam param="red_team_names" subst_value="True">$(arg red_team_names)</rosparam> 
         <param name="threshold" value="1" />
     </node>
 
