@@ -104,7 +104,8 @@ class ETDDF_Node:
             rospy.Subscriber("uuv_control/control_status", ControlStatus, self.control_status_callback, queue_size=1)
 
         rospy.Subscriber(rospy.get_param("~measurement_topics/imu_est"), Odometry, self.orientation_estimate_callback, queue_size=1)
-        rospy.wait_for_message(rospy.get_param("~measurement_topics/imu_est"), Odometry)
+        if rospy.get_param("~measurement_topics/imu_est") != "None":
+            rospy.wait_for_message(rospy.get_param("~measurement_topics/imu_est"), Odometry)
 
         # IMU Covariance Intersection
         if rospy.get_param("~measurement_topics/imu_ci") == "None":
