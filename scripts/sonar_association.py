@@ -17,8 +17,8 @@ class SonarAssociator:
 
         self.landmark_dict = rospy.get_param("~landmarks", {})
 
-        pose_topic = "etddf/estimate" + rospy.get_namespace()[:-1]
-        # pose_topic = rospy.get_namespace()[:-1] + "/pose_gt"
+        # pose_topic = "etddf/estimate" + rospy.get_namespace()[:-1]
+        pose_topic = rospy.get_namespace()[:-1] + "/pose_gt"
         rospy.Subscriber(pose_topic, Odometry, self.pose_callback)
         rospy.wait_for_message(pose_topic, Odometry)
 

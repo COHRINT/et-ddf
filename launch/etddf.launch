@@ -2,6 +2,7 @@
     <arg name="my_name" default="bluerov2_3" />
     <arg name="blue_team_names" default="[]" />
     <arg name="landmark_file" default="$(find etddf)/config/landmarks_sim.yaml" />
+    <arg name="strapdown" default="True" />
 
     <!-- not required, list of lists, index of outer 
     list corresponds to index in blue_team_names -->
@@ -18,14 +19,14 @@
         <rosparam param="blue_team_names" subst_value="True">$(arg blue_team_names)</rosparam> 
         <rosparam param="red_team_names" subst_value="True">$(arg red_team_names)</rosparam> 
         <rosparam param="starting_position" subst_value="True">$(arg starting_position_enu)</rosparam> 
-        <param name="starting_yaw" value="$(arg starting_yaw_enu)" />
         <rosparam command="load" file="$(arg config_file)" />        
         <rosparam command="load" file="$(find etddf)/config/measurements.yaml" />
         <rosparam command="load" file="$(arg landmark_file)" />
+        <param name="strapdown" value="$(arg strapdown)" />
     </node>
 
     <!-- Launch the strapdown filter -->
-    <include file="$(find etddf)/launch/nav_filter.launch" >
+    <include file="$(find etddf)/launch/nav_filter.launch" if="$(eval strapdown)" >
         <arg name="starting_position_enu" value="$(arg starting_position_enu)" />
         <arg name="starting_yaw_enu" value="$(arg starting_yaw_enu)" />
         <arg name="wait_on_startup" value="10" />

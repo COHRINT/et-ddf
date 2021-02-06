@@ -104,17 +104,17 @@ class ETDDF_Node:
             rospy.Subscriber("uuv_control/control_status", ControlStatus, self.control_status_callback, queue_size=1)
 
         rospy.Subscriber(rospy.get_param("~measurement_topics/imu_est"), Odometry, self.orientation_estimate_callback, queue_size=1)
-        if rospy.get_param("~measurement_topics/imu_est") != "None":
+        if rospy.get_param("~strapdown"):
             rospy.wait_for_message(rospy.get_param("~measurement_topics/imu_est"), Odometry)
 
         # IMU Covariance Intersection
-        if rospy.get_param("~measurement_topics/imu_ci") == "None":
-            self.cuprint("Not intersecting with strapdown filter")
-            rospy.Timer(rospy.Duration(1 / self.update_rate), self.no_nav_filter_callback)
-        else:
+        if rospy.get_param("~strapdown") and rospy.get_param("~measurement_topics/imu_ci") != "None":
             self.cuprint("Intersecting with strapdown")
             self.intersection_pub = rospy.Publisher("strapdown/intersection_result", PositionVelocity, queue_size=1)
             rospy.Subscriber(rospy.get_param("~measurement_topics/imu_ci"), PositionVelocity, self.nav_filter_callback, queue_size=1)
+        else:
+            self.cuprint("Not intersecting with strapdown filter")
+            rospy.Timer(rospy.Duration(1 / self.update_rate), self.no_nav_filter_callback)
 
         # Sonar Subscription
         if rospy.get_param("~measurement_topics/sonar") != "None":
@@ -401,9 +401,8 @@ class ETDDF_Node:
 ### Initialization Functions ###
 ################################
 
-def get_indices_from_asset_names():
+def get_indices_from_asset_names(blue_team):
     my_name = rospy.get_param("~my_name")
-    blue_team = rospy.get_param("~blue_team_names")
     red_team = rospy.get_param("~red_team_names")
     asset2id = {}
     asset2id[my_name] = 0
@@ -419,7 +418,8 @@ def get_indices_from_asset_names():
         asset2id[asset] = next_index
         next_index += 1
 
-    asset2id["surface"] = -1 # arbitrary negative number
+    if my_name != "surface":
+        asset2id["surface"] = -1 # arbitrary negative number
 
     return asset2id
 
@@ -468,7 +468,7 @@ def _add_velocity_states(base_states):
     velocities = np.zeros((base_states.size,1))
     return np.concatenate((base_states, velocities), axis=0)
 
-def get_initial_estimate(num_states):
+def get_initial_estimate(num_states, blue_team_names, blue_team_positions):
     default_starting_position = _dict2arr(rospy.get_param("~default_starting_position"))
     uncertainty_known_starting_position = _dict2arr( rospy.get_param("~initial_uncertainty/known_starting_position"))
     uncertainty_unknown_starting_position = _dict2arr( rospy.get_param("~initial_uncertainty/unknown_starting_position"))
@@ -487,8 +487,6 @@ def get_initial_estimate(num_states):
 
     state_vector = my_starting_position
     my_name = rospy.get_param("~my_name")
-    blue_team_names = rospy.get_param("~blue_team_names")
-    blue_team_positions = rospy.get_param("~blue_team_positions")
     red_team_names = rospy.get_param("~red_team_names")
 
     next_index_unc = 1
@@ -523,7 +521,7 @@ def get_initial_estimate(num_states):
     
     return state_vector, uncertainty
 
-def get_process_noise(num_states):
+def get_process_noise(num_states, blue_team_names):
     Q = np.zeros((num_states, num_states))
     ownship_Q = _dict2arr(rospy.get_param("~process_noise/ownship"))
     blueteam_Q = _dict2arr(rospy.get_param("~process_noise/blueteam"))
@@ -534,7 +532,6 @@ def get_process_noise(num_states):
     Q += np.eye(num_states) * Q_vec
 
     my_name = rospy.get_param("~my_name")
-    blue_team_names = rospy.get_param("~blue_team_names")
     red_team_names = rospy.get_param("~red_team_names")
 
     next_index = 1
@@ -565,14 +562,29 @@ if __name__ == "__main__":
     my_name = rospy.get_param("~my_name")
     update_rate = rospy.get_param("~update_rate")
     delta_tiers = rospy.get_param("~delta_tiers")
-    asset2id = get_indices_from_asset_names()
+    blue_team_names = rospy.get_param("~blue_team_names")
+    blue_team_positions = rospy.get_param("~blue_team_positions")
+
+    # Don't track surface if it isn't this agent
+    if my_name != "surface":
+        ind = blue_team_names.index("surface")
+        if ind >= 0:
+            blue_team_names.pop(ind)
+            blue_team_positions.pop(ind)
+
+
+    asset2id = get_indices_from_asset_names(blue_team_names)
     delta_codebook_table = get_delta_codebook_table()
     buffer_size = rospy.get_param("~buffer_space/capacity")
     meas_space_table = get_meas_space_table()
     missed_meas_tolerance_table = get_missed_meas_tolerance_table()
-    num_assets = len(asset2id) - 1 # subtract surface
-    x0, P0 = get_initial_estimate(num_assets * NUM_OWNSHIP_STATES)
-    Q = get_process_noise(num_assets * NUM_OWNSHIP_STATES)
+    if my_name != "surface":
+        num_assets = len(asset2id) - 1 # subtract surface
+    else:
+        num_assets = len(asset2id)
+    x0, P0 = get_initial_estimate(num_assets * NUM_OWNSHIP_STATES, blue_team_names, blue_team_positions)
+    Q = get_process_noise(num_assets * NUM_OWNSHIP_STATES, blue_team_names)
+    rospy.logwarn("{}, {}, {}, {}".format(my_name, x0.shape, P0.shape, Q.shape))
     default_meas_variance = get_default_meas_variance()
     use_control_input = rospy.get_param("~use_control_input")
 

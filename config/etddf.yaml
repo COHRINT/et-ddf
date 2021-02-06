@@ -8,7 +8,7 @@ delta_tiers: [1,5]
 measurement_topics:
   depth: baro
   imu_ci: None #strapdown/intersection
-  imu_est: None #strapdown/estimate
+  imu_est: strapdown/estimate
   sonar: "sonar_processing/target_list/associated" # "sonar_processing/target_list/"
 
 ### Buffer space configurations ###
