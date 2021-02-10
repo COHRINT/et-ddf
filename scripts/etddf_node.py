@@ -30,7 +30,7 @@ __email__ = "luke.barbier@colorado.edu"
 __status__ = "Development"
 __license__ = "MIT"
 __maintainer__ = "Luke Barbier"
-__version__ = "2.0"
+__version__ = "3.0"
 
 NUM_OWNSHIP_STATES = 6
 
@@ -103,8 +103,9 @@ class ETDDF_Node:
             self.control_input = None
             rospy.Subscriber("uuv_control/control_status", ControlStatus, self.control_status_callback, queue_size=1)
 
-        rospy.Subscriber(rospy.get_param("~measurement_topics/imu_est"), Odometry, self.orientation_estimate_callback, queue_size=1)
+        
         if rospy.get_param("~strapdown"):
+            rospy.Subscriber(rospy.get_param("~measurement_topics/imu_est"), Odometry, self.orientation_estimate_callback, queue_size=1)
             rospy.wait_for_message(rospy.get_param("~measurement_topics/imu_est"), Odometry)
 
         # IMU Covariance Intersection
@@ -144,6 +145,7 @@ class ETDDF_Node:
         for target in sonar_list.targets:
             # self.cuprint("Receiving sonar measurements")
             if self.last_orientation is None: # No orientation, no linearization of the sonar measurement
+                # print("no ori")
                 return
             if target.id == "detection":
                 continue
@@ -178,6 +180,7 @@ class ETDDF_Node:
             self.filter.add_meas(sonar_x)
             self.filter.add_meas(sonar_y)
             # self.filter.add_meas(sonar_z)
+            # self.cuprint("meas added")
 
     def publish_stats(self, last_update_time):
         self.statistics.seq = self.update_seq

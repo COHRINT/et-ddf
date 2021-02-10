@@ -142,11 +142,18 @@ def bytes2MeasPkg(byte_arr, transmission_time, asset_landmark_dict, global_pose)
     index = 1
     present_time = rospy.get_rostime()
     while index < len(byte_arr):
+        msg_global_pose = global_pose
         header = byte_arr[index]
         meas_type = HEADERS.keys()[HEADERS.values().index( (header & (15 << 4)) >> 4 )]
         if meas_type == "empty":
             break
         header2 = header & 15
+        measured_agent = ""
+        for mwa in MEASUREMENTS_WITH_AGENTS:
+            if mwa in meas_type:
+                measured_agent = asset_landmark_dict.keys()[asset_landmark_dict.values().index( header2 )]
+                break
+
         index += 1
 
         timestamp = rospy.Time( (present_time.secs - transmission_time) - byte_arr[index] )
@@ -163,6 +170,8 @@ def bytes2MeasPkg(byte_arr, transmission_time, asset_landmark_dict, global_pose)
             elif meas_type in ["sonar_x", "sonar_y"]:
                 bin_per_meter = 255 / 20.0
                 data = data_bin / bin_per_meter - 10.0
+                if "landmark" not in measured_agent: # Sonar measurements between agents have global_pose as empty list
+                    msg_global_pose = []
             elif meas_type == "modem_range":
                 bin_per_meter = 255 / 20.0
                 data = data_bin / bin_per_meter
@@ -170,21 +179,14 @@ def bytes2MeasPkg(byte_arr, transmission_time, asset_landmark_dict, global_pose)
                 bin_per_meter = 255 / 360.0
                 data = data_bin / bin_per_meter
                 data = np.mod( data + 180, 360) - 180 # -180 to 180
-            measured_agent = ""
-            for mwa in MEASUREMENTS_WITH_AGENTS:
-                if mwa in meas_type:
-                    measured_agent = asset_landmark_dict.keys()[asset_landmark_dict.values().index( header2 )]
-                    break
-            m = Measurement(meas_type, timestamp, mp.src_asset, measured_agent, data, 0.0, global_pose)
+            
+            m = Measurement(meas_type, timestamp, mp.src_asset, measured_agent, data, 0.0, msg_global_pose)
             mp.measurements.append(m)
             index += 1
         else:
-            measured_agent = ""
-            for mwa in MEASUREMENTS_WITH_AGENTS:
-                if mwa in meas_type:
-                    measured_agent = asset_landmark_dict.keys()[asset_landmark_dict.values().index( header2 )]
-                    break
-            m = Measurement(meas_type, timestamp, mp.src_asset, measured_agent, 0.0, 0.0, global_pose)
+            if "sonar" in meas_type and "landmark" not in meas_type:
+                msg_global_pose = []
+            m = Measurement(meas_type, timestamp, mp.src_asset, measured_agent, 0.0, 0.0, msg_global_pose)
             mp.measurements.append(m)
 
     return mp

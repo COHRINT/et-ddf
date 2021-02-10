@@ -97,7 +97,7 @@ class DeltaTier:
         if ros_meas.measured_asset in self.asset2id.keys():
             measured_id = self.asset2id[ros_meas.measured_asset]
         elif ros_meas.measured_asset == "":
-            measured_id = -1
+            measured_id = -1 #self.asset2id["surface"]
         else:
             rospy.logerr("ETDDF doesn't recognize: " + ros_meas.measured_asset + " ... ignoring")
             return
@@ -153,7 +153,9 @@ class DeltaTier:
 
         # Update main filter states
         if Pcc.shape != self.main_filter.filter.P.shape:
-            self.psci(x_prior, P_prior, c_bar, Pcc)
+            # self.psci(x_prior, P_prior, c_bar, Pcc)
+            self.main_filter.filter.x_hat[begin_ind:end_ind] = c_bar
+            self.main_filter.filter.P[begin_ind:end_ind,begin_ind:end_ind] = P_prior
         else:
             self.main_filter.filter.x_hat = c_bar
             self.main_filter.filter.P = Pcc
@@ -215,6 +217,11 @@ class DeltaTier:
         meas_types = []
         for meas in shared_buffer: # Fuse all of the measurements now
             if (meas.meas_type not in meas_types and "bookstart" not in meas.meas_type) and meas.meas_type != "final_time":
+                # src_id = self.asset2id[ros_meas.src_asset]
+                # measured_id = self.asset2id[ros_meas.measured_asset]
+
+                print("Fusing meas:")
+                print(meas)
                 self.add_meas(meas, force_fuse=True)
                 meas_types.append(meas.meas_type)
 

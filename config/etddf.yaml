@@ -7,7 +7,7 @@ delta_tiers: [1,5]
 ## Measurement topics
 measurement_topics:
   depth: baro
-  imu_ci: None #strapdown/intersection
+  imu_ci: strapdown/intersection
   imu_est: strapdown/estimate
   sonar: "sonar_processing/target_list/associated" # "sonar_processing/target_list/"
 
@@ -72,8 +72,8 @@ initial_uncertainty:
     z_vel: 0.01
   # asset positions not provided in roslaunch, including redteam
   unknown_starting_position: 
-    x: 1000
-    y: 1000
+    x: 10000
+    y: 10000
     z: 8
     x_vel: 1.0
     y_vel: 1.0
