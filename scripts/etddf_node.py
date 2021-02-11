@@ -57,7 +57,6 @@ class ETDDF_Node:
         self.default_meas_variance = default_meas_variance
         self.my_name = my_name
         self.landmark_dict = rospy.get_param("~landmarks", {})
-        print(self.landmark_dict)
 
         self.cuprint = CUPrint(rospy.get_name())
         

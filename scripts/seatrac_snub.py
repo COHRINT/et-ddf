@@ -41,8 +41,9 @@ if __name__ == "__main__":
 
     # [comms_type, time_taken]
     # comm_scheme = [["broadcast_dory",4]]
-    # comm_scheme = [["ping_surface_to_dory", 3], ["ping_surface_to_guppy", 3], ["broadcast_surface",3], ["broadcast_dory",4], ["broadcast_guppy",4]]
-    comm_scheme = [["broadcast_dory",10], ["broadcast_guppy",4]]
+    comm_scheme = [["ping_surface_to_dory", 3], ["ping_surface_to_guppy", 3], ["broadcast_surface",3], ["broadcast_dory",4]]#, ["broadcast_guppy",4]]
+    # comm_scheme = [["ping_surface_to_dory", 3], ["ping_surface_to_guppy", 3], ["broadcast_surface",3]]
+    # comm_scheme = [["broadcast_dory",10], ["broadcast_guppy",4]]
 
     asset_landmark_dict = {"surface" : 0, "dory":1, "guppy" : 2, "red_actor_5" : 3}
 

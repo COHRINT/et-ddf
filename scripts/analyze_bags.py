@@ -10,11 +10,18 @@ from matplotlib.collections import PatchCollection
 import tf
 
 # ASSET_NAME = "bluerov2_3"
-ASSET_NAME = "bluerov2_4"
+# ASSET_NAME = "bluerov2_4"
 # MEASURED_NAME = ASSET_NAME
 # MEASURED_NAME = "bluerov2_4"
 # MEASURED_NAME = "bluerov2_3"
-MEASURED_NAME = "red_actor_5"
+# MEASURED_NAME = "red_actor_5"
+
+# ASSET_NAME = "dory"
+ASSET_NAME = "guppy"
+# MEASURED_NAME = ASSET_NAME
+MEASURED_NAME = "dory"
+# MEASURED_NAME = "guppy"
+# MEASURED_NAME = "red_actor_5"
 
 
 def get_plot_labels(num_states, num_ownship_states, asset_id):
