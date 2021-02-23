@@ -1,3 +1,5 @@
+# This repository has been archived
+The latest version is COHRIRNT/etddf_minau and COHRINT/etddf
 # Event-triggered Decentralized Data Fusion
 
 This repository provides a library of Python and ROS code implementing event-trigged decentralized data fusion (ET-DDF) algorithms, which enable decentralized cooperative localization and tracking at significantly reduced communication overheads. See [[1]](#References) and [[2]](#References) for more information about the algorithms themselves.
